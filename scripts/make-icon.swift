@@ -478,11 +478,12 @@ func fanCard(_ ctx: CGContext, angle: Double, suit: String, color: UInt32) {
 }
 
 // MARK: - 案（--candidates で書き出す。採用が決まったら、採用した案だけを残す）
-// 番号は配列の順（01〜）。名前は採用したときに代替アイコンの名前（AppIcon-<名前>）にする前提の英語
+// キーは案の番号（一覧の画像と選定のやり取りで使う。案を消しても他の案の番号は変えない）。
+// 名前は採用したときに代替アイコンの名前（AppIcon-<名前>）にする前提の英語
 
-let candidates: [IconDesign] = [
-    // 01 ルーレット盤: ネオン
-    IconDesign(name: "Neon", fill: .solid(0x0B0614), groups: [
+let candidates: [Int: IconDesign] = [
+    // ルーレット盤: ネオン
+    1: IconDesign(name: "Neon", fill: .solid(0x0B0614), groups: [
         IconGroup(layers: [IconLayer(name: "needle") { ctx in
             let needle = poly([P(512, 790), P(464, 920), P(560, 920)])
             neon(ctx, needle, 0xFF3EA5, width: 10)
@@ -505,8 +506,8 @@ let candidates: [IconDesign] = [
             neon(ctx, circle(center, 392), 0xB46BFF, width: 14)
         }]),
     ]),
-    // 02 ルーレット盤: パステル
-    IconDesign(name: "Pastel", fill: .solid(0xFFF4E8), groups: [
+    // ルーレット盤: パステル
+    2: IconDesign(name: "Pastel", fill: .solid(0xFFF4E8), groups: [
         IconGroup(layers: [IconLayer(name: "pin") { ctx in
             fill(ctx, circle(P(512, 900), 50), 0xFF6F7D)
             fill(ctx, poly([P(468, 880), P(556, 880), P(512, 790)]), 0xFF6F7D)
@@ -530,8 +531,8 @@ let candidates: [IconDesign] = [
             stroke(ctx, circle(center, 410), 0xF3D3BA, width: 12)
         }]),
     ]),
-    // 03 ルーレット盤: カジノ
-    IconDesign(name: "Casino", fill: .gradient(top: 0x1E7A46, bottom: 0x0B3D22), groups: [
+    // ルーレット盤: カジノ
+    3: IconDesign(name: "Casino", fill: .gradient(top: 0x1E7A46, bottom: 0x0B3D22), groups: [
         IconGroup(layers: [IconLayer(name: "ball") { ctx in
             let c = polar(center, 305, 0)
             fillRadial(ctx, circle(c, 24), inner: 0xFFFFFF, outer: 0xBDBDBD, focus: P(c.x - 8, c.y + 8), radius: 34)
@@ -567,8 +568,8 @@ let candidates: [IconDesign] = [
             fill(ctx, circle(center, 372), 0x2B1408)
         }]),
     ]),
-    // 04 ルーレット盤: ボードゲームのスピナー
-    IconDesign(name: "Spinner", fill: .solid(0xFDF6E3), groups: [
+    // ルーレット盤: ボードゲームのスピナー
+    4: IconDesign(name: "Spinner", fill: .solid(0xFDF6E3), groups: [
         IconGroup(layers: [IconLayer(name: "cap") { ctx in
             fill(ctx, circle(center, 54), 0xFFFFFF)
             stroke(ctx, circle(center, 54), 0x073B4C, width: 14)
@@ -594,8 +595,8 @@ let candidates: [IconDesign] = [
             stroke(ctx, circle(center, 400), 0x073B4C, width: 16)
         }]),
     ]),
-    // 05 ルーレット盤: 大きな盤の上半分
-    IconDesign(name: "BigWheel", fill: .gradient(top: 0x1B1464, bottom: 0x5F27CD), groups: [
+    // ルーレット盤: 大きな盤の上半分
+    5: IconDesign(name: "BigWheel", fill: .gradient(top: 0x1B1464, bottom: 0x5F27CD), groups: [
         IconGroup(layers: [IconLayer(name: "pointer") { ctx in
             let pointer = poly([P(452, 880), P(572, 880), P(512, 660)])
             stroke(ctx, pointer, 0xFFFFFF, width: 28)
@@ -628,15 +629,15 @@ let candidates: [IconDesign] = [
             },
         ]),
     ]),
-    // 06 抽象図形: 回る弧
-    IconDesign(name: "Arcs", fill: .gradient(top: 0x1A1446, bottom: 0x3A2C8C), groups: [
+    // 抽象図形: 回る弧
+    6: IconDesign(name: "Arcs", fill: .gradient(top: 0x1A1446, bottom: 0x3A2C8C), groups: [
         IconGroup(layers: [IconLayer(name: "dot") { ctx in fill(ctx, circle(center, 50), 0xFFFFFF) }]),
         IconGroup(layers: [IconLayer(name: "inner") { ctx in stroke(ctx, arc(center, 150, from: 110, to: 380), 0x4ECDC4, width: 80) }]),
         IconGroup(layers: [IconLayer(name: "middle") { ctx in stroke(ctx, arc(center, 260, from: 20, to: 290), 0xFFC857, width: 80) }]),
         IconGroup(layers: [IconLayer(name: "outer") { ctx in stroke(ctx, arc(center, 370, from: 200, to: 470), 0xFF6F61, width: 80) }]),
     ]),
-    // 07 抽象図形: 1 切れを引き出したパイ
-    IconDesign(name: "Pie", fill: .solid(0x1F2A44), groups: [
+    // 抽象図形: 1 切れを引き出したパイ
+    7: IconDesign(name: "Pie", fill: .solid(0x1F2A44), groups: [
         IconGroup(layers: [IconLayer(name: "picked") { ctx in
             fill(ctx, sector(P(512, 560), 350, from: -36, to: 36), 0xFFB703)
         }]),
@@ -652,14 +653,14 @@ let candidates: [IconDesign] = [
             },
         ]),
     ]),
-    // 08 抽象図形: 重なる円（板を透かして重なりを見せる）
-    IconDesign(name: "Circles", fill: .solid(0x111827), groups: [
+    // 抽象図形: 重なる円（板を透かして重なりを見せる）
+    8: IconDesign(name: "Circles", fill: .solid(0x111827), groups: [
         IconGroup(translucency: 0.35, layers: [IconLayer(name: "red") { ctx in fill(ctx, circle(polar(P(512, 490), 150, 0), 240), 0xFF4D6D) }]),
         IconGroup(translucency: 0.35, layers: [IconLayer(name: "yellow") { ctx in fill(ctx, circle(polar(P(512, 490), 150, 120), 240), 0xFFD60A) }]),
         IconGroup(translucency: 0.35, layers: [IconLayer(name: "blue") { ctx in fill(ctx, circle(polar(P(512, 490), 150, 240), 240), 0x3A86FF) }]),
     ]),
-    // 09 抽象図形: ひまわりの種のように並ぶ点
-    IconDesign(name: "Spiral", fill: .gradient(top: 0x0F2027, bottom: 0x2C5364), groups: [
+    // 抽象図形: ひまわりの種のように並ぶ点
+    9: IconDesign(name: "Spiral", fill: .gradient(top: 0x0F2027, bottom: 0x2C5364), groups: [
         IconGroup(layers: [IconLayer(name: "core") { ctx in fill(ctx, circle(center, 34), 0xFFFFFF) }]),
         IconGroup(layers: [IconLayer(name: "dots") { ctx in
             for n in 1..<240 {
@@ -668,8 +669,8 @@ let candidates: [IconDesign] = [
             }
         }]),
     ]),
-    // 10 サイコロ: 立体
-    IconDesign(name: "Cube", fill: .gradient(top: 0xF25C54, bottom: 0xB0122A), groups: [
+    // サイコロ: 立体
+    10: IconDesign(name: "Cube", fill: .gradient(top: 0xF25C54, bottom: 0xB0122A), groups: [
         IconGroup(layers: [IconLayer(name: "pips") { ctx in
             let near = P(512, 512), a = P(260, 150), b = P(-260, 150), d = P(0, -300)
             fill(ctx, facePip(near, a, b, u: 0.5, v: 0.5, r: 0.17), 0xD62828)
@@ -685,8 +686,8 @@ let candidates: [IconDesign] = [
             fill(ctx, poly([near, near + b, near + b + d, near + d]), 0xE9E9EF)
         }]),
     ]),
-    // 11 サイコロ: ふたつ
-    IconDesign(name: "Dice", fill: .gradient(top: 0x274472, bottom: 0x14213D), groups: [
+    // サイコロ: ふたつ
+    11: IconDesign(name: "Dice", fill: .gradient(top: 0x274472, bottom: 0x14213D), groups: [
         IconGroup(layers: [
             IconLayer(name: "front-pips") { ctx in
                 diePips(ctx, P(600, 420), size: 360, angle: 12, count: 5) { $0 == 4 ? 0xE63946 : 0x1D3557 }
@@ -700,8 +701,8 @@ let candidates: [IconDesign] = [
             IconLayer(name: "back") { ctx in dieBody(ctx, P(420, 600), size: 340, angle: -16, color: 0xF1FAEE) },
         ]),
     ]),
-    // 12 サイコロ: 転がる
-    IconDesign(name: "Roll", fill: .solid(0xFFD23F), groups: [
+    // サイコロ: 転がる
+    12: IconDesign(name: "Roll", fill: .solid(0xFFD23F), groups: [
         IconGroup(layers: [
             IconLayer(name: "pips") { ctx in
                 diePips(ctx, P(580, 500), size: 420, angle: 22, count: 6) { _ in 0x2B2D42 }
@@ -714,8 +715,8 @@ let candidates: [IconDesign] = [
             stroke(ctx, line(P(150, 360), P(290, 360)), 0xE8A317, width: 40)
         }]),
     ]),
-    // 13 サイコロ: 20 面
-    IconDesign(name: "D20", fill: .gradient(top: 0x5A189A, bottom: 0x240046), groups: [
+    // サイコロ: 20 面
+    13: IconDesign(name: "D20", fill: .gradient(top: 0x5A189A, bottom: 0x240046), groups: [
         IconGroup(layers: [IconLayer(name: "number") { ctx in
             text(ctx, "20", font: "AvenirNext-Heavy", size: 130, color: 0xFFFFFF, at: P(512, 500))
         }]),
@@ -732,8 +733,8 @@ let candidates: [IconDesign] = [
             for (points, _) in facets { stroke(ctx, poly(points), 0xE0AAFF, width: 7) }
         }]),
     ]),
-    // 14 くじ: おみくじ
-    IconDesign(name: "Omikuji", fill: .gradient(top: 0xFFF3E0, bottom: 0xFFD8A8), groups: [
+    // くじ: おみくじ
+    14: IconDesign(name: "Omikuji", fill: .gradient(top: 0xFFF3E0, bottom: 0xFFD8A8), groups: [
         IconGroup(layers: [IconLayer(name: "stick") { ctx in
             rotated(ctx, around: P(512, 712), 18) {
                 fill(ctx, box(P(512, 842), 40, 260, radius: 10), 0xF2D7A6)
@@ -756,8 +757,8 @@ let candidates: [IconDesign] = [
             },
         ]),
     ]),
-    // 15 くじ: 福引き（ガラポン）
-    IconDesign(name: "Garapon", fill: .gradient(top: 0xFFF1C1, bottom: 0xFFC94D), groups: [
+    // くじ: 福引き（ガラポン）
+    15: IconDesign(name: "Garapon", fill: .gradient(top: 0xFFF1C1, bottom: 0xFFC94D), groups: [
         IconGroup(layers: [IconLayer(name: "ball") { ctx in
             fillRadial(ctx, circle(P(700, 300), 50), inner: 0xFFF6C2, outer: 0xF4A100, focus: P(684, 318), radius: 64)
         }]),
@@ -783,8 +784,8 @@ let candidates: [IconDesign] = [
             fill(ctx, box(P(730, 215), 220, 56, radius: 20), 0x8D5524)
         }]),
     ]),
-    // 16 くじ: あみだくじ
-    IconDesign(name: "Amida", fill: .solid(0xEDF2F4), groups: [
+    // くじ: あみだくじ
+    16: IconDesign(name: "Amida", fill: .solid(0xEDF2F4), groups: [
         IconGroup(layers: [IconLayer(name: "path") { ctx in
             let route = polyline([P(257, 800), P(257, 690), P(427, 690), P(427, 560), P(597, 560), P(597, 380), P(767, 380), P(767, 230)])
             stroke(ctx, route, 0xEF233C, width: 36)
@@ -797,8 +798,8 @@ let candidates: [IconDesign] = [
             for (x0, x1, y) in rungs { stroke(ctx, line(P(x0, y), P(x1, y)), 0x2B2D42, width: 26) }
         }]),
     ]),
-    // 17 くじ: 抽選券
-    IconDesign(name: "Ticket", fill: .gradient(top: 0x06D6A0, bottom: 0x118AB2), groups: [
+    // くじ: 抽選券
+    17: IconDesign(name: "Ticket", fill: .gradient(top: 0x06D6A0, bottom: 0x118AB2), groups: [
         IconGroup(layers: [IconLayer(name: "front") { ctx in
             ticket(ctx, P(550, 420), angle: -12, color: 0xFFD166, perforation: 0xE0A800, mark: 0xEF476F)
         }]),
@@ -806,8 +807,8 @@ let candidates: [IconDesign] = [
             ticket(ctx, P(470, 610), angle: 14, color: 0xEF476F, perforation: 0xF7A1B5, mark: 0xFFFFFF)
         }]),
     ]),
-    // 18 くじ: ガチャのカプセル
-    IconDesign(name: "Capsule", fill: .gradient(top: 0xC3F0FF, bottom: 0x7FD3F5), groups: [
+    // くじ: ガチャのカプセル
+    18: IconDesign(name: "Capsule", fill: .gradient(top: 0xC3F0FF, bottom: 0x7FD3F5), groups: [
         IconGroup(layers: [IconLayer(name: "big-top") { ctx in
             capsuleHalf(ctx, P(540, 470), 300, angle: -20, top: true, color: 0xFF5C8A)
             rotated(ctx, around: P(540, 470), -20) { fill(ctx, ellipse(P(420, 640), 130, 70), 0xFFFFFF, alpha: 0.5) }
@@ -824,14 +825,14 @@ let candidates: [IconDesign] = [
             },
         ]),
     ]),
-    // 19 トランプ: 扇に開く
-    IconDesign(name: "Fan", fill: .gradient(top: 0x2D6A4F, bottom: 0x1B4332), groups: [
+    // トランプ: 扇に開く
+    19: IconDesign(name: "Fan", fill: .gradient(top: 0x2D6A4F, bottom: 0x1B4332), groups: [
         IconGroup(layers: [IconLayer(name: "spade") { ctx in fanCard(ctx, angle: 0, suit: "♠", color: 0x1B1B1B) }]),
         IconGroup(layers: [IconLayer(name: "diamond") { ctx in fanCard(ctx, angle: 20, suit: "♦", color: 0xD62828) }]),
         IconGroup(layers: [IconLayer(name: "heart") { ctx in fanCard(ctx, angle: -20, suit: "♥", color: 0xD62828) }]),
     ]),
-    // 20 トランプ: スペードのエース
-    IconDesign(name: "Ace", fill: .gradient(top: 0xAE2012, bottom: 0x6A040F), groups: [
+    // トランプ: スペードのエース
+    20: IconDesign(name: "Ace", fill: .gradient(top: 0xAE2012, bottom: 0x6A040F), groups: [
         IconGroup(layers: [IconLayer(name: "marks") { ctx in
             rotated(ctx, around: center, -8) {
                 text(ctx, "♠", font: "HiraginoSans-W6", size: 360, color: 0x111111, at: P(512, 500))
@@ -845,8 +846,8 @@ let candidates: [IconDesign] = [
             rotated(ctx, around: center, -8) { fill(ctx, box(center, 500, 700, radius: 50), 0xFFFFFF) }
         }]),
     ]),
-    // 21 トランプ: 裏と表
-    IconDesign(name: "Cards", fill: .solid(0x14213D), groups: [
+    // トランプ: 裏と表
+    21: IconDesign(name: "Cards", fill: .solid(0x14213D), groups: [
         IconGroup(layers: [
             IconLayer(name: "front-star") { ctx in
                 rotated(ctx, around: P(610, 470), 10) { fill(ctx, star(P(610, 470), outer: 150, inner: 62), 0xFCA311) }
@@ -878,8 +879,8 @@ let candidates: [IconDesign] = [
             },
         ]),
     ]),
-    // 22 ダイヤル・メーター: メーター
-    IconDesign(name: "Gauge", fill: .gradient(top: 0x1B263B, bottom: 0x0D1B2A), groups: [
+    // ダイヤル・メーター: メーター
+    22: IconDesign(name: "Gauge", fill: .gradient(top: 0x1B263B, bottom: 0x0D1B2A), groups: [
         IconGroup(layers: [IconLayer(name: "needle") { ctx in
             let c = P(512, 470)
             rotated(ctx, around: c, 55) { fill(ctx, poly([P(490, 410), P(534, 410), P(517, 770), P(507, 770)]), 0xF8F9FA) }
@@ -902,8 +903,8 @@ let candidates: [IconDesign] = [
             }
         }]),
     ]),
-    // 23 ダイヤル・メーター: 金庫のダイヤル
-    IconDesign(name: "Safe", fill: .gradient(top: 0xC9D1D9, bottom: 0x6C757D), groups: [
+    // ダイヤル・メーター: 金庫のダイヤル
+    23: IconDesign(name: "Safe", fill: .gradient(top: 0xC9D1D9, bottom: 0x6C757D), groups: [
         IconGroup(layers: [IconLayer(name: "marker") { ctx in
             fill(ctx, poly([P(512, 860), P(478, 930), P(546, 930)]), 0xE63946)
         }]),
@@ -928,8 +929,8 @@ let candidates: [IconDesign] = [
             for k in 0..<60 { stroke(ctx, line(polar(center, 362, Double(k) * 6), polar(center, 396, Double(k) * 6)), 0x6C757D, width: 7) }
         }]),
     ]),
-    // 24 ダイヤル・メーター: スロット
-    IconDesign(name: "Slot", fill: .gradient(top: 0x7B2CBF, bottom: 0x3C096C), groups: [
+    // ダイヤル・メーター: スロット
+    24: IconDesign(name: "Slot", fill: .gradient(top: 0x7B2CBF, bottom: 0x3C096C), groups: [
         IconGroup(layers: [IconLayer(name: "sevens") { ctx in
             for x in [277.0, 512, 747] { text(ctx, "7", font: "AvenirNext-Heavy", size: 210, color: 0xD00000, at: P(x, 512)) }
         }]),
@@ -941,8 +942,8 @@ let candidates: [IconDesign] = [
             fill(ctx, box(center, 760, 380, radius: 46), 0x9D0208)
         }]),
     ]),
-    // 25 文字・ロゴ: D の中に盤
-    IconDesign(name: "Monogram", fill: .gradient(top: 0xFF9966, bottom: 0xFF5E62), groups: [
+    // 文字・ロゴ: D の中に盤
+    25: IconDesign(name: "Monogram", fill: .gradient(top: 0xFF9966, bottom: 0xFF5E62), groups: [
         IconGroup(layers: [IconLayer(name: "wheel") { ctx in
             let c = P(528, 512)
             let colors: [UInt32] = [0xFF5E62, 0xFFD166, 0x06D6A0, 0x118AB2, 0x8338EC, 0xFF9F1C]
@@ -968,15 +969,15 @@ let candidates: [IconDesign] = [
             clear(ctx, counter)
         }]),
     ]),
-    // 26 文字・ロゴ: はてな
-    IconDesign(name: "Question", fill: .gradient(top: 0x4361EE, bottom: 0x3A0CA3), groups: [
+    // 文字・ロゴ: はてな
+    26: IconDesign(name: "Question", fill: .gradient(top: 0x4361EE, bottom: 0x3A0CA3), groups: [
         IconGroup(layers: [IconLayer(name: "mark") { ctx in
             text(ctx, "?", font: "AvenirNext-Heavy", size: 520, color: 0x3A0CA3, at: center)
         }]),
         IconGroup(layers: [IconLayer(name: "circle") { ctx in fill(ctx, circle(center, 340), 0xFFD60A) }]),
     ]),
-    // 27 文字・ロゴ: 「運」の印
-    IconDesign(name: "Seal", fill: .solid(0xFAF3E3), groups: [
+    // 文字・ロゴ: 「運」の印
+    27: IconDesign(name: "Seal", fill: .solid(0xFAF3E3), groups: [
         IconGroup(layers: [IconLayer(name: "kanji") { ctx in
             text(ctx, "運", font: "HiraMinProN-W6", size: 400, color: 0xFAF3E3, at: center)
         }]),
@@ -985,8 +986,8 @@ let candidates: [IconDesign] = [
             stroke(ctx, circle(center, 310), 0xFAF3E3, width: 16)
         }]),
     ]),
-    // 28 文字・ロゴ: 針と輪
-    IconDesign(name: "Needle", fill: .solid(0xF8F9FA), groups: [
+    // 文字・ロゴ: 針と輪
+    28: IconDesign(name: "Needle", fill: .solid(0xF8F9FA), groups: [
         IconGroup(layers: [IconLayer(name: "needle") { ctx in
             let needle = poly([P(382, 900), P(642, 900), P(512, 560)])
             stroke(ctx, needle, 0xFF4E63, width: 40)
@@ -995,8 +996,8 @@ let candidates: [IconDesign] = [
         IconGroup(layers: [IconLayer(name: "dot") { ctx in fill(ctx, circle(P(512, 470), 46), 0x2B2D42) }]),
         IconGroup(layers: [IconLayer(name: "ring") { ctx in stroke(ctx, circle(P(512, 470), 330), 0x2B2D42, width: 64) }]),
     ]),
-    // 29 的・王冠: ダーツ
-    IconDesign(name: "Darts", fill: .gradient(top: 0x3D405B, bottom: 0x22223B), groups: [
+    // 的・王冠: ダーツ
+    29: IconDesign(name: "Darts", fill: .gradient(top: 0x3D405B, bottom: 0x22223B), groups: [
         IconGroup(layers: [IconLayer(name: "dart") { ctx in
             rotated(ctx, around: center, 45) {
                 fill(ctx, poly([P(512, 512), P(505, 560), P(519, 560)]), 0xCED4DA)
@@ -1022,14 +1023,14 @@ let candidates: [IconDesign] = [
             for i in 0..<20 { fill(ctx, circle(polar(center, 372, Double(i) * 18), 7), 0xE9ECEF) }
         }]),
     ]),
-    // 30 的・王冠: 的
-    IconDesign(name: "Target", fill: .solid(0xF1FAEE), groups: [
+    // 的・王冠: 的
+    30: IconDesign(name: "Target", fill: .solid(0xF1FAEE), groups: [
         IconGroup(layers: [IconLayer(name: "center") { ctx in fill(ctx, circle(center, 80), 0xE63946) }]),
         IconGroup(layers: [IconLayer(name: "middle") { ctx in fill(ctx, ring(center, outer: 240, inner: 160), 0xE63946, evenOdd: true) }]),
         IconGroup(layers: [IconLayer(name: "outer") { ctx in fill(ctx, ring(center, outer: 400, inner: 320), 0xE63946, evenOdd: true) }]),
     ]),
-    // 31 的・王冠: 王冠
-    IconDesign(name: "Crown", fill: .gradient(top: 0x0F4C5C, bottom: 0x07262E), groups: [
+    // 的・王冠: 王冠
+    31: IconDesign(name: "Crown", fill: .gradient(top: 0x0F4C5C, bottom: 0x07262E), groups: [
         IconGroup(layers: [IconLayer(name: "jewels") { ctx in
             fill(ctx, circle(P(352, 335), 30), 0xE63946)
             fill(ctx, circle(P(512, 335), 30), 0x4CC9F0)
@@ -1044,8 +1045,8 @@ let candidates: [IconDesign] = [
             fillGradient(ctx, box(P(512, 335), 540, 110, radius: 24), top: 0xF4A261, bottom: 0xE76F51)
         }]),
     ]),
-    // 32 的・王冠: メダル
-    IconDesign(name: "Medal", fill: .gradient(top: 0x1C2541, bottom: 0x0B132B), groups: [
+    // 的・王冠: メダル
+    32: IconDesign(name: "Medal", fill: .gradient(top: 0x1C2541, bottom: 0x0B132B), groups: [
         IconGroup(layers: [IconLayer(name: "star") { ctx in
             fill(ctx, star(P(512, 400), outer: 120, inner: 50), 0xFFF3B0)
         }]),
@@ -1090,8 +1091,8 @@ case (2, "--candidates"):
         try fm.createDirectory(at: output, withIntermediateDirectories: true)
     }
     try writeIcon(appIcon, into: output, packageName: "00-\(appIcon.name)")
-    for (i, design) in candidates.enumerated() {
-        try writeIcon(design, into: output, packageName: String(format: "%02d-%@", i + 1, design.name))
+    for (number, design) in candidates.sorted(by: { $0.key < $1.key }) {
+        try writeIcon(design, into: output, packageName: String(format: "%02d-%@", number, design.name))
     }
 case (1, let path?) where !path.hasPrefix("-"):
     // 打ち間違いで .icon や .xcassets の中に 2 つ目の AppIcon.icon を作らないよう、既存の普通のディレクトリだけを受け付ける
