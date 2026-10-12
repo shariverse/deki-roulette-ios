@@ -12,3 +12,10 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - `icon.json` の `fill` の `linear-gradient` は、`orientation` の `y` が 0 で上、1 で下（2026-10-12）
 - `ictool` の `ClearLight` / `ClearDark` の書き出しは、壁紙が透けない不透明な灰色の板になる。一覧の背景に色を付けても見えるのは板の外だけ（2026-10-12）
 - `ictool` の書き出しは 1 回 0.3 秒ほどかかる。33 案 × 外観 4 つ + 小さいサイズ 2 つで 1 分ほど（2026-10-12）
+
+## 代替アイコン
+
+- `UIApplication.setAlternateIconName(_:)`（async 版）は、iOS 26.5 と 18.6 の Simulator で「アイコンを変更しました」のアラートの OK を押すまで返らない。アイコンはアラートが出た時点で変わっている（2026-10-12）
+- Simulator で代替アイコンの切り替えを試すには、テストのホストアプリ（`DekiRouletteTests` の `TEST_HOST` は `DekiRoulette.app`）から `setAlternateIconName` を呼ぶ。
+  `TEST_RUNNER_<名前>=値 xcodebuild test …` で、テストの `ProcessInfo.processInfo.environment["<名前>"]` に値を渡せる。上のとおり返らないので、ホーム画面を撮ったらテストを止める（2026-10-12）
+- ビルドした `Info.plist` の `CFBundleAlternateIcons` には、代替アイコンごとに `CFBundleIconName` だけが入る（`CFBundleIconFiles` の PNG は既定のアイコンの分しか `.app` に書き出されない）（2026-10-12）
