@@ -43,6 +43,18 @@ struct AppIconChoiceTests {
         #expect(primary["CFBundleIconName"] as? String == AppIconChoice.standard.rawValue)
     }
 
+    /// スクリプトが書き出した `.icon`（`DekiRoulette/Resources`）と候補の一覧の食い違いを見つける。
+    /// スクリプトの `alternateIcons` にだけ足して `project.yml` や一覧に足し忘れた場合は、Info.plist のテストでは見つからない。
+    @Test func 書き出したアイコンはすべて候補にある() throws {
+        let resources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("DekiRoulette/Resources")
+        let names = try FileManager.default.contentsOfDirectory(atPath: resources.path)
+            .filter { $0.hasSuffix(".icon") }
+            .map { ($0 as NSString).deletingPathExtension }
+        #expect(Set(names) == Set(AppIconChoice.allCases.map(\.rawValue)))
+    }
+
     @Test(arguments: AppIconChoice.allCases)
     func 見本の画像がある(choice: AppIconChoice) {
         #expect(UIImage(named: choice.previewImageName) != nil)
