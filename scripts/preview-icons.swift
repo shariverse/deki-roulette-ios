@@ -21,6 +21,23 @@ let source = URL(fileURLWithPath: arguments[0], isDirectory: true)
 let output = URL(fileURLWithPath: arguments[1], isDirectory: true)
 let renders = output.appendingPathComponent("renders", isDirectory: true)
 let fm = FileManager.default
+
+/// シンボリックリンクを解決した絶対パスの要素。まだ無い末尾の要素は、あるところまで解決してから付け足す
+func resolvedComponents(_ url: URL) -> [String] {
+    var existing = url.standardizedFileURL
+    var rest: [String] = []
+    while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
+        rest.insert(existing.lastPathComponent, at: 0)
+        existing.deleteLastPathComponent()
+    }
+    return existing.resolvingSymlinksInPath().pathComponents + rest
+}
+
+// DekiRoulette/ の下に置いた画像はアプリに入るので、そこには書かない（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
+guard !resolvedComponents(output).contains(where: { $0.lowercased() == "dekiroulette" }) else {
+    FileHandle.standardError.write(Data("一覧の画像はアプリに入れないので、DekiRoulette/ の外（例: $TMPDIR）に書き出してください: \(output.path)\n".utf8))
+    exit(64)
+}
 try fm.createDirectory(at: renders, withIntermediateDirectories: true)
 
 let icons = try fm.contentsOfDirectory(atPath: source.path).filter { $0.hasSuffix(".icon") }.sorted()
