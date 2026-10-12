@@ -47,6 +47,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.basekeita.roulette
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # 代替アイコン（DekiRoulette/Resources/<名前>.icon。scripts/make-icon.swift の alternateIcons と同じ名前を空白区切りで並べる。
+        # リリースしたら名前を変えない）
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIcon-Neon AppIcon-Pastel AppIcon-Spinner AppIcon-Target
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: NO
