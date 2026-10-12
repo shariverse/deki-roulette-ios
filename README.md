@@ -80,7 +80,7 @@ iOS 26 以降は Liquid Glass の質感が付き、iOS 18 以前は Xcode がビ
 作り直すとき（既定と代替をまとめて書き出す）:
 
 ```bash
-swift scripts/make-icon.swift DekiRoulette/Resources   # DekiRoulette/Resources の AppIcon.icon と AppIcon-<名前>.icon を作り直す
+swift scripts/make-icon.swift DekiRoulette/Resources   # AppIcon.icon・AppIcon-<名前>.icon と、設定画面の見本の imageset を作り直す
 ```
 
 `.icon` の中の画像と `icon.json` はスクリプトの出力なので、手で直さない（Icon Composer で開いて調整を試すのはよいが、
@@ -95,15 +95,20 @@ swift scripts/make-icon.swift DekiRoulette/Resources   # DekiRoulette/Resources 
   --platform iOS --rendition Default --width 1024 --height 1024 --scale 1
 ```
 
+利用者は設定シートの「アプリアイコン」で選ぶ。候補の一覧は `DekiRoulette/Core/AppIconChoice.swift` で、グリッドの見本には
+スクリプトが `ictool` で書き出した `DekiRoulette/Resources/Assets.xcassets/<名前>-Preview.imageset` を使う（アイコンそのものは `UIImage(named:)` で読めない）。
+
 代替アイコンを足すとき:
 
 1. `scripts/make-icon.swift` の `alternateIcons` に `IconDesign(name: "AppIcon-<名前>", …)` を足す（案から採用するときは `candidates` から移す）
-2. `swift scripts/make-icon.swift DekiRoulette/Resources` で `DekiRoulette/Resources/AppIcon-<名前>.icon` を書き出す
+2. `swift scripts/make-icon.swift DekiRoulette/Resources` で `DekiRoulette/Resources/AppIcon-<名前>.icon` と見本の `AppIcon-<名前>-Preview.imageset` を書き出す
 3. `project.yml` の `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` に `AppIcon-<名前>` を空白区切りで足し、`xcodegen generate` を流す
+4. `AppIconChoice` に `case` を足し（`rawValue` は `AppIcon-<名前>`）、`L10n.appIconName` と `Localizable.xcstrings`（日英）に表示名を足す
 
-消すときは、`alternateIcons` と `project.yml` から名前を消し、`DekiRoulette/Resources/AppIcon-<名前>.icon` を消す（スクリプトは消さない）。
-ビルドの後、`Info.plist` の `CFBundleIcons` / `CFBundleIcons~ipad` の `CFBundleAlternateIcons` に名前が並んでいることを確かめる。
-利用者が選んだアイコンは `UIApplication.alternateIconName` に名前で残るので、リリースした代替アイコンの名前は変えない。
+消すときは、上の 4 か所から名前を消し、`DekiRoulette/Resources/AppIcon-<名前>.icon` と `Assets.xcassets/AppIcon-<名前>-Preview.imageset` を消す
+（スクリプトは消さない）。名前の食い違いは `AppIconChoiceTests` がビルドした `Info.plist`（`CFBundleIcons` / `CFBundleIcons~ipad` の
+`CFBundleAlternateIcons`）と突き合わせて見つける。利用者が選んだアイコンは `UIApplication.alternateIconName` に名前で残るので、
+リリースした代替アイコンの名前は変えない。
 
 新しいアイコンを選ぶときは、`candidates` に案を足し、`--candidates` で `<番号>-<名前>.icon` として書き出して
 （`00-` は今アプリに入っているアイコンで、見比べる用）、`scripts/preview-icons.swift` で外観ごと（Default / Dark / TintedDark / ClearLight）の
