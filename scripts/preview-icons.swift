@@ -3,7 +3,7 @@
 // 使い方: swift scripts/preview-icons.swift <.icon を並べたディレクトリ> <出力先のディレクトリ>
 //   例: dir=$(mktemp -d)
 //       swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"
-//   <番号>-<名前>.icon を名前の順に並べ、次の画像を出力先に書く（出力先は無ければ作る。DekiRoulette/ の下は受け付けない）:
+//   <番号>-<名前>.icon を名前の順に並べ、次の画像を出力先に書く（出力先は無ければ作る。リポジトリの中は受け付けない）:
 //     preview-Default.png / preview-Dark.png / preview-TintedDark.png / preview-ClearLight.png  外観ごとの一覧
 //     preview-small.png  60px と 40px で並べた一覧（小さいサイズで潰れる案が分かるように）
 import CoreGraphics
@@ -22,20 +22,38 @@ let output = URL(fileURLWithPath: arguments[1], isDirectory: true)
 let renders = output.appendingPathComponent("renders", isDirectory: true)
 let fm = FileManager.default
 
-/// シンボリックリンクを解決した絶対パスの要素。まだ無い末尾の要素は、あるところまで解決してから付け足す
-func resolvedComponents(_ url: URL) -> [String] {
-    var existing = url.standardizedFileURL
+/// 引数のパスを、シンボリックリンクと .. を OS と同じ順にたどって解決した絶対パスの要素にする。
+/// URL（相対パスのとき）や standardizedFileURL は .. を文字の上で畳むので、リンクの後の .. が実際の書き出し先と食い違う。
+/// まだ無い末尾の要素は、ある祖先を realpath で解決してから文字の上で足す
+func resolvedComponents(_ path: String) -> [String] {
+    var existing = path.hasPrefix("/") ? path : FileManager.default.currentDirectoryPath + "/" + path
     var rest: [String] = []
-    while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
-        rest.insert(existing.lastPathComponent, at: 0)
-        existing.deleteLastPathComponent()
+    while true {
+        if let resolved = realpath(existing, nil) {
+            defer { free(resolved) }
+            var components = (String(cString: resolved) as NSString).pathComponents
+            for part in rest {
+                switch part {
+                case "", ".": continue
+                case "..": if components.count > 1 { components.removeLast() }
+                default: components.append(part)
+                }
+            }
+            return components
+        }
+        rest.insert((existing as NSString).lastPathComponent, at: 0)
+        existing = (existing as NSString).deletingLastPathComponent
     }
-    return existing.resolvingSymlinksInPath().pathComponents + rest
 }
 
-// DekiRoulette/ の下に置いた画像はアプリに入るので、そこには書かない（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
-guard !resolvedComponents(output).contains(where: { $0.lowercased() == "dekiroulette" }) else {
-    FileHandle.standardError.write(Data("一覧の画像はアプリに入れないので、DekiRoulette/ の外（例: $TMPDIR）に書き出してください: \(output.path)\n".utf8))
+/// リポジトリ（project.yml がある祖先）の中か。DekiRoulette/ の下に置いたものはアプリに入り、DekiRouletteTests/ の下はテストに入る
+func isInsideRepository(_ components: [String]) -> Bool {
+    (1...components.count).contains { FileManager.default.fileExists(atPath: NSString.path(withComponents: Array(components.prefix($0)) + ["project.yml"])) }
+}
+
+// 一覧の画像はアプリに入れないので、リポジトリの中には書かない
+guard !isInsideRepository(resolvedComponents(arguments[1])) else {
+    FileHandle.standardError.write(Data("一覧の画像は、リポジトリの外（例: $TMPDIR）に書き出してください: \(output.path)\n".utf8))
     exit(64)
 }
 try fm.createDirectory(at: renders, withIntermediateDirectories: true)

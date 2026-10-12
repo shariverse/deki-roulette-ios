@@ -8,7 +8,7 @@
 //     出力先は既定のアイコンを置くディレクトリ（AppIcon.icon がある、または名前が Resources）だけを受け付ける
 //   swift scripts/make-icon.swift --candidates <出力先のディレクトリ>
 //     アイコンの案を <番号>-<名前>.icon で書き出す（00 が今の既定のアイコン、ほかは採用した案で、番号は選定のときのもの）。
-//     出力先は空のディレクトリ（無ければ作る）。案はアプリに入れないので、DekiRoulette/ の下には書き出さない。
+//     出力先は空のディレクトリ（無ければ作る）。案はアプリに入れないので、リポジトリの中には書き出さない。
 //     例: dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons"（一覧の画像は scripts/preview-icons.swift で作る）
 import CoreGraphics
 import Foundation
@@ -398,20 +398,33 @@ func fail(_ message: String) -> Never {
     exit(64)
 }
 
-/// シンボリックリンクを解決した絶対パスの要素。まだ無い末尾の要素は、あるところまで解決してから付け足す
-func resolvedComponents(_ url: URL) -> [String] {
-    var existing = url.standardizedFileURL
+/// 引数のパスを、シンボリックリンクと .. を OS と同じ順にたどって解決した絶対パスの要素にする。
+/// URL（相対パスのとき）や standardizedFileURL は .. を文字の上で畳むので、リンクの後の .. が実際の書き出し先と食い違う。
+/// まだ無い末尾の要素は、ある祖先を realpath で解決してから文字の上で足す
+func resolvedComponents(_ path: String) -> [String] {
+    var existing = path.hasPrefix("/") ? path : FileManager.default.currentDirectoryPath + "/" + path
     var rest: [String] = []
-    while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
-        rest.insert(existing.lastPathComponent, at: 0)
-        existing.deleteLastPathComponent()
+    while true {
+        if let resolved = realpath(existing, nil) {
+            defer { free(resolved) }
+            var components = (String(cString: resolved) as NSString).pathComponents
+            for part in rest {
+                switch part {
+                case "", ".": continue
+                case "..": if components.count > 1 { components.removeLast() }
+                default: components.append(part)
+                }
+            }
+            return components
+        }
+        rest.insert((existing as NSString).lastPathComponent, at: 0)
+        existing = (existing as NSString).deletingLastPathComponent
     }
-    return existing.resolvingSymlinksInPath().pathComponents + rest
 }
 
-/// DekiRoulette/ の下か（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
-func isInsideApp(_ url: URL) -> Bool {
-    resolvedComponents(url).contains { $0.lowercased() == "dekiroulette" }
+/// リポジトリ（project.yml がある祖先）の中か。DekiRoulette/ の下に置いたものはアプリに入り、DekiRouletteTests/ の下はテストに入る
+func isInsideRepository(_ components: [String]) -> Bool {
+    (1...components.count).contains { FileManager.default.fileExists(atPath: NSString.path(withComponents: Array(components.prefix($0)) + ["project.yml"])) }
 }
 
 let usage = """
@@ -424,10 +437,10 @@ let fm = FileManager.default
 var isDirectory: ObjCBool = false
 switch (arguments.count, arguments.first) {
 case (2, "--candidates"):
-    // 前の案が混ざらないよう、空のディレクトリにだけ書き出す。DekiRoulette/ の下の .icon はすべてアプリに入るので、そこには書かない
+    // 前の案が混ざらないよう、空のディレクトリにだけ書き出す。DekiRoulette/ の下の .icon はすべてアプリに入るので、リポジトリの中には書かない
     let output = URL(fileURLWithPath: arguments[1], isDirectory: true)
-    guard !isInsideApp(output) else {
-        fail("案はアプリに入れないので、DekiRoulette/ の外（例: $TMPDIR）に書き出してください: \(output.path)")
+    guard !isInsideRepository(resolvedComponents(arguments[1])) else {
+        fail("案はアプリに入れないので、リポジトリの外（例: $TMPDIR）に書き出してください: \(output.path)")
     }
     if fm.fileExists(atPath: output.path, isDirectory: &isDirectory) {
         guard isDirectory.boolValue, (try fm.contentsOfDirectory(atPath: output.path)).isEmpty else {
@@ -444,7 +457,7 @@ case (1, let path?) where !path.hasPrefix("-"):
     // 打ち間違いで 2 つ目の AppIcon.icon を作らないよう、既定のアイコンの置き場所だけを受け付ける:
     // .icon や .xcassets などの中ではない既存のディレクトリで、AppIcon.icon が既にあるか、名前が Resources のもの
     let output = URL(fileURLWithPath: path, isDirectory: true)
-    let components = resolvedComponents(output)
+    let components = resolvedComponents(path)
     let insidePackage = components.contains { ["icon", "xcassets", "appiconset", "imageset"].contains(($0 as NSString).pathExtension.lowercased()) }
     let isIconHome = fm.fileExists(atPath: output.appendingPathComponent("\(appIcon.name).icon").path) || components.last?.lowercased() == "resources"
     guard fm.fileExists(atPath: output.path, isDirectory: &isDirectory), isDirectory.boolValue, !insidePackage, isIconHome else {
