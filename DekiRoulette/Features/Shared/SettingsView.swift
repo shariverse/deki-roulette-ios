@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// ヘッダ右上のアイコンから開く設定。触覚フィードバックと効果音の切替、ルーレットの詳細設定（光彩の色・3D 表示）、
-/// 項目の初期化、著作権の項目を置く。
+/// アプリアイコンの選択、項目の初期化、著作権の項目を置く。
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Config.hapticsEnabledKey) private var hapticsEnabled = true
@@ -9,6 +9,7 @@ struct SettingsView: View {
     // 両画面のモデルは RootView が environment に流している。どちらのタブから開いても両方を戻せる。
     @Environment(RouletteModel.self) private var rouletteModel
     @Environment(OrderModel.self) private var orderModel
+    @State private var appIcons = AppIconModel(source: UIApplicationIconSource())
 
     /// 確認ダイアログを出している対象。
     private enum ResetTarget: Identifiable {
@@ -38,6 +39,12 @@ struct SettingsView: View {
                     }
                     SettingsLinkRow(title: L10n.rouletteAdvancedTitle) {
                         RouletteAdvancedSettingsView()
+                    }
+                    // 代替アイコンに切り替えられない端末では項目ごと出さない
+                    if appIcons.isSupported {
+                        SettingsLinkRow(title: L10n.appIconTitle) {
+                            AppIconSettingsView(model: appIcons)
+                        }
                     }
                     SettingsSection(title: L10n.resetItemsTitle) {
                         Text(L10n.resetItemsDescription)
@@ -161,6 +168,80 @@ private struct RouletteAdvancedSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.ink800, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
+/// 設定から進む「アプリアイコン」。既定のアイコンと代替アイコンをグリッドに並べ、選んだものに切り替える。
+/// 選択中の表示は `AppIconModel`（`alternateIconName`）に従う。切り替えると iOS が確認のアラートを出す（消せない）。
+private struct AppIconSettingsView: View {
+    @Bindable var model: AppIconModel
+
+    /// 列の幅の下限。iPhone の縦では 3 列、横幅のある画面ではそれより多く並ぶ。
+    private let columns = [GridItem(.adaptive(minimum: 88), spacing: 12, alignment: .top)]
+
+    var body: some View {
+        ScrollView {
+            SettingsCard {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(AppIconChoice.allCases, id: \.self) { choice in
+                        AppIconCell(choice: choice, selected: model.current == choice) {
+                            Task { await model.select(choice) }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
+        }
+        .background(Theme.ink900.ignoresSafeArea())
+        .navigationTitle(L10n.appIconTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.ink800, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .onAppear { model.refresh() }
+        .alert(L10n.appIconFailedTitle, isPresented: $model.failed) {
+            Button(L10n.close, role: .cancel) {}
+        } message: {
+            Text(L10n.appIconFailedMessage)
+        }
+    }
+}
+
+/// アプリアイコンの候補 1 つ。見本の画像と名前を縦に並べ、選ばれているものは画像を輪で囲む。
+private struct AppIconCell: View {
+    let choice: AppIconChoice
+    let selected: Bool
+    let action: () -> Void
+
+    /// 見本の一辺。`scripts/make-icon.swift` の `previewPoints` と同じにする（見本の画像はこの大きさの @2x・@3x）。
+    private let iconSize: CGFloat = 64
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(choice.previewImageName)
+                    .resizable()
+                    .frame(width: iconSize, height: iconSize)
+                    .padding(4)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Theme.ivory, lineWidth: 3)
+                            .opacity(selected ? 1 : 0)
+                    }
+                Text(L10n.appIconName(choice))
+                    .font(.caption.weight(selected ? .bold : .regular))
+                    .foregroundStyle(selected ? Theme.ivory : Theme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.appIconName(choice))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
