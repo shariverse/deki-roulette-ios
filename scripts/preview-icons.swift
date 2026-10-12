@@ -59,7 +59,9 @@ guard !isInsideRepository(resolvedComponents(arguments[1])) else {
 }
 try fm.createDirectory(at: renders, withIntermediateDirectories: true)
 
-let icons = try fm.contentsOfDirectory(atPath: source.path).filter { $0.hasSuffix(".icon") }.sorted()
+// 拡張子を除いた名前で並べる（そのまま比べると "-" が "." より前なので、AppIcon-Neon.icon が AppIcon.icon より先に来る）
+let icons = try fm.contentsOfDirectory(atPath: source.path).filter { $0.hasSuffix(".icon") }
+    .sorted { ($0 as NSString).deletingPathExtension < ($1 as NSString).deletingPathExtension }
 guard !icons.isEmpty else {
     FileHandle.standardError.write(Data(".icon が見つかりません: \(source.path)\n".utf8))
     exit(1)
