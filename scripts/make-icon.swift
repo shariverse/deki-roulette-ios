@@ -396,6 +396,22 @@ func fail(_ message: String) -> Never {
     exit(64)
 }
 
+/// シンボリックリンクを解決した絶対パスの要素。まだ無い末尾の要素は、あるところまで解決してから付け足す
+func resolvedComponents(_ url: URL) -> [String] {
+    var existing = url.standardizedFileURL
+    var rest: [String] = []
+    while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
+        rest.insert(existing.lastPathComponent, at: 0)
+        existing.deleteLastPathComponent()
+    }
+    return existing.resolvingSymlinksInPath().pathComponents + rest
+}
+
+/// DekiRoulette/ の下か（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
+func isInsideApp(_ url: URL) -> Bool {
+    resolvedComponents(url).contains { $0.lowercased() == "dekiroulette" }
+}
+
 let usage = """
     使い方: swift scripts/make-icon.swift <出力先のディレクトリ>
            swift scripts/make-icon.swift --candidates <出力先のディレクトリ>
@@ -408,7 +424,7 @@ switch (arguments.count, arguments.first) {
 case (2, "--candidates"):
     // 前の案が混ざらないよう、空のディレクトリにだけ書き出す。DekiRoulette/ の下の .icon はすべてアプリに入るので、そこには書かない
     let output = URL(fileURLWithPath: arguments[1], isDirectory: true)
-    guard !output.standardizedFileURL.pathComponents.contains("DekiRoulette") else {
+    guard !isInsideApp(output) else {
         fail("案はアプリに入れないので、DekiRoulette/ の外（例: $TMPDIR）に書き出してください: \(output.path)")
     }
     if fm.fileExists(atPath: output.path, isDirectory: &isDirectory) {
@@ -423,11 +439,14 @@ case (2, "--candidates"):
         try writeIcon(design, into: output, packageName: String(format: "%02d-%@", number, design.name))
     }
 case (1, let path?) where !path.hasPrefix("-"):
-    // 打ち間違いで .icon や .xcassets の中に 2 つ目の AppIcon.icon を作らないよう、既存の普通のディレクトリだけを受け付ける
+    // 打ち間違いで 2 つ目の AppIcon.icon を作らないよう、既定のアイコンの置き場所だけを受け付ける:
+    // .icon や .xcassets などの中ではない既存のディレクトリで、AppIcon.icon が既にあるか、名前が Resources のもの
     let output = URL(fileURLWithPath: path, isDirectory: true)
-    guard fm.fileExists(atPath: output.path, isDirectory: &isDirectory), isDirectory.boolValue,
-          !["icon", "xcassets", "appiconset", "png"].contains(output.pathExtension) else {
-        fail("出力先は既存のディレクトリ（例: DekiRoulette/Resources）にしてください: \(output.path)")
+    let components = resolvedComponents(output)
+    let insidePackage = components.contains { ["icon", "xcassets", "appiconset", "imageset"].contains(($0 as NSString).pathExtension.lowercased()) }
+    let isIconHome = fm.fileExists(atPath: output.appendingPathComponent("\(appIcon.name).icon").path) || components.last?.lowercased() == "resources"
+    guard fm.fileExists(atPath: output.path, isDirectory: &isDirectory), isDirectory.boolValue, !insidePackage, isIconHome else {
+        fail("出力先は既定のアイコンを置くディレクトリ（DekiRoulette/Resources）にしてください: \(output.path)")
     }
     for design in appIcons { try writeIcon(design, into: output) }
 default:
