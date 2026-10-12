@@ -209,6 +209,7 @@ private struct AppIconSettingsView: View {
 }
 
 /// アプリアイコンの候補 1 つ。見本の画像と名前を縦に並べ、選ばれているものは画像を輪で囲む。
+/// 読み上げは `SettingsChoiceRow` と同じく、名前（`Text`）と選択中かどうか（`.isSelected`）だけにする。
 private struct AppIconCell: View {
     let choice: AppIconChoice
     let selected: Bool
@@ -229,6 +230,7 @@ private struct AppIconCell: View {
                             .strokeBorder(Theme.ivory, lineWidth: 3)
                             .opacity(selected ? 1 : 0)
                     }
+                    .accessibilityHidden(true)
                 Text(L10n.appIconName(choice))
                     .font(.caption.weight(selected ? .bold : .regular))
                     .foregroundStyle(selected ? Theme.ivory : Theme.muted)
@@ -239,9 +241,7 @@ private struct AppIconCell: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(L10n.appIconName(choice))
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
