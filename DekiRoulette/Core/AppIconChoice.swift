@@ -10,6 +10,7 @@ enum AppIconChoice: String, CaseIterable, Sendable {
     case neon = "AppIcon-Neon"
     case pastel = "AppIcon-Pastel"
     case spinner = "AppIcon-Spinner"
+    /// 赤と白の的。表示名は「リング」にする（設定画面に出る文言なので、当たりの指定を連想させる「ターゲット」は使わない）。
     case target = "AppIcon-Target"
 
     /// `setAlternateIconName(_:)` に渡す名前。既定のアイコンは nil。

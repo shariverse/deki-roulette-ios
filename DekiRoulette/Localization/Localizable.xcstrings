@@ -1416,13 +1416,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Target"
+            "value" : "Rings"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ターゲット"
+            "value" : "リング"
           }
         }
       }
