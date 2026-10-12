@@ -25,4 +25,6 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   端末に依らず Info.plist を見るテストでは、`Bundle.main.bundleURL` の `Info.plist` を `PropertyListSerialization` で読む（2026-10-12）
 - UI テストのターゲットが無いので、PR の画面のスクリーンショットは、コミットしない一時的なテストからホストアプリの `rootViewController` に
   `UIHostingController` を present して `xcrun simctl io <SIM> screenshot` で撮る（テストが目印を print して待つ間に撮る）。
-  `NavigationLink` は見つけたアクセシビリティ要素の `accessibilityActivate()` で押せたが、`accessibilityElement(children: .ignore)` を付けた `Button` の動作は起動できなかった（2026-10-12）
+  `NavigationLink` や `Button` は、見つけたアクセシビリティ要素の `accessibilityActivate()` で押せる（2026-10-12）
+- `Button` の外側に `.accessibilityElement(children: .ignore)` を付けて名前を付け直すと、`accessibilityActivate()` で動作が起きない（VoiceOver や
+  フルキーボードアクセスから押せないおそれがある）。読ませたくない画像は `.accessibilityHidden(true)` にして、名前はボタンの中の `Text` から読ませる（2026-10-12）

@@ -103,11 +103,13 @@ swift scripts/make-icon.swift DekiRoulette/Resources   # AppIcon.icon・AppIcon-
 1. `scripts/make-icon.swift` の `alternateIcons` に `IconDesign(name: "AppIcon-<名前>", …)` を足す（案から採用するときは `candidates` から移す）
 2. `swift scripts/make-icon.swift DekiRoulette/Resources` で `DekiRoulette/Resources/AppIcon-<名前>.icon` と見本の `AppIcon-<名前>-Preview.imageset` を書き出す
 3. `project.yml` の `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` に `AppIcon-<名前>` を空白区切りで足し、`xcodegen generate` を流す
-4. `AppIconChoice` に `case` を足し（`rawValue` は `AppIcon-<名前>`）、`L10n.appIconName` と `Localizable.xcstrings`（日英）に表示名を足す
+4. `AppIconChoice` に `case` を足し（`rawValue` は `AppIcon-<名前>`）、`L10n.appIconName` と `Localizable.xcstrings`（日英）に表示名を足す。
+   `AppIconChoiceTests` の「名前は変えない」の一覧にも足す
 
-消すときは、上の 4 か所から名前を消し、`DekiRoulette/Resources/AppIcon-<名前>.icon` と `Assets.xcassets/AppIcon-<名前>-Preview.imageset` を消す
-（スクリプトは消さない）。名前の食い違いは `AppIconChoiceTests` がビルドした `Info.plist`（`CFBundleIcons` / `CFBundleIcons~ipad` の
-`CFBundleAlternateIcons`）と突き合わせて見つける。利用者が選んだアイコンは `UIApplication.alternateIconName` に名前で残るので、
+消すときは、手順 1・3・4 で足したもの（スクリプトの `alternateIcons`・`project.yml`・`AppIconChoice` と表示名・テストの一覧）から名前を消し、
+`DekiRoulette/Resources/AppIcon-<名前>.icon` と `Assets.xcassets/AppIcon-<名前>-Preview.imageset` を消す（スクリプトは消さない）。
+名前の食い違いは `AppIconChoiceTests` が、ビルドした `Info.plist`（`CFBundleIcons` / `CFBundleIcons~ipad` の `CFBundleAlternateIcons`）と、
+`DekiRoulette/Resources` の `.icon` に突き合わせて見つける。利用者が選んだアイコンは `UIApplication.alternateIconName` に名前で残るので、
 リリースした代替アイコンの名前は変えない。
 
 新しいアイコンを選ぶときは、`candidates` に案を足し、`--candidates` で `<番号>-<名前>.icon` として書き出して
