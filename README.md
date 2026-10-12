@@ -68,10 +68,24 @@ xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-アプリアイコンは `scripts/make-icon.swift` で描いている。作り直すとき:
+アプリアイコンは `scripts/make-icon.swift` でレイヤーごとに描き、Icon Composer の `.icon`
+（`DekiRoulette/Resources/AppIcon.icon`。`icon.json` と `Assets/` のレイヤー画像）に組み立てている。
+背景は `icon.json` の `fill` で、前景（針・ハブ・スライスと区切り線・盤面の外周）はそれぞれ別の group にしてある。
+iOS 26 以降は Liquid Glass の質感が付き、iOS 18 以前は Xcode がビルド時に書き出す平面の画像が使われる。
+ダーク・色付き・クリアの外観は Icon Composer の自動に任せている。作り直すとき:
 
 ```bash
-swift scripts/make-icon.swift DekiRoulette/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+swift scripts/make-icon.swift DekiRoulette/Resources   # DekiRoulette/Resources/AppIcon.icon を作り直す
+```
+
+`.icon` の中の画像と `icon.json` はスクリプトの出力なので、手で直さない（Icon Composer で開いて調整を試すのはよいが、
+決めた値はスクリプトに戻す。戻さないと次に作り直したときに消える）。外観ごとの見え方は、Icon Composer に付属する
+`ictool` で画像に書き出して確かめられる（`--rendition` は `Default` / `Dark` / `TintedLight` / `TintedDark` / `ClearLight` / `ClearDark`）:
+
+```bash
+"/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool" \
+  DekiRoulette/Resources/AppIcon.icon --export-image --output-file /tmp/AppIcon.png \
+  --platform iOS --rendition Default --width 1024 --height 1024 --scale 1
 ```
 
 ## 構成
