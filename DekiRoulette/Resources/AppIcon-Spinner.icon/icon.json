@@ -1,0 +1,62 @@
+{
+  "fill" : {
+    "solid" : "srgb:0.99216,0.96471,0.89020,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "cap.png",
+          "name" : "cap"
+        }
+      ],
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "arrow.png",
+          "name" : "arrow"
+        }
+      ],
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "dividers.png",
+          "name" : "dividers"
+        },
+        {
+          "image-name" : "quarters.png",
+          "name" : "quarters"
+        }
+      ],
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "base.png",
+          "name" : "base"
+        }
+      ],
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

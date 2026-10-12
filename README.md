@@ -72,10 +72,15 @@ xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette \
 （`DekiRoulette/Resources/AppIcon.icon`。`icon.json` と `Assets/` のレイヤー画像）に組み立てている。
 背景は `icon.json` の `fill` で、前景（針・ハブ・スライスと区切り線・盤面の外周）はそれぞれ別の group にしてある。
 iOS 26 以降は Liquid Glass の質感が付き、iOS 18 以前は Xcode がビルド時に書き出す平面の画像が使われる。
-ダーク・色付き・クリアの外観は Icon Composer の自動に任せている。作り直すとき:
+ダーク・色付き・クリアの外観は Icon Composer の自動に任せている。
+
+既定のアイコンのほかに、iOS 標準の代替アイコン（`UIApplication.setAlternateIconName(_:)` で切り替える）を 4 つ持つ。
+32 案から選定で採用した `AppIcon-Neon`・`AppIcon-Pastel`・`AppIcon-Spinner`・`AppIcon-Target` で、
+`DekiRoulette/Resources/AppIcon-<名前>.icon` に置き、`project.yml` の `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` に並べている。
+作り直すとき（既定と代替をまとめて書き出す）:
 
 ```bash
-swift scripts/make-icon.swift DekiRoulette/Resources   # DekiRoulette/Resources/AppIcon.icon を作り直す
+swift scripts/make-icon.swift DekiRoulette/Resources   # DekiRoulette/Resources の AppIcon.icon と AppIcon-<名前>.icon を作り直す
 ```
 
 `.icon` の中の画像と `icon.json` はスクリプトの出力なので、手で直さない（Icon Composer で開いて調整を試すのはよいが、
@@ -90,15 +95,25 @@ swift scripts/make-icon.swift DekiRoulette/Resources   # DekiRoulette/Resources/
   --platform iOS --rendition Default --width 1024 --height 1024 --scale 1
 ```
 
-アイコンの案は `--candidates` で `<番号>-<名前>.icon` として書き出し（`00` が今の既定のアイコン）、`scripts/preview-icons.swift` で
-外観ごと（Default / Dark / TintedDark / ClearLight）の一覧と、60px・40px の一覧の画像にする。スクリプトに残っている案は、
-32 案から選定で採用したもの（`01` Neon・`02` Pastel・`04` Spinner・`30` Target。番号は選定のときのまま）。
-`DekiRoulette/` の下に置いた `.icon` はすべてアプリに入るので、案はリポジトリの外の空のディレクトリに書き出す:
+代替アイコンを足すとき:
+
+1. `scripts/make-icon.swift` の `alternateIcons` に `IconDesign(name: "AppIcon-<名前>", …)` を足す（案から採用するときは `candidates` から移す）
+2. `swift scripts/make-icon.swift DekiRoulette/Resources` で `DekiRoulette/Resources/AppIcon-<名前>.icon` を書き出す
+3. `project.yml` の `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` に `AppIcon-<名前>` を空白区切りで足し、`xcodegen generate` を流す
+
+消すときは、`alternateIcons` と `project.yml` から名前を消し、`DekiRoulette/Resources/AppIcon-<名前>.icon` を消す（スクリプトは消さない）。
+ビルドの後、`Info.plist` の `CFBundleIcons` / `CFBundleIcons~ipad` の `CFBundleAlternateIcons` に名前が並んでいることを確かめる。
+利用者が選んだアイコンは `UIApplication.alternateIconName` に名前で残るので、リリースした代替アイコンの名前は変えない。
+
+新しいアイコンを選ぶときは、`candidates` に案を足し、`--candidates` で `<番号>-<名前>.icon` として書き出して
+（`00-` は今アプリに入っているアイコンで、見比べる用）、`scripts/preview-icons.swift` で外観ごと（Default / Dark / TintedDark / ClearLight）の
+一覧と、60px・40px の一覧の画像にする。`DekiRoulette/` の下に置いた `.icon` はすべてアプリに入るので、案はリポジトリの外の空のディレクトリに書き出す:
 
 ```bash
 dir=$(mktemp -d)
 swift scripts/make-icon.swift --candidates "$dir/icons"
 swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"   # preview-*.png を書き出す
+swift scripts/preview-icons.swift DekiRoulette/Resources "$dir/app"   # アプリに入っているアイコンだけの一覧
 ```
 
 ## 構成

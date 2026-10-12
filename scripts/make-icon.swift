@@ -4,18 +4,19 @@
 // 盤面だけの中立な絵。
 // 使い方:
 //   swift scripts/make-icon.swift <出力先のディレクトリ>
-//     アプリに入れるアイコンを書き出す。例: swift scripts/make-icon.swift DekiRoulette/Resources → DekiRoulette/Resources/AppIcon.icon を作り直す
+//     アプリに入れるアイコンを書き出す。例: swift scripts/make-icon.swift DekiRoulette/Resources → DekiRoulette/Resources の
+//     AppIcon.icon（既定）と AppIcon-<名前>.icon（代替アイコン）を作り直す
 //     出力先は既定のアイコンを置くディレクトリ（AppIcon.icon がある、または名前が Resources）だけを受け付ける
 //   swift scripts/make-icon.swift --candidates <出力先のディレクトリ>
-//     アイコンの案を <番号>-<名前>.icon で書き出す（00 が今の既定のアイコン、ほかは採用した案で、番号は選定のときのもの）。
-//     出力先は空のディレクトリ（無ければ作る）。案はアプリに入れないので、DekiRoulette/ の下には書き出さない。
+//     アイコンの案を <番号>-<名前>.icon で書き出す（00 は今アプリに入っているアイコンで見比べる用、01〜 が案）。
+//     出力先は空のディレクトリ（無ければ作る）。案はアプリに入れないので、リポジトリの中には書き出さない。
 //     例: dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons"（一覧の画像は scripts/preview-icons.swift で作る）
 import CoreGraphics
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-// MARK: - .icon の組み立て（案に依らない部分）
+// MARK: - .icon の組み立て（アイコンに依らない部分）
 
 /// レイヤーの画像の一辺（Icon Composer の iOS の画面と同じ 1024pt を 1 倍で描く）。角丸・影・余白は描かない（OS がマスクする）
 let canvas = 1024.0
@@ -112,11 +113,8 @@ func writePNG(_ image: CGImage, to url: URL) {
 }
 
 /// `<directory>/<packageName>.icon` を作り直す（前のレイヤー画像が残らないよう、いったん消してから書く）
+/// 名前の重なりは書き出す前に `validate` で確かめる
 func writeIcon(_ design: IconDesign, into directory: URL, packageName: String? = nil) throws {
-    // レイヤーの名前は PNG のファイル名になるので、重なると先に書いた画像が上書きされる（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
-    let names = design.groups.flatMap { $0.layers.map(\.name) }
-    precondition(Set(names.map { $0.lowercased() }).count == names.count, "\(design.name) のレイヤーの名前が重なっています: \(names)")
-
     let fm = FileManager.default
     let package = directory.appendingPathComponent("\(packageName ?? design.name).icon")
     let assets = package.appendingPathComponent("Assets")
@@ -211,10 +209,7 @@ let appIcon = IconDesign(name: "AppIcon", fill: .solid(0x17111F), groups: [
     }]),
 ])
 
-/// アプリに入れるアイコン（`swift scripts/make-icon.swift <出力先>` で書き出す）
-let appIcons = [appIcon]
-
-// MARK: - 図形の道具（案で使う）
+// MARK: - 図形の道具（代替アイコンと案で使う）
 // 角度は 12 時を 0 度として時計回りに測る（盤面と同じ）。座標は CG のまま y が上向き
 
 func P(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x, y: y) }
@@ -302,13 +297,13 @@ func neon(_ ctx: CGContext, _ path: CGPath, _ color: UInt32, width: Double) {
     stroke(ctx, path, color, width: width)
 }
 
-// MARK: - 採用した案（--candidates で書き出す。32 案から選定で採用されたものだけを残している）
-// キーは案の番号（一覧の画像と選定のやり取りで使ったもの。案を消しても他の案の番号は変えない）。
-// 名前は代替アイコンの名前（AppIcon-<名前>）にする。リリースしたら変えない（利用者の選択が名前で残るため）
+// MARK: - 代替アイコン（設定画面から選べるアイコン。32 案から選定で採用した案）
+// 名前（AppIcon-<名前>）は .icon のファイル名で、project.yml の ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES と同じにする。
+// リリースしたら名前を変えない（利用者の選択が UIApplication.alternateIconName に名前で残るため）
 
-let candidates: [Int: IconDesign] = [
-    // ルーレット盤: ネオン
-    1: IconDesign(name: "Neon", fill: .solid(0x0B0614), groups: [
+let alternateIcons: [IconDesign] = [
+    // ルーレット盤: ネオン（案 01）
+    IconDesign(name: "AppIcon-Neon", fill: .solid(0x0B0614), groups: [
         IconGroup(layers: [IconLayer(name: "needle") { ctx in
             let needle = poly([P(512, 790), P(464, 920), P(560, 920)])
             neon(ctx, needle, 0xFF3EA5, width: 10)
@@ -331,8 +326,8 @@ let candidates: [Int: IconDesign] = [
             neon(ctx, circle(center, 392), 0xB46BFF, width: 14)
         }]),
     ]),
-    // ルーレット盤: パステル
-    2: IconDesign(name: "Pastel", fill: .solid(0xFFF4E8), groups: [
+    // ルーレット盤: パステル（案 02）
+    IconDesign(name: "AppIcon-Pastel", fill: .solid(0xFFF4E8), groups: [
         IconGroup(layers: [IconLayer(name: "pin") { ctx in
             fill(ctx, circle(P(512, 900), 50), 0xFF6F7D)
             fill(ctx, poly([P(468, 880), P(556, 880), P(512, 790)]), 0xFF6F7D)
@@ -356,8 +351,8 @@ let candidates: [Int: IconDesign] = [
             stroke(ctx, circle(center, 410), 0xF3D3BA, width: 12)
         }]),
     ]),
-    // ルーレット盤: ボードゲームのスピナー
-    4: IconDesign(name: "Spinner", fill: .solid(0xFDF6E3), groups: [
+    // ルーレット盤: ボードゲームのスピナー（案 04）
+    IconDesign(name: "AppIcon-Spinner", fill: .solid(0xFDF6E3), groups: [
         IconGroup(layers: [IconLayer(name: "cap") { ctx in
             fill(ctx, circle(center, 54), 0xFFFFFF)
             stroke(ctx, circle(center, 54), 0x073B4C, width: 14)
@@ -383,13 +378,22 @@ let candidates: [Int: IconDesign] = [
             stroke(ctx, circle(center, 400), 0x073B4C, width: 16)
         }]),
     ]),
-    // 的・王冠: 的
-    30: IconDesign(name: "Target", fill: .solid(0xF1FAEE), groups: [
+    // 的・王冠: 的（案 30）
+    IconDesign(name: "AppIcon-Target", fill: .solid(0xF1FAEE), groups: [
         IconGroup(layers: [IconLayer(name: "center") { ctx in fill(ctx, circle(center, 80), 0xE63946) }]),
         IconGroup(layers: [IconLayer(name: "middle") { ctx in fill(ctx, ring(center, outer: 240, inner: 160), 0xE63946, evenOdd: true) }]),
         IconGroup(layers: [IconLayer(name: "outer") { ctx in fill(ctx, ring(center, outer: 400, inner: 320), 0xE63946, evenOdd: true) }]),
     ]),
 ]
+
+/// アプリに入れるアイコン（`swift scripts/make-icon.swift <出力先>` で書き出す）。先頭が既定のアイコン
+let appIcons = [appIcon] + alternateIcons
+
+// MARK: - 案（--candidates で書き出す。アプリには入れない）
+// 新しいアイコンを選ぶときに、ここへ案を足して一覧の画像（scripts/preview-icons.swift）で見比べる。キーは案の番号
+// （一覧の画像と選定のやり取りで使う。案を消しても他の案の番号は変えない）。採用したら alternateIcons に移し、名前を AppIcon-<名前> にする
+
+let candidates: [Int: IconDesign] = [:]
 
 // MARK: - 書き出し
 
@@ -398,20 +402,45 @@ func fail(_ message: String) -> Never {
     exit(64)
 }
 
-/// シンボリックリンクを解決した絶対パスの要素。まだ無い末尾の要素は、あるところまで解決してから付け足す
-func resolvedComponents(_ url: URL) -> [String] {
-    var existing = url.standardizedFileURL
+/// 引数のパスを、シンボリックリンクと .. を OS と同じ順にたどって解決した絶対パスの要素にする。
+/// URL（相対パスのとき）や standardizedFileURL は .. を文字の上で畳むので、リンクの後の .. が実際の書き出し先と食い違う。
+/// まだ無い末尾の要素は、ある祖先を realpath で解決してから文字の上で足す
+func resolvedComponents(_ path: String) -> [String] {
+    var existing = path.hasPrefix("/") ? path : FileManager.default.currentDirectoryPath + "/" + path
     var rest: [String] = []
-    while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
-        rest.insert(existing.lastPathComponent, at: 0)
-        existing.deleteLastPathComponent()
+    while true {
+        if let resolved = realpath(existing, nil) {
+            defer { free(resolved) }
+            var components = (String(cString: resolved) as NSString).pathComponents
+            for part in rest {
+                switch part {
+                case "", ".": continue
+                case "..": if components.count > 1 { components.removeLast() }
+                default: components.append(part)
+                }
+            }
+            return components
+        }
+        rest.insert((existing as NSString).lastPathComponent, at: 0)
+        existing = (existing as NSString).deletingLastPathComponent
     }
-    return existing.resolvingSymlinksInPath().pathComponents + rest
 }
 
-/// DekiRoulette/ の下か（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
-func isInsideApp(_ url: URL) -> Bool {
-    resolvedComponents(url).contains { $0.lowercased() == "dekiroulette" }
+/// リポジトリ（project.yml がある祖先）の中か。DekiRoulette/ の下に置いたものはアプリに入り、DekiRouletteTests/ の下はテストに入る
+func isInsideRepository(_ components: [String]) -> Bool {
+    (1...components.count).contains { FileManager.default.fileExists(atPath: NSString.path(withComponents: Array(components.prefix($0)) + ["project.yml"])) }
+}
+
+/// 書き出す前に全部をまとめて確かめる（途中で止まって、出力先に半端な .icon が残らないように）。
+/// .icon の名前とレイヤーの名前（PNG のファイル名になる）が重なると、先に書いたものが上書きされる。
+/// APFS は大文字小文字を区別しないので、小文字にそろえて比べる
+func validate(_ packages: [(name: String, design: IconDesign)]) {
+    func overlaps(_ names: [String]) -> Bool { Set(names.map { $0.lowercased() }).count != names.count }
+    if overlaps(packages.map(\.name)) { fail(".icon の名前が重なっています: \(packages.map(\.name))") }
+    for (name, design) in packages {
+        let layers = design.groups.flatMap { $0.layers.map(\.name) }
+        if overlaps(layers) { fail("\(name) のレイヤーの名前が重なっています: \(layers)") }
+    }
 }
 
 let usage = """
@@ -424,10 +453,14 @@ let fm = FileManager.default
 var isDirectory: ObjCBool = false
 switch (arguments.count, arguments.first) {
 case (2, "--candidates"):
-    // 前の案が混ざらないよう、空のディレクトリにだけ書き出す。DekiRoulette/ の下の .icon はすべてアプリに入るので、そこには書かない
+    // 見比べるため、今アプリに入っているアイコン（既定と代替）を 00 として先頭に並べる
+    let packages = appIcons.map { ("00-\($0.name)", $0) }
+        + candidates.sorted(by: { $0.key < $1.key }).map { (String(format: "%02d-%@", $0.key, $0.value.name), $0.value) }
+    validate(packages)
+    // 前の案が混ざらないよう、空のディレクトリにだけ書き出す。DekiRoulette/ の下の .icon はすべてアプリに入るので、リポジトリの中には書かない
     let output = URL(fileURLWithPath: arguments[1], isDirectory: true)
-    guard !isInsideApp(output) else {
-        fail("案はアプリに入れないので、DekiRoulette/ の外（例: $TMPDIR）に書き出してください: \(output.path)")
+    guard !isInsideRepository(resolvedComponents(arguments[1])) else {
+        fail("案はアプリに入れないので、リポジトリの外（例: $TMPDIR）に書き出してください: \(output.path)")
     }
     if fm.fileExists(atPath: output.path, isDirectory: &isDirectory) {
         guard isDirectory.boolValue, (try fm.contentsOfDirectory(atPath: output.path)).isEmpty else {
@@ -436,15 +469,13 @@ case (2, "--candidates"):
     } else {
         try fm.createDirectory(at: output, withIntermediateDirectories: true)
     }
-    try writeIcon(appIcon, into: output, packageName: "00-\(appIcon.name)")
-    for (number, design) in candidates.sorted(by: { $0.key < $1.key }) {
-        try writeIcon(design, into: output, packageName: String(format: "%02d-%@", number, design.name))
-    }
+    for (name, design) in packages { try writeIcon(design, into: output, packageName: name) }
 case (1, let path?) where !path.hasPrefix("-"):
+    validate(appIcons.map { ($0.name, $0) })
     // 打ち間違いで 2 つ目の AppIcon.icon を作らないよう、既定のアイコンの置き場所だけを受け付ける:
     // .icon や .xcassets などの中ではない既存のディレクトリで、AppIcon.icon が既にあるか、名前が Resources のもの
     let output = URL(fileURLWithPath: path, isDirectory: true)
-    let components = resolvedComponents(output)
+    let components = resolvedComponents(path)
     let insidePackage = components.contains { ["icon", "xcassets", "appiconset", "imageset"].contains(($0 as NSString).pathExtension.lowercased()) }
     let isIconHome = fm.fileExists(atPath: output.appendingPathComponent("\(appIcon.name).icon").path) || components.last?.lowercased() == "resources"
     guard fm.fileExists(atPath: output.path, isDirectory: &isDirectory), isDirectory.boolValue, !insidePackage, isIconHome else {

@@ -3,7 +3,8 @@
 // 使い方: swift scripts/preview-icons.swift <.icon を並べたディレクトリ> <出力先のディレクトリ>
 //   例: dir=$(mktemp -d)
 //       swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"
-//   <番号>-<名前>.icon を名前の順に並べ、次の画像を出力先に書く（出力先は無ければ作る。DekiRoulette/ の下は受け付けない）:
+//   .icon を名前の順に並べ、次の画像を出力先に書く（出力先は無ければ作る。リポジトリの中は受け付けない）。
+//   DekiRoulette/Resources を渡すと、アプリに入っているアイコン（既定と代替）の一覧になる:
 //     preview-Default.png / preview-Dark.png / preview-TintedDark.png / preview-ClearLight.png  外観ごとの一覧
 //     preview-small.png  60px と 40px で並べた一覧（小さいサイズで潰れる案が分かるように）
 import CoreGraphics
@@ -22,25 +23,45 @@ let output = URL(fileURLWithPath: arguments[1], isDirectory: true)
 let renders = output.appendingPathComponent("renders", isDirectory: true)
 let fm = FileManager.default
 
-/// シンボリックリンクを解決した絶対パスの要素。まだ無い末尾の要素は、あるところまで解決してから付け足す
-func resolvedComponents(_ url: URL) -> [String] {
-    var existing = url.standardizedFileURL
+/// 引数のパスを、シンボリックリンクと .. を OS と同じ順にたどって解決した絶対パスの要素にする。
+/// URL（相対パスのとき）や standardizedFileURL は .. を文字の上で畳むので、リンクの後の .. が実際の書き出し先と食い違う。
+/// まだ無い末尾の要素は、ある祖先を realpath で解決してから文字の上で足す
+func resolvedComponents(_ path: String) -> [String] {
+    var existing = path.hasPrefix("/") ? path : FileManager.default.currentDirectoryPath + "/" + path
     var rest: [String] = []
-    while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
-        rest.insert(existing.lastPathComponent, at: 0)
-        existing.deleteLastPathComponent()
+    while true {
+        if let resolved = realpath(existing, nil) {
+            defer { free(resolved) }
+            var components = (String(cString: resolved) as NSString).pathComponents
+            for part in rest {
+                switch part {
+                case "", ".": continue
+                case "..": if components.count > 1 { components.removeLast() }
+                default: components.append(part)
+                }
+            }
+            return components
+        }
+        rest.insert((existing as NSString).lastPathComponent, at: 0)
+        existing = (existing as NSString).deletingLastPathComponent
     }
-    return existing.resolvingSymlinksInPath().pathComponents + rest
 }
 
-// DekiRoulette/ の下に置いた画像はアプリに入るので、そこには書かない（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
-guard !resolvedComponents(output).contains(where: { $0.lowercased() == "dekiroulette" }) else {
-    FileHandle.standardError.write(Data("一覧の画像はアプリに入れないので、DekiRoulette/ の外（例: $TMPDIR）に書き出してください: \(output.path)\n".utf8))
+/// リポジトリ（project.yml がある祖先）の中か。DekiRoulette/ の下に置いたものはアプリに入り、DekiRouletteTests/ の下はテストに入る
+func isInsideRepository(_ components: [String]) -> Bool {
+    (1...components.count).contains { FileManager.default.fileExists(atPath: NSString.path(withComponents: Array(components.prefix($0)) + ["project.yml"])) }
+}
+
+// 一覧の画像はアプリに入れないので、リポジトリの中には書かない
+guard !isInsideRepository(resolvedComponents(arguments[1])) else {
+    FileHandle.standardError.write(Data("一覧の画像は、リポジトリの外（例: $TMPDIR）に書き出してください: \(output.path)\n".utf8))
     exit(64)
 }
 try fm.createDirectory(at: renders, withIntermediateDirectories: true)
 
-let icons = try fm.contentsOfDirectory(atPath: source.path).filter { $0.hasSuffix(".icon") }.sorted()
+// 拡張子を除いた名前で並べる（そのまま比べると "-" が "." より前なので、AppIcon-Neon.icon が AppIcon.icon より先に来る）
+let icons = try fm.contentsOfDirectory(atPath: source.path).filter { $0.hasSuffix(".icon") }
+    .sorted { ($0 as NSString).deletingPathExtension < ($1 as NSString).deletingPathExtension }
 guard !icons.isEmpty else {
     FileHandle.standardError.write(Data(".icon が見つかりません: \(source.path)\n".utf8))
     exit(1)
@@ -87,18 +108,26 @@ func cg(_ hex: UInt32) -> CGColor {
     CGColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
 }
 
-/// `03-Casino.icon` → `03 Casino`
+/// `00-AppIcon-Neon.icon` → `00 AppIcon Neon`
 func label(_ icon: String) -> String {
     (icon as NSString).deletingPathExtension.replacingOccurrences(of: "-", with: " ")
 }
 
-func draw(_ ctx: CGContext, _ string: String, size: Double, color: UInt32, centerX: Double, baseline: Double) {
+func textLine(_ string: String, size: Double, color: UInt32 = 0x000000) -> CTLine {
     let font = CTFontCreateWithName("HiraginoSans-W6" as CFString, size, nil)
     let attributes: [NSAttributedString.Key: Any] = [
         NSAttributedString.Key(kCTFontAttributeName as String): font,
         NSAttributedString.Key(kCTForegroundColorAttributeName as String): cg(color),
     ]
-    let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
+    return CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
+}
+
+func textWidth(_ string: String, size: Double) -> Double {
+    CTLineGetTypographicBounds(textLine(string, size: size), nil, nil, nil)
+}
+
+func draw(_ ctx: CGContext, _ string: String, size: Double, color: UInt32, centerX: Double, baseline: Double) {
+    let line = textLine(string, size: size, color: color)
     let width = CTLineGetTypographicBounds(line, nil, nil, nil)
     ctx.textPosition = CGPoint(x: centerX - width / 2, y: baseline)
     CTLineDraw(line, ctx)
@@ -112,9 +141,10 @@ struct Sheet {
 }
 
 /// 各セルの画像を横に並べ（画像は縮めずに等倍で描く）、下にラベルを付けて columns 列に並べる。
-/// cellWidth はセルの幅（ラベルが隣と重ならない幅にする）
-func writeSheet(_ sheet: Sheet, cells: [(String, [CGImage])], columns: Int, cellWidth: Double, gap: Double, to url: URL) {
-    let pad = 32.0, labelHeight = 40.0, titleHeight = 72.0
+/// minCellWidth はセルの幅の下限（ラベルがそれより長いときは、隣と重ならないようラベルの幅まで広げる）
+func writeSheet(_ sheet: Sheet, cells: [(String, [CGImage])], columns: Int, minCellWidth: Double, gap: Double, to url: URL) {
+    let pad = 32.0, labelHeight = 40.0, titleHeight = 72.0, labelSize = 22.0
+    let cellWidth = max(minCellWidth, cells.map { textWidth($0.0, size: labelSize) }.max()!.rounded(.up))
     let cell = Double(cells.flatMap { $0.1.map(\.height) }.max()!)
     let rows = (cells.count + columns - 1) / columns
     let width = pad * 2 + Double(columns) * cellWidth + Double(columns - 1) * pad
@@ -134,7 +164,7 @@ func writeSheet(_ sheet: Sheet, cells: [(String, [CGImage])], columns: Int, cell
             ctx.draw(image, in: CGRect(x: left, y: top - cell, width: Double(image.width), height: Double(image.height)))
             left += Double(image.width) + gap
         }
-        draw(ctx, name, size: 22, color: sheet.text, centerX: x + cellWidth / 2, baseline: top - cell - 30)
+        draw(ctx, name, size: labelSize, color: sheet.text, centerX: x + cellWidth / 2, baseline: top - cell - 30)
     }
     let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
     CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
@@ -152,8 +182,8 @@ let sheets: [(rendition: String, sheet: Sheet)] = [
 let columns = min(6, icons.count)
 for (rendition, sheet) in sheets {
     let cells = icons.map { (label($0), [load(export($0, rendition: rendition, size: 200))]) }
-    writeSheet(sheet, cells: cells, columns: columns, cellWidth: 200, gap: 0, to: output.appendingPathComponent("preview-\(rendition).png"))
+    writeSheet(sheet, cells: cells, columns: columns, minCellWidth: 200, gap: 0, to: output.appendingPathComponent("preview-\(rendition).png"))
 }
 let small = icons.map { (label($0), [load(export($0, rendition: "Default", size: 60)), load(export($0, rendition: "Default", size: 40))]) }
 writeSheet(Sheet(title: "Default 60px / 40px", background: (0xF2F2F7, 0xF2F2F7), text: 0x1C1C1E),
-           cells: small, columns: columns, cellWidth: 160, gap: 16, to: output.appendingPathComponent("preview-small.png"))
+           cells: small, columns: columns, minCellWidth: 160, gap: 16, to: output.appendingPathComponent("preview-small.png"))
