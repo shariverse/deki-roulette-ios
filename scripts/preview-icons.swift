@@ -148,10 +148,12 @@ let sheets: [(rendition: String, sheet: Sheet)] = [
     ("TintedDark", Sheet(title: "TintedDark", background: (0x1C1C1E, 0x1C1C1E), text: 0xF2F2F7)),
     ("ClearLight", Sheet(title: "ClearLight", background: (0x7FA7D9, 0x3E6AA8), text: 0xFFFFFF)),
 ]
+// 6 列で折り返す（6 個より少ないときは右に空の列を残さない）
+let columns = min(6, icons.count)
 for (rendition, sheet) in sheets {
     let cells = icons.map { (label($0), [load(export($0, rendition: rendition, size: 200))]) }
-    writeSheet(sheet, cells: cells, columns: 6, cellWidth: 200, gap: 0, to: output.appendingPathComponent("preview-\(rendition).png"))
+    writeSheet(sheet, cells: cells, columns: columns, cellWidth: 200, gap: 0, to: output.appendingPathComponent("preview-\(rendition).png"))
 }
 let small = icons.map { (label($0), [load(export($0, rendition: "Default", size: 60)), load(export($0, rendition: "Default", size: 40))]) }
 writeSheet(Sheet(title: "Default 60px / 40px", background: (0xF2F2F7, 0xF2F2F7), text: 0x1C1C1E),
-           cells: small, columns: 6, cellWidth: 160, gap: 16, to: output.appendingPathComponent("preview-small.png"))
+           cells: small, columns: columns, cellWidth: 160, gap: 16, to: output.appendingPathComponent("preview-small.png"))
