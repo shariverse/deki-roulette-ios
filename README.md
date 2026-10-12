@@ -91,12 +91,14 @@ swift scripts/make-icon.swift DekiRoulette/Resources   # DekiRoulette/Resources/
 ```
 
 アイコンの案は `--candidates` で `<番号>-<名前>.icon` として書き出し（`00` が今の既定のアイコン）、`scripts/preview-icons.swift` で
-外観ごと（Default / Dark / TintedDark / ClearLight）の一覧と、60px・40px の一覧の画像にする。`DekiRoulette/` の下に置いた `.icon` は
-すべてアプリに入るので、案はリポジトリの外に書き出す:
+外観ごと（Default / Dark / TintedDark / ClearLight）の一覧と、60px・40px の一覧の画像にする。スクリプトに残っている案は、
+32 案から選定で採用したもの（`01` Neon・`02` Pastel・`04` Spinner・`30` Target。番号は選定のときのまま）。
+`DekiRoulette/` の下に置いた `.icon` はすべてアプリに入るので、案はリポジトリの外の空のディレクトリに書き出す:
 
 ```bash
-swift scripts/make-icon.swift --candidates "$TMPDIR/icon-candidates"
-swift scripts/preview-icons.swift "$TMPDIR/icon-candidates" "$TMPDIR/icon-preview"   # preview-*.png を書き出す
+dir=$(mktemp -d)
+swift scripts/make-icon.swift --candidates "$dir/icons"
+swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"   # preview-*.png を書き出す
 ```
 
 ## 構成

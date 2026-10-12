@@ -1,9 +1,9 @@
 // .icon を外観ごとに画像へ書き出し、番号つきで並べた一覧の画像を作る（アイコンの案を選ぶとき・PR のスクリーンショット用）。
 // 書き出しには Icon Composer に付属する ictool を使う（Xcode 26 以降。xcode-select で選んでいる Xcode のものを使う）。
 // 使い方: swift scripts/preview-icons.swift <.icon を並べたディレクトリ> <出力先のディレクトリ>
-//   例: swift scripts/make-icon.swift --candidates $TMPDIR/icon-candidates
-//       swift scripts/preview-icons.swift $TMPDIR/icon-candidates $TMPDIR/icon-preview
-//   <番号>-<名前>.icon を名前の順に並べ、次の画像を出力先に書く（出力先は無ければ作る）:
+//   例: dir=$(mktemp -d)
+//       swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"
+//   <番号>-<名前>.icon を名前の順に並べ、次の画像を出力先に書く（出力先は無ければ作る。DekiRoulette/ の下は受け付けない）:
 //     preview-Default.png / preview-Dark.png / preview-TintedDark.png / preview-ClearLight.png  外観ごとの一覧
 //     preview-small.png  60px と 40px で並べた一覧（小さいサイズで潰れる案が分かるように）
 import CoreGraphics

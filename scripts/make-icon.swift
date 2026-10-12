@@ -5,9 +5,11 @@
 // 使い方:
 //   swift scripts/make-icon.swift <出力先のディレクトリ>
 //     アプリに入れるアイコンを書き出す。例: swift scripts/make-icon.swift DekiRoulette/Resources → DekiRoulette/Resources/AppIcon.icon を作り直す
+//     出力先は既定のアイコンを置くディレクトリ（AppIcon.icon がある、または名前が Resources）だけを受け付ける
 //   swift scripts/make-icon.swift --candidates <出力先のディレクトリ>
-//     アイコンの案を <番号>-<名前>.icon で書き出す（00 が今の既定のアイコン、01〜 が案）。出力先は空のディレクトリ（無ければ作る）。
-//     案はアプリに入れないので、DekiRoulette/ の下には書き出さない。一覧の画像は scripts/preview-icons.swift で作る
+//     アイコンの案を <番号>-<名前>.icon で書き出す（00 が今の既定のアイコン、ほかは採用した案で、番号は選定のときのもの）。
+//     出力先は空のディレクトリ（無ければ作る）。案はアプリに入れないので、DekiRoulette/ の下には書き出さない。
+//     例: dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons"（一覧の画像は scripts/preview-icons.swift で作る）
 import CoreGraphics
 import Foundation
 import ImageIO
