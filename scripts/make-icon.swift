@@ -5,7 +5,7 @@
 // 使い方:
 //   swift scripts/make-icon.swift <出力先のディレクトリ>
 //     アプリに入れるアイコンを書き出す。例: swift scripts/make-icon.swift DekiRoulette/Resources → DekiRoulette/Resources の
-//     AppIcon.icon（既定）と AppIcon-<名前>.icon（代替アイコン）を作り直す
+//     AppIcon.icon（既定）と AppIcon-<名前>.icon（代替アイコン）、設定画面の見本の画像（Assets.xcassets/<名前>-Preview.imageset）を作り直す
 //     出力先は既定のアイコンを置くディレクトリ（AppIcon.icon がある、または名前が Resources）だけを受け付ける
 //   swift scripts/make-icon.swift --candidates <出力先のディレクトリ>
 //     アイコンの案を <番号>-<名前>.icon で書き出す（00 は今アプリに入っているアイコンで見比べる用、01〜 が案）。
@@ -443,6 +443,53 @@ func validate(_ packages: [(name: String, design: IconDesign)]) {
     }
 }
 
+/// 設定画面のアイコンの見本の一辺（pt）。設定画面の `AppIconCell` の大きさと同じにする
+let previewPoints = 64
+
+func run(_ executable: String, _ args: [String]) -> String {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: executable)
+    process.arguments = args
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    try! process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    let text = String(decoding: data, as: UTF8.self)
+    guard process.terminationStatus == 0 else { fatalError("\(executable) \(args.joined(separator: " ")) が失敗しました: \(text)") }
+    return text
+}
+
+/// Icon Composer に付属する ictool（xcode-select で選んでいる Xcode のもの。Developer/usr/bin/ictool は別物で、画像に書き出せない）
+func ictoolPath() -> String {
+    let developer = run("/usr/bin/xcode-select", ["-p"]).trimmingCharacters(in: .whitespacesAndNewlines)
+    let path = URL(fileURLWithPath: developer).deletingLastPathComponent()
+        .appendingPathComponent("Applications/Icon Composer.app/Contents/Executables/ictool").path
+    guard FileManager.default.isExecutableFile(atPath: path) else { fail("ictool が見つかりません: \(path)") }
+    return path
+}
+
+/// アイコンの見本を `<catalog>/<名前>-Preview.imageset` に書き出す。アイコンそのものは `UIImage(named:)` で読めない
+/// （iOS 26 では UIKit のアサーションで落ち、iOS 18 では nil）ので、ictool で角丸まで付けた Default の見た目を @2x・@3x の画像にする
+func writePreview(of icon: URL, name: String, into catalog: URL, ictool: String) throws {
+    let fm = FileManager.default
+    let imageset = catalog.appendingPathComponent("\(name)-Preview.imageset")
+    if fm.fileExists(atPath: imageset.path) { try fm.removeItem(at: imageset) }
+    try fm.createDirectory(at: imageset, withIntermediateDirectories: false)
+    var images: [[String: Any]] = [["idiom": "universal", "scale": "1x"]]
+    for scale in [2, 3] {
+        let file = "\(name)-Preview@\(scale)x.png"
+        _ = run(ictool, [icon.path, "--export-image", "--output-file", imageset.appendingPathComponent(file).path, "--platform", "iOS",
+                         "--rendition", "Default", "--width", "\(previewPoints)", "--height", "\(previewPoints)", "--scale", "\(scale)"])
+        images.append(["filename": file, "idiom": "universal", "scale": "\(scale)x"])
+    }
+    let json: [String: Any] = ["images": images, "info": ["author": "xcode", "version": 1]]
+    let data = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+    try (data + Data("\n".utf8)).write(to: imageset.appendingPathComponent("Contents.json"))
+    print("wrote \(imageset.path)")
+}
+
 let usage = """
     使い方: swift scripts/make-icon.swift <出力先のディレクトリ>
            swift scripts/make-icon.swift --candidates <出力先のディレクトリ>
@@ -478,10 +525,16 @@ case (1, let path?) where !path.hasPrefix("-"):
     let components = resolvedComponents(path)
     let insidePackage = components.contains { ["icon", "xcassets", "appiconset", "imageset"].contains(($0 as NSString).pathExtension.lowercased()) }
     let isIconHome = fm.fileExists(atPath: output.appendingPathComponent("\(appIcon.name).icon").path) || components.last?.lowercased() == "resources"
-    guard fm.fileExists(atPath: output.path, isDirectory: &isDirectory), isDirectory.boolValue, !insidePackage, isIconHome else {
-        fail("出力先は既定のアイコンを置くディレクトリ（DekiRoulette/Resources）にしてください: \(output.path)")
+    let catalog = output.appendingPathComponent("Assets.xcassets")
+    guard fm.fileExists(atPath: output.path, isDirectory: &isDirectory), isDirectory.boolValue, !insidePackage, isIconHome,
+          fm.fileExists(atPath: catalog.path) else {
+        fail("出力先は既定のアイコンと Assets.xcassets を置くディレクトリ（DekiRoulette/Resources）にしてください: \(output.path)")
     }
+    let ictool = ictoolPath()
     for design in appIcons { try writeIcon(design, into: output) }
+    for design in appIcons {
+        try writePreview(of: output.appendingPathComponent("\(design.name).icon"), name: design.name, into: catalog, ictool: ictool)
+    }
 default:
     fail(usage)
 }
