@@ -215,8 +215,12 @@ private struct AppIconCell: View {
     let selected: Bool
     let action: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     /// 見本の一辺。`scripts/make-icon.swift` の `previewPoints` と同じにする（見本の画像はこの大きさの @2x・@3x）。
     private let iconSize: CGFloat = 64
+    /// 見本の角の丸み。iOS のアイコンの形（一辺の約 22%）に合わせる。
+    private var iconCornerRadius: CGFloat { iconSize * 0.2237 }
 
     var body: some View {
         Button(action: action) {
@@ -224,9 +228,14 @@ private struct AppIconCell: View {
                 Image(choice.previewImageName)
                     .resizable()
                     .frame(width: iconSize, height: iconSize)
+                    // 明るい地の見本が枠の明るい背景に溶けないよう、細い縁を付ける
+                    .overlay {
+                        RoundedRectangle(cornerRadius: iconCornerRadius, style: .continuous)
+                            .strokeBorder(Theme.ink700, lineWidth: 1)
+                    }
                     .padding(4)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        RoundedRectangle(cornerRadius: iconCornerRadius + 4, style: .continuous)
                             .strokeBorder(Theme.ivory, lineWidth: 3)
                             .opacity(selected ? 1 : 0)
                     }
@@ -234,7 +243,8 @@ private struct AppIconCell: View {
                 Text(L10n.appIconName(choice))
                     .font(.caption.weight(selected ? .bold : .regular))
                     .foregroundStyle(selected ? Theme.ivory : Theme.muted)
-                    .lineLimit(1)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(TypeLayout.labelLineLimit(for: typeSize))
                     .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
