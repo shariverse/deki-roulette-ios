@@ -111,9 +111,9 @@ func writePNG(_ image: CGImage, to url: URL) {
 
 /// `<directory>/<packageName>.icon` を作り直す（前のレイヤー画像が残らないよう、いったん消してから書く）
 func writeIcon(_ design: IconDesign, into directory: URL, packageName: String? = nil) throws {
-    // レイヤーの名前は PNG のファイル名になるので、重なると先に書いた画像が上書きされる
+    // レイヤーの名前は PNG のファイル名になるので、重なると先に書いた画像が上書きされる（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
     let names = design.groups.flatMap { $0.layers.map(\.name) }
-    precondition(Set(names).count == names.count, "\(design.name) のレイヤーの名前が重なっています: \(names)")
+    precondition(Set(names.map { $0.lowercased() }).count == names.count, "\(design.name) のレイヤーの名前が重なっています: \(names)")
 
     let fm = FileManager.default
     let package = directory.appendingPathComponent("\(packageName ?? design.name).icon")
