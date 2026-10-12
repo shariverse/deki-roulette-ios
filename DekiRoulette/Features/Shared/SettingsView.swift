@@ -36,29 +36,9 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(Theme.muted)
                     }
-                    NavigationLink {
+                    SettingsLinkRow(title: L10n.rouletteAdvancedTitle) {
                         RouletteAdvancedSettingsView()
-                    } label: {
-                        HStack {
-                            Text(L10n.rouletteAdvancedTitle)
-                                .font(.callout.weight(.bold))
-                                .foregroundStyle(Theme.ivory)
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Theme.muted)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 12)
-                        .frame(minHeight: 44)
-                        .background(Theme.ink800, in: .rect(cornerRadius: 12))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Theme.ink700, lineWidth: 1)
-                        }
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
                     SettingsSection(title: L10n.resetItemsTitle) {
                         Text(L10n.resetItemsDescription)
                             .font(.caption)
@@ -210,6 +190,38 @@ private struct SettingsChoiceRow: View {
     }
 }
 
+/// 設定から別の画面へ進む 1 行。枠の中に見出しと山かっこを並べる。
+private struct SettingsLinkRow<Destination: View>: View {
+    let title: String
+    @ViewBuilder let destination: () -> Destination
+
+    var body: some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack {
+                Text(title)
+                    .font(.callout.weight(.bold))
+                    .foregroundStyle(Theme.ivory)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .background(Theme.ink800, in: .rect(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Theme.ink700, lineWidth: 1)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// 設定の ON/OFF 1 項目。枠の中に見出しとスイッチを並べる。
 private struct SettingsToggle: View {
     let title: String
@@ -243,17 +255,26 @@ private struct SettingsSection<Content: View>: View {
                 .foregroundStyle(Theme.ivory)
                 .accessibilityAddTraits(.isHeader)
 
-            VStack(alignment: .leading, spacing: 8) {
-                content()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .background(Theme.ink800, in: .rect(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Theme.ink700, lineWidth: 1)
-            }
+            SettingsCard(content: content)
+        }
+    }
+}
+
+/// 設定の枠。中身を縦に並べて囲む。
+private struct SettingsCard<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(Theme.ink800, in: .rect(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Theme.ink700, lineWidth: 1)
         }
     }
 }
