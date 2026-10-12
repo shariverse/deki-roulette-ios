@@ -113,13 +113,21 @@ func label(_ icon: String) -> String {
     (icon as NSString).deletingPathExtension.replacingOccurrences(of: "-", with: " ")
 }
 
-func draw(_ ctx: CGContext, _ string: String, size: Double, color: UInt32, centerX: Double, baseline: Double) {
+func textLine(_ string: String, size: Double, color: UInt32 = 0x000000) -> CTLine {
     let font = CTFontCreateWithName("HiraginoSans-W6" as CFString, size, nil)
     let attributes: [NSAttributedString.Key: Any] = [
         NSAttributedString.Key(kCTFontAttributeName as String): font,
         NSAttributedString.Key(kCTForegroundColorAttributeName as String): cg(color),
     ]
-    let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
+    return CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
+}
+
+func textWidth(_ string: String, size: Double) -> Double {
+    CTLineGetTypographicBounds(textLine(string, size: size), nil, nil, nil)
+}
+
+func draw(_ ctx: CGContext, _ string: String, size: Double, color: UInt32, centerX: Double, baseline: Double) {
+    let line = textLine(string, size: size, color: color)
     let width = CTLineGetTypographicBounds(line, nil, nil, nil)
     ctx.textPosition = CGPoint(x: centerX - width / 2, y: baseline)
     CTLineDraw(line, ctx)
@@ -133,9 +141,10 @@ struct Sheet {
 }
 
 /// 各セルの画像を横に並べ（画像は縮めずに等倍で描く）、下にラベルを付けて columns 列に並べる。
-/// cellWidth はセルの幅（ラベルが隣と重ならない幅にする）
-func writeSheet(_ sheet: Sheet, cells: [(String, [CGImage])], columns: Int, cellWidth: Double, gap: Double, to url: URL) {
-    let pad = 32.0, labelHeight = 40.0, titleHeight = 72.0
+/// minCellWidth はセルの幅の下限（ラベルがそれより長いときは、隣と重ならないようラベルの幅まで広げる）
+func writeSheet(_ sheet: Sheet, cells: [(String, [CGImage])], columns: Int, minCellWidth: Double, gap: Double, to url: URL) {
+    let pad = 32.0, labelHeight = 40.0, titleHeight = 72.0, labelSize = 22.0
+    let cellWidth = max(minCellWidth, cells.map { textWidth($0.0, size: labelSize) }.max()!.rounded(.up))
     let cell = Double(cells.flatMap { $0.1.map(\.height) }.max()!)
     let rows = (cells.count + columns - 1) / columns
     let width = pad * 2 + Double(columns) * cellWidth + Double(columns - 1) * pad
@@ -155,7 +164,7 @@ func writeSheet(_ sheet: Sheet, cells: [(String, [CGImage])], columns: Int, cell
             ctx.draw(image, in: CGRect(x: left, y: top - cell, width: Double(image.width), height: Double(image.height)))
             left += Double(image.width) + gap
         }
-        draw(ctx, name, size: 22, color: sheet.text, centerX: x + cellWidth / 2, baseline: top - cell - 30)
+        draw(ctx, name, size: labelSize, color: sheet.text, centerX: x + cellWidth / 2, baseline: top - cell - 30)
     }
     let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
     CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
@@ -173,8 +182,8 @@ let sheets: [(rendition: String, sheet: Sheet)] = [
 let columns = min(6, icons.count)
 for (rendition, sheet) in sheets {
     let cells = icons.map { (label($0), [load(export($0, rendition: rendition, size: 200))]) }
-    writeSheet(sheet, cells: cells, columns: columns, cellWidth: 200, gap: 0, to: output.appendingPathComponent("preview-\(rendition).png"))
+    writeSheet(sheet, cells: cells, columns: columns, minCellWidth: 200, gap: 0, to: output.appendingPathComponent("preview-\(rendition).png"))
 }
 let small = icons.map { (label($0), [load(export($0, rendition: "Default", size: 60)), load(export($0, rendition: "Default", size: 40))]) }
 writeSheet(Sheet(title: "Default 60px / 40px", background: (0xF2F2F7, 0xF2F2F7), text: 0x1C1C1E),
-           cells: small, columns: columns, cellWidth: 160, gap: 16, to: output.appendingPathComponent("preview-small.png"))
+           cells: small, columns: columns, minCellWidth: 160, gap: 16, to: output.appendingPathComponent("preview-small.png"))
