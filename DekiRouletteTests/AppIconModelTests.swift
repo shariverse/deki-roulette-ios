@@ -84,8 +84,28 @@ struct AppIconModelTests {
         #expect(model.current == .standard)
     }
 
+    /// 一覧に無い名前（消した代替アイコンなど）を選んでいた利用者も、選び直せる。
+    @Test func どれも選ばれていない状態から選べる() async {
+        let source = FakeIconSource(alternateIconName: "AppIcon-Casino")
+        let model = AppIconModel(source: source)
+        await model.select(.neon)
+        #expect(source.requested == ["AppIcon-Neon"])
+        #expect(model.current == .neon)
+    }
+
+    @Test func どれも選ばれていない状態で失敗したらそのまま戻す() async {
+        let source = FakeIconSource(alternateIconName: "AppIcon-Casino")
+        source.fails = true
+        let model = AppIconModel(source: source)
+        await model.select(.neon)
+        #expect(model.current == nil)
+        #expect(model.failed == true)
+    }
+
     /// iOS のアラートを閉じるまで切替は終わらない。その間も選択の表示は選んだものにし、次の選択は受け付けない。
-    @Test func 切り替えの途中は選択を先に変えて次を受け付けない() async {
+    /// 待ち合わせが外れたときに止まり続けないよう、時間を区切る。
+    @Test(.timeLimit(.minutes(1)))
+    func 切り替えの途中は選択を先に変えて次を受け付けない() async {
         let source = FakeIconSource()
         source.holds = true
         let model = AppIconModel(source: source)
