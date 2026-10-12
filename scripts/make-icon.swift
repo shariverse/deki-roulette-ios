@@ -112,11 +112,8 @@ func writePNG(_ image: CGImage, to url: URL) {
 }
 
 /// `<directory>/<packageName>.icon` を作り直す（前のレイヤー画像が残らないよう、いったん消してから書く）
+/// 名前の重なりは書き出す前に `validate` で確かめる
 func writeIcon(_ design: IconDesign, into directory: URL, packageName: String? = nil) throws {
-    // レイヤーの名前は PNG のファイル名になるので、重なると先に書いた画像が上書きされる（APFS は大文字小文字を区別しないので、小文字にそろえて比べる）
-    let names = design.groups.flatMap { $0.layers.map(\.name) }
-    precondition(Set(names.map { $0.lowercased() }).count == names.count, "\(design.name) のレイヤーの名前が重なっています: \(names)")
-
     let fm = FileManager.default
     let package = directory.appendingPathComponent("\(packageName ?? design.name).icon")
     let assets = package.appendingPathComponent("Assets")
@@ -427,6 +424,18 @@ func isInsideRepository(_ components: [String]) -> Bool {
     (1...components.count).contains { FileManager.default.fileExists(atPath: NSString.path(withComponents: Array(components.prefix($0)) + ["project.yml"])) }
 }
 
+/// 書き出す前に全部をまとめて確かめる（途中で止まって、出力先に半端な .icon が残らないように）。
+/// .icon の名前とレイヤーの名前（PNG のファイル名になる）が重なると、先に書いたものが上書きされる。
+/// APFS は大文字小文字を区別しないので、小文字にそろえて比べる
+func validate(_ packages: [(name: String, design: IconDesign)]) {
+    func overlaps(_ names: [String]) -> Bool { Set(names.map { $0.lowercased() }).count != names.count }
+    if overlaps(packages.map(\.name)) { fail(".icon の名前が重なっています: \(packages.map(\.name))") }
+    for (name, design) in packages {
+        let layers = design.groups.flatMap { $0.layers.map(\.name) }
+        if overlaps(layers) { fail("\(name) のレイヤーの名前が重なっています: \(layers)") }
+    }
+}
+
 let usage = """
     使い方: swift scripts/make-icon.swift <出力先のディレクトリ>
            swift scripts/make-icon.swift --candidates <出力先のディレクトリ>
@@ -437,6 +446,9 @@ let fm = FileManager.default
 var isDirectory: ObjCBool = false
 switch (arguments.count, arguments.first) {
 case (2, "--candidates"):
+    let packages = [("00-\(appIcon.name)", appIcon)]
+        + candidates.sorted(by: { $0.key < $1.key }).map { (String(format: "%02d-%@", $0.key, $0.value.name), $0.value) }
+    validate(packages)
     // 前の案が混ざらないよう、空のディレクトリにだけ書き出す。DekiRoulette/ の下の .icon はすべてアプリに入るので、リポジトリの中には書かない
     let output = URL(fileURLWithPath: arguments[1], isDirectory: true)
     guard !isInsideRepository(resolvedComponents(arguments[1])) else {
@@ -449,11 +461,9 @@ case (2, "--candidates"):
     } else {
         try fm.createDirectory(at: output, withIntermediateDirectories: true)
     }
-    try writeIcon(appIcon, into: output, packageName: "00-\(appIcon.name)")
-    for (number, design) in candidates.sorted(by: { $0.key < $1.key }) {
-        try writeIcon(design, into: output, packageName: String(format: "%02d-%@", number, design.name))
-    }
+    for (name, design) in packages { try writeIcon(design, into: output, packageName: name) }
 case (1, let path?) where !path.hasPrefix("-"):
+    validate(appIcons.map { ($0.name, $0) })
     // 打ち間違いで 2 つ目の AppIcon.icon を作らないよう、既定のアイコンの置き場所だけを受け付ける:
     // .icon や .xcassets などの中ではない既存のディレクトリで、AppIcon.icon が既にあるか、名前が Resources のもの
     let output = URL(fileURLWithPath: path, isDirectory: true)
