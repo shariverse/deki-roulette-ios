@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 xcodegen generate   # project.yml から DekiRoulette.xcodeproj を生成（.xcodeproj は git 管理外）
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
-swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（DekiRoulette/Resources/AppIcon.icon を書き出す）
+swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（DekiRoulette/Resources の AppIcon.icon と代替アイコンの AppIcon-<名前>.icon を書き出す）
 dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"  # アイコンの案と一覧の画像（案はアプリに入れない）
 swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 回転音の再生成（--preview で 1 スピン分の試聴用）
 ```

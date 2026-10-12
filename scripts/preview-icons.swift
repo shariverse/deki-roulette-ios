@@ -3,7 +3,8 @@
 // 使い方: swift scripts/preview-icons.swift <.icon を並べたディレクトリ> <出力先のディレクトリ>
 //   例: dir=$(mktemp -d)
 //       swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"
-//   <番号>-<名前>.icon を名前の順に並べ、次の画像を出力先に書く（出力先は無ければ作る。リポジトリの中は受け付けない）:
+//   .icon を名前の順に並べ、次の画像を出力先に書く（出力先は無ければ作る。リポジトリの中は受け付けない）。
+//   DekiRoulette/Resources を渡すと、アプリに入っているアイコン（既定と代替）の一覧になる:
 //     preview-Default.png / preview-Dark.png / preview-TintedDark.png / preview-ClearLight.png  外観ごとの一覧
 //     preview-small.png  60px と 40px で並べた一覧（小さいサイズで潰れる案が分かるように）
 import CoreGraphics
@@ -105,7 +106,7 @@ func cg(_ hex: UInt32) -> CGColor {
     CGColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
 }
 
-/// `03-Casino.icon` → `03 Casino`
+/// `00-AppIcon-Neon.icon` → `00 AppIcon Neon`
 func label(_ icon: String) -> String {
     (icon as NSString).deletingPathExtension.replacingOccurrences(of: "-", with: " ")
 }
