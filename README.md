@@ -79,13 +79,26 @@ swift scripts/make-icon.swift DekiRoulette/Resources   # DekiRoulette/Resources/
 ```
 
 `.icon` の中の画像と `icon.json` はスクリプトの出力なので、手で直さない（Icon Composer で開いて調整を試すのはよいが、
-決めた値はスクリプトに戻す。戻さないと次に作り直したときに消える）。外観ごとの見え方は、Icon Composer に付属する
-`ictool` で画像に書き出して確かめられる（`--rendition` は `Default` / `Dark` / `TintedLight` / `TintedDark` / `ClearLight` / `ClearDark`）:
+決めた値はスクリプトに戻す。戻さないと次に作り直したときに消える）。スクリプトで指定できるのは、背景（単色・上から下への
+グラデーション・自動のグラデーション）と、group ごとの透け具合・縁の光（specular）・影、レイヤーごとの Liquid Glass の有無。
+外観ごとの見え方は、Icon Composer に付属する `ictool` で画像に書き出して確かめられる
+（`--rendition` は `Default` / `Dark` / `TintedLight` / `TintedDark` / `ClearLight` / `ClearDark`）:
 
 ```bash
 "/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool" \
   DekiRoulette/Resources/AppIcon.icon --export-image --output-file /tmp/AppIcon.png \
   --platform iOS --rendition Default --width 1024 --height 1024 --scale 1
+```
+
+アイコンの案は `--candidates` で `<番号>-<名前>.icon` として書き出し（`00` が今の既定のアイコン）、`scripts/preview-icons.swift` で
+外観ごと（Default / Dark / TintedDark / ClearLight）の一覧と、60px・40px の一覧の画像にする。スクリプトに残っている案は、
+32 案から選定で採用したもの（`01` Neon・`02` Pastel・`04` Spinner・`30` Target。番号は選定のときのまま）。
+`DekiRoulette/` の下に置いた `.icon` はすべてアプリに入るので、案はリポジトリの外の空のディレクトリに書き出す:
+
+```bash
+dir=$(mktemp -d)
+swift scripts/make-icon.swift --candidates "$dir/icons"
+swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"   # preview-*.png を書き出す
 ```
 
 ## 構成
