@@ -63,6 +63,18 @@ enum L10n {
         case .grip: tr("tiltReferenceGrip")
         }
     }
+    static var appIconTitle: String { tr("appIconTitle") }
+    static func appIconName(_ choice: AppIconChoice) -> String {
+        switch choice {
+        case .standard: tr("appIconStandard")
+        case .neon: tr("appIconNeon")
+        case .pastel: tr("appIconPastel")
+        case .spinner: tr("appIconSpinner")
+        case .target: tr("appIconTarget")
+        }
+    }
+    static var appIconFailedTitle: String { tr("appIconFailedTitle") }
+    static var appIconFailedMessage: String { tr("appIconFailedMessage") }
     static var soundToggle: String { tr("soundToggle") }
     static var soundNote: String { tr("soundNote") }
     static var close: String { tr("close") }

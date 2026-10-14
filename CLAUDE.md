@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 xcodegen generate   # project.yml から DekiRoulette.xcodeproj を生成（.xcodeproj は git 管理外）
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
-swift scripts/make-icon.swift DekiRoulette/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png  # アイコン再生成
+swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（DekiRoulette/Resources の AppIcon.icon・代替アイコンの AppIcon-<名前>.icon と、設定画面の見本の imageset を書き出す）
+dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"  # アイコンの案と一覧の画像（案はアプリに入れない）
 swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 回転音の再生成（--preview で 1 スピン分の試聴用）
 ```
 
@@ -44,6 +45,12 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
   `ItemListView` が `ids(in:)` を描画のたびに求めて同名の行すべてのラベルの下に注意を出し（追加・読み込み・復元・元に戻すの
   どの経路でも反映される）、追加時は `conflicts(adding:to:)` が真のときだけ確認の `alert` を挟む（読み込み・復元・元に戻すでは出さない）。
   注意は指定の有無で変えない（印とは独立。色は `muted`）。
+- アプリアイコンは `scripts/make-icon.swift` が Core Graphics でレイヤーを描き、Icon Composer の `.icon`（既定は `Resources/AppIcon.icon`、
+  代替アイコンは `Resources/AppIcon-<名前>.icon`）と、設定画面の見本（`Assets.xcassets/<名前>-Preview.imageset`。`ictool` で書き出す）を作る。
+  代替アイコンの名前は `project.yml` の `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES`・スクリプトの `alternateIcons`・`AppIconChoice`（`Core/`）で
+  そろえ（`AppIconChoiceTests` がビルドした Info.plist と突き合わせる）、リリースしたら変えない。設定シートの「アプリアイコン」で選び、
+  `AppIconModel` が `AppIconSource`（実体は `UIApplication`）の `setAlternateIconName` を呼ぶ。選択はシステムが覚えるので `UserDefaults` には持たない。
+  アイコンそのものを `UIImage(named:)` で読まない（iOS 26 で UIKit のアサーションで落ち、iOS 18 では nil）。
 
 ### スピンの仕組み
 
