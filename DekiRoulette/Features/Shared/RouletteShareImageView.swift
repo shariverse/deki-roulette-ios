@@ -71,7 +71,8 @@ enum ShareImageRenderer {
     }
 
     /// 一辺 `side` の正方形の View を画像にする。書体はアプリ全体と同じ丸ゴシック（`ImageRenderer` はアプリの environment を継がない）。
-    /// 色は固定のトークンだけを使うので外観に依らないが、解決の環境はダークにそろえる。
+    /// 地・文字・盤面は固定のトークンだが、針と帯の影（`Theme.pointerShadow`）は外観で濃さが変わるので、解決の環境をダークに固定して
+    /// 端末の外観に依らず同じ画像にする。
     static func render(_ content: some View, side: Double) -> UIImage? {
         let renderer = ImageRenderer(
             content: content

@@ -55,8 +55,9 @@ struct RouletteShareImageTests {
         let layout = ShareImageLayout.roulette(side: ShareImageLayout.defaultSide)
         let nearTop = CGPoint(x: layout.wheelCenter.x, y: layout.pointerTop + 3)
         #expect(isClose(pixels.color(at: nearTop), srgb(Theme.flare)))
-        // 針のすぐ上は地
-        #expect(isClose(pixels.color(at: CGPoint(x: layout.wheelCenter.x, y: layout.pointerTop - 8)), srgb(Theme.shareBackground)))
+        // 針の上の余白は地。止まったスライスの光彩（`stopGlowRadius` の数倍まで届く）が掛からない、画像の縁に近いところで見る
+        let aboveGlow = CGPoint(x: layout.wheelCenter.x, y: ShareImageLayout.margin(side: layout.side) / 4)
+        #expect(isClose(pixels.color(at: aboveGlow), srgb(Theme.shareBackground)))
     }
 
     @Test func 止まったスライスは塗りのままで他のスライスは沈む() throws {
