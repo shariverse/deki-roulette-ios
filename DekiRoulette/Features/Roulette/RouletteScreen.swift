@@ -9,6 +9,8 @@ struct RouletteScreen: View {
     @AppStorage(Config.wheel3DEnabledKey) private var wheel3DEnabled = false
     let model: RouletteModel
     @State private var sound = SpinSoundPlayer()
+    /// 共有シートに本文と一緒に渡す結果の画像。結果ごとに 1 回だけ描く（`shareImageKey` の変化で `.task` が描き直す）。
+    @State private var shareImage: UIImage?
 
     var body: some View {
         PageFrame(
@@ -62,6 +64,23 @@ struct RouletteScreen: View {
         }
         .onAppear { if soundEnabled { sound.prepare() } }
         .onDisappear { sound.stop() }
+        // 結果が出て演出が終わったあとに 1 回だけ共有画像を描く。スピン中・結果が無いときは描かず、前の画像も捨てる。
+        // 3D 表示が ON でも 2D の盤面で描く。光彩は画面の設定に合わせる
+        .task(id: shareImageKey) {
+            guard shareImageKey != nil, let outcome = model.outcome else {
+                shareImage = nil
+                return
+            }
+            shareImage = ShareImageRenderer.roulette(
+                items: model.items, outcome: outcome, rotation: model.rotation, glowStyle: glowStyle
+            )
+        }
+    }
+
+    /// 共有画像を描き直す鍵。結果が出て演出が終わった後だけ値を持ち、結果ごと（`spinCount`）に変わる（結果の表示の `.id` と同じ）。
+    private var shareImageKey: String? {
+        guard let outcome = model.outcome, !model.spinning else { return nil }
+        return outcome.label + "\(model.spinCount)"
     }
 
     private var regular: Bool { sizeClass == .regular }
@@ -87,7 +106,7 @@ struct RouletteScreen: View {
                 // 結果が出ている間だけ出す。順番決めと同じ位置・同じ見た目
                 if let outcome = model.outcome, !model.spinning {
                     let text = ResultText.roulette(label: outcome.label, heading: L10n.resultHeading)
-                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName))
+                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
                         .id(outcome.label + "\(model.spinCount)")
                 }
             }

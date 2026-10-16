@@ -56,7 +56,7 @@ struct RouletteShareImageView: View {
 
 /// 共有画像を `UIImage` に焼く。`ImageRenderer` は `@MainActor` なので View 側から呼ぶ。
 /// `scale` は 1 に固定し、端末の画面倍率に依らず一辺 `side` px の画像にする。重い処理なので、結果が確定したあとに 1 回だけ呼び、
-/// 結果ごとに `LatestCache` で持つ（スピン中・結果が無いときは呼ばない）。
+/// 画面が `@State` に持つ（`RouletteScreen` の `.task(id:)`。スピン中・結果が無いときは呼ばない）。
 @MainActor
 enum ShareImageRenderer {
     /// ルーレットの結果画像。`items` と `outcome` は結果を出したときのもの、`rotation` は止まったときの累積の回転角。
