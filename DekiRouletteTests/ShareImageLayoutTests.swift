@@ -1,10 +1,10 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import DekiRoulette
 
 struct ShareImageLayoutTests {
     private let side = ShareImageLayout.defaultSide
-    private let sides = [540.0, 1080, 2160]
 
     @Test func 基本の一辺は1080px() {
         #expect(ShareImageLayout.defaultSide == 1080)
@@ -47,8 +47,8 @@ struct ShareImageLayoutTests {
         #expect(layout.wheelCenter.x - layout.wheelDiameter / 2 >= margin - 1e-9)
         #expect(layout.wheelCenter.x + layout.wheelDiameter / 2 <= side - margin + 1e-9)
         #expect(layout.wheelBottom <= ShareImageLayout.contentRange(side: side).upperBound + 1e-9)
-        // 左右中央
-        #expect(layout.wheelCenter.x == side / 2)
+        // 左右中央（`CGFloat` と `Double` を `==` で比べると `#expect` の中では型が合わず常に偽になるので差で見る）
+        #expect(abs(layout.wheelCenter.x - side / 2) < 1e-9)
     }
 
     @Test func 盤面は内容の範囲を縦いっぱいに使う() {
@@ -62,7 +62,7 @@ struct ShareImageLayoutTests {
         #expect(layout.wheelDiameter > Double(Theme.Layout.wheelMaxWidthRegular))
     }
 
-    @Test func 針は画面と同じ比率で盤面に合わせる() {
+    @Test func 針は基準直径での画面の針と同じ比率で盤面に合わせる() {
         let layout = ShareImageLayout.roulette(side: side)
         let scale = layout.wheelDiameter / WheelLabel.referenceDiameter
         #expect(abs(layout.pointerSize.width - ShareImageLayout.basePointerWidth * scale) < 1e-9)
@@ -100,6 +100,11 @@ struct ShareImageLayoutTests {
     @Test func 上限までは全件を並べ超えたら最後の行をまとめる() {
         let layout = ShareImageLayout.order(side: side)
         let max = layout.maxRows
+        // 比率を変えて上限が項目数の範囲の外に出たら、範囲の生成で落ちる前に失敗として知らせる
+        guard max >= Config.minItems, max < Config.maxItems else {
+            Issue.record("行数の上限 \(max) が項目数の範囲（\(Config.minItems)...\(Config.maxItems)）の中にない")
+            return
+        }
         for count in Config.minItems...max {
             let rows = layout.rows(count: count)
             #expect(rows == ShareImageLayout.Order.Rows(shown: count, omitted: 0))
@@ -169,7 +174,7 @@ struct ShareImageLayoutTests {
         let order = ShareImageLayout.order(side: side)
         #expect(order.maxRows == 0)
         #expect(order.labelLimit == 0)
-        #expect(order.rows(count: 5) == ShareImageLayout.Order.Rows(shown: 0, omitted: 5))
+        #expect(order.rows(count: 5) == ShareImageLayout.Order.Rows(shown: 0, omitted: 0))
         #expect(order.rowsTop(count: 5) == 0)
         #expect(ShareImageLayout.margin(side: side) == 0)
     }

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// 共有シートに渡す結果の画像の寸法とレイアウト。正方形 1 枚（基本は `defaultSide` = 1080px 四方）を前提に、
@@ -19,10 +20,11 @@ enum ShareImageLayout {
     /// 内容（盤面・カード）とアプリ名の間隔（一辺に対する割合）。
     static let brandGapRatio = 0.03
 
-    /// 針の大きさ（盤面の基準直径 `WheelLabel.referenceDiameter` での pt）。`RouletteWheelView` の針と同じ。
+    /// 針の大きさ（盤面の基準直径 `WheelLabel.referenceDiameter` での pt）。画面の針（`RouletteWheelView`、22×26pt の固定）を
+    /// 基準直径での大きさとみなし、共有画像では盤面の直径に比例させる。
     static let basePointerWidth: Double = 22
     static let basePointerHeight: Double = 26
-    /// 針が盤面の上端から外へ出る長さ（基準直径での pt）。`RouletteWheelView` の `offset(y: -6)` と同じ。
+    /// 針が盤面の上端から外へ出る長さ（基準直径での pt）。画面の針の `offset(y: -6)` を基準直径での値とみなす。
     static let basePointerOverhang: Double = 6
 
     /// 順番決めのカードの 1 行の高さ（一辺に対する割合）。
@@ -33,7 +35,7 @@ enum ShareImageLayout {
     static let orderFontRatio = 0.03
     /// 行の左右の内側の余白（一辺に対する割合）。
     static let orderRowPaddingRatio = 0.02
-    /// 順位の欄の幅（一辺に対する割合）。2 桁の数字と「.」が入る。
+    /// 順位の欄の幅（一辺に対する割合）。2 桁の順位が入る（順位の書き方は描画側が決める）。
     static let orderRankWidthRatio = 0.045
     /// 順位の欄とラベルの間隔（一辺に対する割合）。
     static let orderRankGapRatio = 0.012
@@ -121,8 +123,9 @@ enum ShareImageLayout {
     struct Order: Equatable {
         /// 画像の一辺。
         let side: Double
-        /// 行を置く範囲の左端と幅（カードの幅）。
+        /// 行（カード）の左端。
         let rowsLeft: Double
+        /// 行（カード）の幅。
         let rowWidth: Double
         /// 1 行の高さ。
         let rowHeight: Double
@@ -159,8 +162,10 @@ enum ShareImageLayout {
         }
 
         /// `count` 件の結果に対して置く行の内訳。上限に収まるなら全件、収まらなければ上限より 1 つ少ない件数を並べて残りをまとめる。
+        /// 行を 1 つも置けない（`maxRows == 0`）ときは何も置かない。`total` は常に `maxRows` 以下。
         func rows(count: Int) -> Rows {
             let count = max(0, count)
+            guard maxRows > 0 else { return Rows(shown: 0, omitted: 0) }
             guard count > maxRows else { return Rows(shown: count, omitted: 0) }
             let shown = max(0, maxRows - 1)
             return Rows(shown: shown, omitted: count - shown)
