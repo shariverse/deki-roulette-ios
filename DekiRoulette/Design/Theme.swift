@@ -196,6 +196,16 @@ enum Theme {
     /// 削除を元に戻すトーストの出入り。
     static let undoToastAnimation = Animation.easeOut(duration: 0.2)
 
+    // MARK: 共有画像
+
+    // 共有シートに渡す結果の画像（`RouletteShareImageView`。寸法は `ShareImageLayout`）。アプリの外で見られるので外観に依らず固定し、
+    // 盤面の固定色（`wheel*` / `onSlice` / スライスの塗り）がなじむダークの地に、白系の文字でアプリ名だけを載せる（アイコンは置かない）。
+
+    /// 共有画像の地。ダークの `ink900` と同じ値を固定で持つ。
+    static let shareBackground = Color(hex: 0x17111F)
+    /// 共有画像の文字（アプリ名）。ダークの `ivory` と同じ値を固定で持つ。
+    static let shareInk = Color(hex: 0xF5EFE6)
+
     // MARK: スワイプ削除
 
     /// 行を左にスワイプしたときに出る削除ボタンの塗り。外観に依らず固定し、文字は `onDestructive` で載せる。
