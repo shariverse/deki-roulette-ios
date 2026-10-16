@@ -6,6 +6,8 @@ struct OrderScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     let model: OrderModel
     @AppStorage(Config.hapticsEnabledKey) private var hapticsEnabled = true
+    /// 共有シートに本文と一緒に渡す結果の画像。結果ごとに 1 回だけ描く（`shareImageKey` の変化で `.task` が描き直す）。
+    @State private var shareImage: UIImage?
 
     var body: some View {
         PageFrame(
@@ -45,6 +47,21 @@ struct OrderScreen: View {
         .sensoryFeedback(trigger: model.revealing) { wasRevealing, revealing in
             hapticsEnabled && wasRevealing && !revealing ? .success : nil
         }
+        // 演出が終わって結果が出ているときに 1 回だけ共有画像を描く。演出中・結果が無いときは描かず、前の画像も捨てる。
+        // 渡すのは並べ替え後のラベルだけ（先頭・末尾の指定や印は渡さない）
+        .task(id: shareImageKey) {
+            guard shareImageKey != nil, let ordered = model.ordered else {
+                shareImage = nil
+                return
+            }
+            shareImage = ShareImageRenderer.order(labels: ordered.map(\.label))
+        }
+    }
+
+    /// 共有画像を描き直す鍵。演出が終わって結果が出ている間だけ値を持ち、並べ替えるたび（`resultId`）に変わる（結果の表示の `.id` と同じ）。
+    private var shareImageKey: UUID? {
+        guard model.ordered != nil, !model.revealing else { return nil }
+        return model.resultId
     }
 
     private var regular: Bool { sizeClass == .regular }
@@ -70,7 +87,7 @@ struct OrderScreen: View {
                 // 「コピーしました」も自然に戻る
                 if let ordered = model.ordered, !model.revealing {
                     let text = ResultText.order(ordered.map(\.label))
-                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName))
+                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
                         .id(model.resultId)
                 }
             }
