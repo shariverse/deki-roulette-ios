@@ -96,6 +96,8 @@ enum L10n {
     static var copyResult: String { tr("copyResult") }
     static var copied: String { tr("copied") }
     static var share: String { tr("share") }
+    /// 共有画像で省略した順位の件数の行（「ほか 3 件」）。
+    static func shareOrderOthers(_ count: Int) -> String { fmt("shareOrderOthers", count) }
     static var resultHeading: String { tr("resultHeading") }
     static var appName: String { tr("appName") }
     static var listMenuLabel: String { tr("listMenuLabel") }
