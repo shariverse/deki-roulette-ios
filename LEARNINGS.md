@@ -28,3 +28,11 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   `NavigationLink` や `Button` は、見つけたアクセシビリティ要素の `accessibilityActivate()` で押せる（2026-10-12）
 - `Button` の外側に `.accessibilityElement(children: .ignore)` を付けて名前を付け直すと、`accessibilityActivate()` で動作が起きない（VoiceOver や
   フルキーボードアクセスから押せないおそれがある）。読ませたくない画像は `.accessibilityHidden(true)` にして、名前はボタンの中の `Text` から読ませる（2026-10-12）
+
+## テスト（Swift Testing）
+
+- `#expect` の中で `CGFloat` と `Double` を `==` で比べると、値が同じでも常に偽になる（マクロの展開で暗黙の変換が効かない）。ローカルで通っているように見えてもテストを動かせる Mac が無いと気付けないので、`abs(a - b) < 1e-9` のように同じ型にそろえてから比べる。`CGPoint` / `CGSize` を使う `Core/` のファイルとテストは `import CoreGraphics` を明示する（2026-10-16）
+- `ImageRenderer` で焼いた画像の画素を見るテストでは、止まったスライスの光彩（`stopGlow` の `.shadow`）が半径の 2〜3 倍まで届く（`Wheel3DView` が焼く余白を `stopGlowRadius × scale × 3` 取っているのと同じ）。
+  「地」の色を見る画素は光彩の外（画像の縁の近く）に置く。盤面のすぐ上の余白で見ると、地より明るくなって許容 0.04 を超える（2026-10-16）
+- `xcodebuild build-for-testing` はラッパー経由でローカルでも動くので、テストを動かせる Mac が無いときもテストのコンパイルまでは確かめられる
+  （`build` ではスキームの設定上テストターゲットはビルドされない）（2026-10-16）

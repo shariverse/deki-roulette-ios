@@ -144,6 +144,33 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 1 つだけ作る（`CMMotionManager` を作り直さない）。傾きと揺れは見た目だけで、止まる位置・結果・触覚・回転音の時刻には影響させない。
 3D の盤面も `accessibilityHidden` で、指定（`targetId`）は渡さない。見た目は `Wheel3DSceneTests` が `SCNRenderer` の画面外描画の画素で確かめる。
 
+### 共有画像の仕組み
+
+両画面の「共有」（`ResultActions`、`Features/Shared/`）は、`shareImage` があれば `ShareLink(item: ShareImageFile, message: 本文, preview:)` で
+結果の画像（PNG）を本体にし本文（`ResultText.share`）を添えて共有シートに渡す。無ければ今までどおり本文だけ。
+プレビューの題名は `L10n.appName`、画像は結果画像そのもの。X・Instagram の専用ボタン（ディープリンク）は置かない。
+
+- 寸法とレイアウトは `ShareImageLayout`（`Core/`）が画像の一辺から決める純粋関数。基本は 1080×1080 px（`defaultSide`）、余白 8%、アプリ名の文字 3.6% で
+  下の余白のすぐ上。ルーレット（`roulette(side:)`）は盤面の直径と中心・針（基準直径での 22×26pt に比例）・帯の中心（`ResultBand.centerOffset`）、
+  順番決め（`order(side:)`）は行の高さ 6.4%・間隔 1.2%・文字 3%・順位の欄（「10.」が入る幅）と、行数の上限（範囲に入る行数。1080px で 10 行）。
+  上限を超えるときは `rows(count:)` が上限より 1 つ少ない件数を並べて最後を「ほか M 件」（`L10n.shareOrderOthers`）にする。テストは `ShareImageLayoutTests`。
+- 描画は `RouletteShareImageView` と `OrderShareImageView`（`Features/Shared/`）。ルーレットの盤面は画面と同じ `WheelFaceView`（`RouletteWheelView` から
+  切り出した面。縁・スライス・ラベル・ハブ・停止の強調）を `animated: false`・`highlightScale: Theme.stopHoldScale` で描き、針は `WheelPointerView` を
+  直径に比例した大きさで、帯は画面と同じ `ResultBandLabel` を置く。盤面の影は付けない。3D 表示（`wheel3DEnabled`）が ON でも 2D で描き、SceneKit の
+  画面外描画は使わない。順番決めの行は `OrderResultView` と同じトークン（1 位は `gold`、他は `ivory` / `muted`、地は `ink800`）で「1. ラベル」の並び。
+- 配色は外観に依らず固定で、地は `Theme.shareBackground`（ダークの `ink900` と同じ値）、アプリ名は `Theme.shareInk`（ダークの `ivory` と同じ値）の文字だけ
+  （アイコンは `UIImage(named:)` で読めないので置かない）。`ShareImageRenderer.render` が `ImageRenderer` を `scale = 1`・`.fontDesign(.rounded)`・
+  `.environment(\.colorScheme, .dark)` で焼くので、外観で変わるトークンもダーク値に解決され、端末の画面倍率に依らず一辺 px の画像になる。
+  追加した配色は `ThemeContrastTests` で検証する。見た目は `RouletteShareImageTests` / `OrderShareImageTests` が画素で確かめる（光彩は半径の 2〜3 倍まで届くので、
+  「地」を見る画素は光彩の外に置く）。
+- 画像の生成は `@MainActor` の `ShareImageRenderer`（`roulette(items:outcome:rotation:glowStyle:)` / `order(labels:)`）を、各 Screen が
+  `.task(id: shareImageKey)` で呼んで `@State` に持つ。鍵は結果の表示の `.id` と同じ（ルーレットは `outcome.label + spinCount`、順番決めは `resultId`）で、
+  結果が出て演出が終わった後だけ値を持つ。スピン中・演出中・結果が無いときは描かず前の画像も捨てる（重い描画をスピンの演出・触覚・回転音の時刻に重ねない）。
+- ステルスの制約: 画像を描く View の入力は項目（id とラベル）・結果・回転角、または並べ替え後のラベルだけで、`targetId` / `firstId` / `lastId` / 印を
+  受け取る口を作らない。画像にも本文にも項目リスト・印・指定の有無・「当たり」「必ず」等の語を載せない。画面のスクリーンショットは使わず描き直すので
+  `ScreenCaptureMonitor` とは干渉しない。
+- 共有シートの投稿先（X・Instagram・LINE）での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。
+
 ### 並べ替えの仕組み
 
 `OrderModel.shuffleItems` が `Shuffler.arrange` を呼ぶ。Fisher-Yates で一様にシャッフルしてから先頭・末尾を入れ替える。
