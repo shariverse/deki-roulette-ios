@@ -35,8 +35,9 @@ enum ShareImageLayout {
     static let orderFontRatio = 0.03
     /// 行の左右の内側の余白（一辺に対する割合）。
     static let orderRowPaddingRatio = 0.02
-    /// 順位の欄の幅（一辺に対する割合）。2 桁の順位が入る（順位の書き方は描画側が決める）。
-    static let orderRankWidthRatio = 0.045
+    /// 順位の欄の幅（一辺に対する割合）。2 桁の順位にピリオドを付けた「10.」（`OrderShareImageView`。文字サイズ `orderFontRatio` の
+    /// 太字・等幅数字で約 5.1%）が収まる幅。
+    static let orderRankWidthRatio = 0.055
     /// 順位の欄とラベルの間隔（一辺に対する割合）。
     static let orderRankGapRatio = 0.012
 

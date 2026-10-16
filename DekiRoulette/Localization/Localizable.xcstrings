@@ -1751,6 +1751,23 @@
         }
       }
     },
+    "shareOrderOthers" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほか %lld 件"
+          }
+        }
+      }
+    },
     "resultHeading" : {
       "extractionState" : "manual",
       "localizations" : {
