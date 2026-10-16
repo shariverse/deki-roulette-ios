@@ -28,3 +28,7 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   `NavigationLink` や `Button` は、見つけたアクセシビリティ要素の `accessibilityActivate()` で押せる（2026-10-12）
 - `Button` の外側に `.accessibilityElement(children: .ignore)` を付けて名前を付け直すと、`accessibilityActivate()` で動作が起きない（VoiceOver や
   フルキーボードアクセスから押せないおそれがある）。読ませたくない画像は `.accessibilityHidden(true)` にして、名前はボタンの中の `Text` から読ませる（2026-10-12）
+
+## テスト（Swift Testing）
+
+- `#expect` の中で `CGFloat` と `Double` を `==` で比べると、値が同じでも常に偽になる（マクロの展開で暗黙の変換が効かない）。ローカルで通っているように見えてもテストを動かせる Mac が無いと気付けないので、`abs(a - b) < 1e-9` のように同じ型にそろえてから比べる。`CGPoint` / `CGSize` を使う `Core/` のファイルとテストは `import CoreGraphics` を明示する（2026-10-16）
