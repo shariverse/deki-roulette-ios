@@ -79,6 +79,34 @@ struct OrderShareImageTests {
         #expect(isClose(pixels.color(at: Int(side / 2), below), srgb(Theme.shareBackground)))
     }
 
+    @Test func 件数が上限ちょうどなら全件を並べて省略の行は出ない() throws {
+        let layout = ShareImageLayout.order(side: side)
+        let exact = Array(repeating: "■■■", count: layout.maxRows)
+        let pixels = try render(exact)
+        let rows = layout.rows(count: exact.count)
+        #expect(rows == ShareImageLayout.Order.Rows(shown: exact.count, omitted: 0))
+        // 最後の行（10 位）は 1 位の色ではなく本文の色で、その下は地
+        let last = rowRect(index: exact.count - 1, count: exact.count, layout: layout)
+        #expect(count(in: last, near: resolved(Theme.gold), pixels: pixels) == 0)
+        #expect(count(in: last, near: resolved(Theme.ivory), pixels: pixels) > 30)
+        let below = Int(layout.rowTop(index: exact.count, count: exact.count)) + 4
+        #expect(isClose(pixels.color(at: Int(side / 2), below), srgb(Theme.shareBackground)))
+    }
+
+    @Test func 二桁の順位は順位の欄に収まる() {
+        // 「10.」を画像と同じ書体（太字・丸ゴシック・等幅数字）で測り、欄の幅を超えないことを確かめる
+        let layout = ShareImageLayout.order(side: side)
+        var font = UIFont.systemFont(ofSize: layout.fontSize, weight: .black)
+        if let descriptor = font.fontDescriptor.withDesign(.rounded) {
+            font = UIFont(descriptor: descriptor, size: layout.fontSize)
+        }
+        font = UIFont(descriptor: font.fontDescriptor.addingAttributes([
+            .featureSettings: [[UIFontDescriptor.FeatureKey.type: kNumberSpacingType, .selector: kMonospacedNumbersSelector]],
+        ]), size: layout.fontSize)
+        let width = ("\(layout.maxRows)." as NSString).size(withAttributes: [.font: font]).width
+        #expect(width <= layout.rankWidth, "\(width) > \(layout.rankWidth)")
+    }
+
     // MARK: 計算
 
     private func render(_ labels: [String]) throws -> Pixels {
