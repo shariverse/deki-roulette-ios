@@ -34,7 +34,7 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
   `SlicePalette.index(for:at:count:paletteSize:)`（`Core/`）が決め、色の項目（`ItemAppearance.color`）は選んだ色、自動・絵文字の項目は
   件数つきの規則（`n % 色数 == 1` のときだけ末尾をずらして環の継ぎ目が同じ色にならないようにする）で引く。
   盤面の塗り・光彩（`WheelFaceView`）・行の色見本（`ItemListView`）・結果の帯の枠（`RouletteScreen`）・共有画像は同じ関数で引く。
-  件数だけの `sliceColor(at:count:)` は 3D の盤面（`Wheel3DView`）がまだ使っている。
+  3D の盤面（`Wheel3DView`）の塗り・停止の強調・ラベル画像も同じ関数と `WheelLabel.display` で引く。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
   絵文字の項目は `WheelLabel.display` が絵文字ぶん 1 文字短く省略して前に絵文字を付け、結果の帯（2D・3D・共有画像）は `WheelLabel.decorated` の全文を出す（読み上げと共有の本文はラベルのまま）。
@@ -121,7 +121,7 @@ ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚
 設定の「3D 表示」（`@AppStorage(Config.wheel3DEnabledKey)`、既定 OFF）が ON のとき、`RouletteScreen` は `RouletteWheelView` の代わりに
 `Wheel3DView` を出す（OFF のときの 2D は変えない。描画経路は二重になる）。SceneKit（`SCNView` を `UIViewRepresentable` で包む。
 iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・盤を裏の中心 1 点で支える支柱を描く（寸法は `Theme.Wheel3D`、メッシュは
-`WheelGeometry`）。スライスの塗りは 2D と同じ `Theme.sliceColor(at:count:)` で、表面は照明に依らない塗り（`.constant`）、側面・縁・
+`WheelGeometry`）。スライスの塗りは 2D と同じ `Theme.sliceColor(in:at:)`（項目の見た目を踏まえる）で、表面は照明に依らない塗り（`.constant`）、側面・縁・
 支柱だけ陰影を付ける。ラベルは `WheelLabel` の省略・文字サイズで 1 枚の画像に焼いて表面に貼る。
 場面は盤面の枠より `Theme.Wheel3D.overscan` だけ広く描き（触れた操作は受けない）、傾いた盤や針が切れないようにする。
 
