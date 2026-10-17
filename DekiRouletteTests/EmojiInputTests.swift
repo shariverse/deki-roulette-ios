@@ -14,6 +14,8 @@ struct EmojiInputTests {
         "☺️",
         "1️⃣", // キーキャップ
         "#️⃣",
+        "🧑🏻‍🤝‍🧑🏼", // 肌色の違う 2 人の ZWJ 結合
+        "🏴󠁧󠁢󠁥󠁮󠁧󠁿", // タグ付きの旗
     ])
     func 絵文字は1文字として通る(input: String) {
         #expect(EmojiInput.normalize(input) == Character(input))
@@ -51,5 +53,27 @@ struct EmojiInputTests {
     func 先頭が絵文字でなければ弾く() {
         #expect(EmojiInput.normalize("あ🍣") == nil)
         #expect(EmojiInput.normalize("1🍣") == nil)
+    }
+
+    @Test(arguments: [
+        "1\u{1F3FD}", // 肌色を受けない文字に肌色
+        "#\u{1F3FD}",
+        "©\u{1F3FD}",
+        "1\u{200D}", // 後ろに絵文字が続かない ZWJ
+        "™\u{200D}",
+        "1\u{FE0F}", // キーキャップの無い数字
+        "#\u{FE0F}",
+        "\u{1F1EF}", // 国旗の片割れ
+        "🍣\u{FE0E}", // 文字表示の異体字セレクタ
+        "☺\u{FE0E}",
+    ])
+    func 絵文字に見えない並びは弾く(input: String) {
+        #expect(EmojiInput.normalize(input) == nil)
+    }
+
+    @Test
+    func 数字のあとにZWJと絵文字が続いても弾く() {
+        // 先頭の書記素は「1 と ZWJ」で、絵文字は 2 文字目になる
+        #expect(EmojiInput.normalize("1\u{200D}🍣") == nil)
     }
 }
