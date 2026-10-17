@@ -3,10 +3,13 @@ import Foundation
 struct Item: Identifiable, Hashable, Sendable {
     let id: UUID
     let label: String
+    /// 色・絵文字の見た目。未指定は自動（並び順と件数から色を引く）。
+    let appearance: ItemAppearance
 
-    init(id: UUID = UUID(), label: String) {
+    init(id: UUID = UUID(), label: String, appearance: ItemAppearance = .auto) {
         self.id = id
         self.label = label
+        self.appearance = appearance
     }
 }
 
