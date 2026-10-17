@@ -35,8 +35,8 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
   盤面の塗り（`RouletteWheelView`）・行の色見本（`ItemListView`）・結果の帯の枠（`RouletteScreen`）は同じ関数で引く。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
-- 項目リストは `ItemStore`（`Core/`）が画面ごとに `UserDefaults` へ保存する。保存するのは `id` と `label` だけで、
-  指定（`targetId` / `firstId` / `lastId`）は保存しない。保存データが無い・読めないときだけ `L10n` の初期項目を使う。
+- 項目リストは `ItemStore`（`Core/`）が画面ごとに `UserDefaults` へ保存する。保存するのは `id`・`label` と見た目（`StoredAppearance`。
+  自動のときは書かず、読めない値は自動として読む）だけで、指定（`targetId` / `firstId` / `lastId`）は保存しない。保存データが無い・読めないときだけ `L10n` の初期項目を使う。
   両モデルは `RootView` が生成して各 Screen に渡し、設定シートが両方を初期化できるよう environment にも流す。
 - 名前を付けて保存したリストは `SavedListStore`（`Core/`）が 1 つのキーに保存し、`SavedListsModel` を `RootView` が
   生成して environment で両画面に配る。項目リストの見出し行のメニューから保存・読み込み・管理（`SavedListsView`）する。
