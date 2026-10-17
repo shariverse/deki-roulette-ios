@@ -280,7 +280,7 @@ struct ItemListView: View {
                 let mark = marks[item.id]
                 ItemRow(
                     item: item,
-                    color: Theme.sliceAccent(at: index, count: items.count),
+                    color: Theme.sliceAccent(in: items, at: index),
                     mark: mark,
                     showMark: revealMarks && mark != nil,
                     duplicate: duplicateIds.contains(item.id),

@@ -82,10 +82,31 @@ struct RouletteShareImageTests {
         #expect(!isClose(center, composite(Theme.sliceDim, over: Theme.sliceColor(at: 1, count: 4))))
     }
 
+    @Test func 色の項目は選んだ色で塗り他は今の規則で沈める() throws {
+        // 止まる添字 3 に紫、沈める添字 0 に水色を選ぶ。添字 2 は自動のまま
+        let styled = [
+            Item(label: "", appearance: .color(.cyan)),
+            Item(label: ""),
+            Item(label: ""),
+            Item(label: "", appearance: .color(.purple)),
+        ]
+        let pixels = try render(items: styled)
+        let layout = ShareImageLayout.roulette(side: ShareImageLayout.defaultSide)
+        let purple = Theme.sliceColors[SliceColor.purple.paletteIndex]
+        let stopped = pixels.color(at: location(angle: 0, fraction: 0.8, layout: layout))
+        #expect(isClose(stopped, srgb(purple)), "\(stopped)")
+        #expect(!isClose(stopped, srgb(Theme.sliceColor(at: 3, count: 4))), "\(stopped)")
+        let cyan = Theme.sliceColors[SliceColor.cyan.paletteIndex]
+        let dimmedCyan = pixels.color(at: location(angle: 90, fraction: 0.8, layout: layout))
+        #expect(isClose(dimmedCyan, composite(Theme.sliceDim, over: cyan)), "\(dimmedCyan)")
+        let dimmedAuto = pixels.color(at: location(angle: 270, fraction: 0.8, layout: layout))
+        #expect(isClose(dimmedAuto, composite(Theme.sliceDim, over: Theme.sliceColor(at: 2, count: 4))), "\(dimmedAuto)")
+    }
+
     // MARK: 計算
 
-    private func render() throws -> Pixels {
-        let image = try #require(ShareImageRenderer.roulette(items: items, outcome: outcome, rotation: rotation))
+    private func render(items: [Item]? = nil) throws -> Pixels {
+        let image = try #require(ShareImageRenderer.roulette(items: items ?? self.items, outcome: outcome, rotation: rotation))
         let cgImage = try #require(image.cgImage)
         let width = cgImage.width, height = cgImage.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)

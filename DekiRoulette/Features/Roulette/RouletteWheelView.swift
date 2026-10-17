@@ -116,13 +116,13 @@ struct WheelFaceView: View {
                 Circle().fill(Theme.wheelRim).frame(width: radius * 2, height: radius * 2)
             } else if count == 1 {
                 let highlighted = highlight == 0
-                Circle().fill(Theme.sliceColor(at: 0, count: count))
+                Circle().fill(Theme.sliceColor(in: items, at: 0))
                     .overlay(
                         Circle().strokeBorder(Theme.stopOutline, lineWidth: Theme.stopOutlineWidth * scale)
                             .opacity(highlighted ? 1 : 0)
                     )
                     .modifier(StopGlow(
-                        shape: Circle(), style: glowStyle, sliceColor: Theme.sliceColor(at: 0, count: count),
+                        shape: Circle(), style: glowStyle, sliceColor: Theme.sliceColor(in: items, at: 0),
                         shown: highlighted, radius: Theme.stopGlowRadius * scale
                     ))
                     .animation(animated ? Theme.stopDimAnimation : nil, value: highlighted)
@@ -141,7 +141,7 @@ struct WheelFaceView: View {
 
                     ZStack {
                         SliceShape(startAngle: start, endAngle: end, radius: radius)
-                            .fill(Theme.sliceColor(at: index, count: count))
+                            .fill(Theme.sliceColor(in: items, at: index))
                             .overlay(
                                 SliceShape(startAngle: start, endAngle: end, radius: radius)
                                     .stroke(Self.ink, lineWidth: 2 * scale)
@@ -169,7 +169,7 @@ struct WheelFaceView: View {
                     )
                     .modifier(StopGlow(
                         shape: SliceShape(startAngle: start, endAngle: end, radius: radius), style: glowStyle,
-                        sliceColor: Theme.sliceColor(at: index, count: count), shown: highlighted,
+                        sliceColor: Theme.sliceColor(in: items, at: index), shown: highlighted,
                         radius: Theme.stopGlowRadius * scale
                     ))
                     .animation(animated ? Theme.stopDimAnimation : nil, value: dimmed)
