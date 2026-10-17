@@ -82,6 +82,8 @@ private struct ItemAppearanceDetail: View {
     @State private var emojiText = ""
     /// 直前の入力が絵文字 1 文字として受け付けられなかった。
     @State private var rejected = false
+    /// 利用者が入力欄を書き換えてから、まだ確定していない。色のボタンや「自動に戻す」で欄を空にしたときは立てない。
+    @State private var edited = false
     @FocusState private var emojiFocused: Bool
     @ScaledMetric(relativeTo: .body) private var swatchSize: CGFloat = 36
 
@@ -114,8 +116,16 @@ private struct ItemAppearanceDetail: View {
                     .foregroundStyle(Theme.ivory)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .submitLabel(.done)
                     .listRowBackground(Theme.ink800)
-                    .onChange(of: emojiText) { _, text in handleEmojiInput(text) }
+                    // かな入力の変換途中で弾かないよう、入力のたびではなく確定したときだけ見る
+                    .onSubmit(commitEmoji)
+                    .onChange(of: emojiText) { _, _ in
+                        if emojiFocused { edited = true }
+                    }
+                    .onChange(of: emojiFocused) { _, focused in
+                        if !focused { commitEmoji() }
+                    }
             } header: {
                 Text(L10n.appearanceEmojiSection)
                     .foregroundStyle(Theme.muted)
@@ -127,8 +137,10 @@ private struct ItemAppearanceDetail: View {
             Section {
                 Button(L10n.appearanceReset) {
                     rejected = false
-                    onChange(.auto)
+                    edited = false
                     emojiText = ""
+                    emojiFocused = false
+                    onChange(.auto)
                 }
                 .foregroundStyle(appearance == .auto ? Theme.muted : Theme.ivory)
                 .disabled(appearance == .auto)
@@ -140,15 +152,19 @@ private struct ItemAppearanceDetail: View {
         .navigationTitle(item?.label ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { emojiText = currentEmoji }
+        // 確定せずに一覧へ戻った・シートを閉じたときも、入力した絵文字を残す
+        .onDisappear(perform: commitEmoji)
     }
 
     private func colorButton(_ color: SliceColor) -> some View {
         let selected = appearance == .color(color)
         return Button {
             rejected = false
+            // 入力欄を空にして確定の対象から外す。外したときの確定で、入力途中の文字や空欄が色を上書きしないようにする
+            edited = false
+            emojiText = ""
             emojiFocused = false
             onChange(.color(color))
-            emojiText = ""
         } label: {
             ZStack {
                 // 盤面と同じ塗り。外観に依らず固定なので、地との境目に細い枠を付ける
@@ -170,24 +186,23 @@ private struct ItemAppearanceDetail: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// 入力欄の変化。絵文字 1 文字なら見た目にし（2 文字以上は先頭だけ残す）、絵文字でなければ前の値に戻して注意を出す。
-    /// 空にしたら、絵文字の項目は自動に戻す。
-    private func handleEmojiInput(_ text: String) {
-        // 見た目と同じ表示に戻した（または戻った）だけの変化は何もしない
-        guard text != currentEmoji else { return }
-        if text.isEmpty {
+    /// 入力欄を確定する（Return・フォーカスが外れた・画面を離れた）。判定は `EmojiInput.commit`。
+    private func commitEmoji() {
+        guard edited else { return }
+        edited = false
+        switch EmojiInput.commit(emojiText, current: appearance) {
+        case .keep(let text):
             rejected = false
-            onChange(.auto)
-            return
-        }
-        guard let emoji = EmojiInput.normalize(text) else {
+            emojiText = text
+        case .set(let next, let text):
+            rejected = false
+            emojiText = text
+            onChange(next)
+        case .rejected(let text):
             rejected = true
-            emojiText = currentEmoji
-            return
+            emojiText = text
+            AccessibilityNotification.Announcement(L10n.appearanceEmojiInvalid).post()
         }
-        rejected = false
-        onChange(.emoji(emoji))
-        if String(emoji) != text { emojiText = String(emoji) }
     }
 }
 
