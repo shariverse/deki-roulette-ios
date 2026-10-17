@@ -170,8 +170,9 @@ struct Wheel3DSceneTests {
 
     // MARK: 停止の強調
 
-    private func makeStoppedScene(index: Int, glowStyle: GlowStyle = .white) -> Wheel3DScene {
+    private func makeStoppedScene(index: Int, glowStyle: GlowStyle = .white, items: [Item]? = nil) -> Wheel3DScene {
         let scene = makeScene(count: 4, rotation: 0)
+        if let items { scene.update(items: items, diameter: size) }
         scene.highlight(Wheel3DHighlight(index: index, glowStyle: glowStyle), reduceMotion: true)
         return scene
     }
@@ -303,5 +304,74 @@ struct Wheel3DSceneTests {
         let pixels = try render(scene)
         let color = pixels.color(at: location(x: 0, y: bandCenterY, pixels: pixels))
         #expect(!isClose(color, srgb(Theme.resultBandFill)), "\(color)")
+    }
+
+    // MARK: 項目の見た目
+
+    private let purple = Theme.sliceColors[SliceColor.purple.paletteIndex]
+
+    /// 添字 1 だけ紫を選んだ 4 件。他は自動。
+    private var styledItems: [Item] {
+        [Item(label: ""), Item(label: "", appearance: .color(.purple)), Item(label: ""), Item(label: "")]
+    }
+
+    @Test func 色の項目は選んだ色で塗り他は今の規則() throws {
+        let scene = Wheel3DScene()
+        scene.update(items: styledItems, diameter: size)
+        let pixels = try render(scene)
+        for index in 0..<4 {
+            let expected = index == 1 ? purple : Theme.sliceColor(at: index, count: 4)
+            let color = pixels.color(at: location(angle: 45 + 90 * Double(index), fraction: 0.6, pixels: pixels))
+            #expect(isClose(color, srgb(expected)), "slice \(index): \(color)")
+        }
+    }
+
+    @Test func 見た目が変わると組み直す() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.update(items: styledItems, diameter: size)
+        let pixels = try render(scene)
+        let color = pixels.color(at: location(angle: 135, fraction: 0.6, pixels: pixels))
+        #expect(isClose(color, srgb(purple)), "\(color)")
+    }
+
+    @Test func 止まった色の項目は選んだ色のまま前に出る() throws {
+        let pixels = try render(makeStoppedScene(index: 1, items: styledItems))
+        let stopped = pixels.color(at: location(angle: 135, fraction: 0.6, pixels: pixels))
+        #expect(isClose(stopped, srgb(purple)), "\(stopped)")
+    }
+
+    @Test func 光彩を止まったスライスの色にすると色の項目は選んだ色で光る() throws {
+        // 止まった添字 1（90〜180 度）の境目から隣（添字 0）へ 5pt 入った位置の青みを、自動の色（添字 1）のときと比べる
+        let radius = (Double(size) / 2 - 16 * Double(size) / WheelLabel.referenceDiameter) * 0.6
+        let angle = 90 - 5 / radius * 180 / .pi
+        let styled = try render(makeStoppedScene(index: 1, glowStyle: .slice, items: styledItems))
+        let plain = try render(makeStoppedScene(index: 1, glowStyle: .slice))
+        let near = styled.color(at: location(angle: angle, fraction: 0.6, pixels: styled))
+        let nearPlain = plain.color(at: location(angle: angle, fraction: 0.6, pixels: plain))
+        // 紫（#CE8CEE）は自動の添字 1（#FFA366）より青みが強い
+        #expect(near.z > nearPlain.z + 0.05, "styled: \(near) plain: \(nearPlain)")
+    }
+
+    @Test func 絵文字の項目はラベルの前に絵文字が描かれる() throws {
+        // ラベルは空にして、ラベルの位置が青い四角の絵文字だけになるようにする
+        let scene = Wheel3DScene()
+        scene.update(
+            items: [Item(label: ""), Item(label: "", appearance: .emoji("🟦")), Item(label: ""), Item(label: "")],
+            diameter: size
+        )
+        let pixels = try render(scene)
+        let label = pixels.color(at: location(angle: 135, fraction: WheelLabel.radiusFraction, pixels: pixels))
+        // 絵文字の項目のスライスは自動の色（添字 1 は橙）。そこに青い絵文字が乗る
+        #expect(label.z > label.x + 0.2, "\(label)")
+    }
+
+    @Test func 同じ結果で帯の文字と枠が変わると焼き直す() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.show(result: Wheel3DResult(id: "a1", label: "\u{3000}", accent: Theme.sliceColor(at: 2, count: 4)), reduceMotion: true)
+        scene.show(result: Wheel3DResult(id: "a1", label: "🟦", accent: purple), reduceMotion: false)
+        let pixels = try render(scene)
+        let color = pixels.color(at: location(x: 0, y: bandCenterY, pixels: pixels))
+        // 出し直しの動き（透明から）ではなく、すぐに新しい帯が見える
+        #expect(color.z > color.x + 0.2, "\(color)")
     }
 }
