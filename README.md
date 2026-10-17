@@ -10,8 +10,8 @@
 
 | branch \ workflow | Build | Archive | Upload |
 |---|---|---|---|
-| main | [![Build](https://github.com/shilokuma-inc/deki-roulette/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/shilokuma-inc/deki-roulette/actions/workflows/build.yml?query=branch%3Amain) | [![Archive](https://github.com/shilokuma-inc/deki-roulette/actions/workflows/archive.yml/badge.svg?branch=main)](https://github.com/shilokuma-inc/deki-roulette/actions/workflows/archive.yml?query=branch%3Amain) | — |
-| develop | [![Build](https://github.com/shilokuma-inc/deki-roulette/actions/workflows/build.yml/badge.svg?branch=develop)](https://github.com/shilokuma-inc/deki-roulette/actions/workflows/build.yml?query=branch%3Adevelop) | — | [![Upload](https://github.com/shilokuma-inc/deki-roulette/actions/workflows/upload.yml/badge.svg?branch=develop)](https://github.com/shilokuma-inc/deki-roulette/actions/workflows/upload.yml?query=branch%3Adevelop) |
+| main | [![Build](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml?query=branch%3Amain) | [![Archive](https://github.com/shariverse/deki-roulette-ios/actions/workflows/archive.yml/badge.svg?branch=main)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/archive.yml?query=branch%3Amain) | — |
+| develop | [![Build](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml/badge.svg?branch=develop)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml?query=branch%3Adevelop) | — | [![Upload](https://github.com/shariverse/deki-roulette-ios/actions/workflows/upload.yml/badge.svg?branch=develop)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/upload.yml?query=branch%3Adevelop) |
 
 ## CI
 
