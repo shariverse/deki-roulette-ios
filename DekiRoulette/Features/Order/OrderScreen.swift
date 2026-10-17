@@ -35,7 +35,8 @@ struct OrderScreen: View {
                     onRemoveAll: { model.removeAll() },
                     onRestore: { model.restore($0, at: $1) },
                     onLongPress: { model.cycleMark(id: $0) },
-                    onLoad: { model.replaceItems($0) }
+                    onLoad: { model.replaceItems($0) },
+                    onSetAppearance: { model.setAppearance($1, for: $0) }
                 )
                 .frame(maxWidth: regular ? Theme.Layout.listWidthRegular : .infinity)
             }
