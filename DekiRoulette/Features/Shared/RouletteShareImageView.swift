@@ -38,7 +38,10 @@ struct RouletteShareImageView: View {
 
             // 帯は回転しない層に置く（画面と同じ）。枠は止まったスライスの塗り
             ResultBandLabel(
-                label: outcome.label,
+                label: WheelLabel.decorated(
+                    outcome.label,
+                    appearance: items.indices.contains(outcome.index) ? items[outcome.index].appearance : .auto
+                ),
                 accent: Theme.sliceColor(in: items, at: outcome.index),
                 diameter: layout.wheelDiameter
             )

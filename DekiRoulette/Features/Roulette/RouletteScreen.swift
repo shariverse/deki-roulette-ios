@@ -152,10 +152,16 @@ struct RouletteScreen: View {
         guard let outcome = model.outcome, !model.spinning else { return nil }
         return Wheel3DResult(
             id: outcome.label + "\(model.spinCount)",
-            label: outcome.label,
-            // 項目を変えると `outcome` は消えるので、件数はスピン開始時と同じ
+            label: bandLabel(outcome),
+            // 項目を足し引きすると `outcome` は消えるので、項目リスト（件数）はスピン開始時と同じ
             accent: Theme.sliceColor(in: model.items, at: outcome.index)
         )
+    }
+
+    /// 結果の帯に出す全文。絵文字の項目は前に絵文字を付ける（読み上げと共有の本文はラベルのまま）。
+    private func bandLabel(_ outcome: SpinOutcome) -> String {
+        let appearance = model.items.indices.contains(outcome.index) ? model.items[outcome.index].appearance : .auto
+        return WheelLabel.decorated(outcome.label, appearance: appearance)
     }
 
     /// 盤面の中心より下に重ねる結果の帯。盤面の下に結果の領域は持たず、結果のラベルはここで全文を出す（盤面のラベルは省略される）。
@@ -167,8 +173,8 @@ struct RouletteScreen: View {
             GeometryReader { proxy in
                 let diameter = Double(min(proxy.size.width, proxy.size.height))
                 ResultBandLabel(
-                    label: outcome.label,
-                    // 項目を変えると `outcome` は消えるので、件数はスピン開始時と同じ
+                    label: bandLabel(outcome),
+                    // 項目を足し引きすると `outcome` は消えるので、項目リスト（件数）はスピン開始時と同じ
                     accent: Theme.sliceColor(in: model.items, at: outcome.index),
                     diameter: diameter
                 )

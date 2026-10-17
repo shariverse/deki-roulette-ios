@@ -127,7 +127,7 @@ struct WheelFaceView: View {
                     ))
                     .animation(animated ? Theme.stopDimAnimation : nil, value: highlighted)
                     .frame(width: radius * 2, height: radius * 2)
-                Text(WheelLabel.truncate(items[0].label, limit: maxLabelLength))
+                Text(WheelLabel.display(items[0].label, appearance: items[0].appearance, limit: maxLabelLength))
                     .font(.system(size: fontSize, weight: .bold))
                     .foregroundStyle(Self.ink)
             } else {
@@ -147,7 +147,7 @@ struct WheelFaceView: View {
                                     .stroke(Self.ink, lineWidth: 2 * scale)
                             )
 
-                        Text(WheelLabel.truncate(item.label, limit: maxLabelLength))
+                        Text(WheelLabel.display(item.label, appearance: item.appearance, limit: maxLabelLength))
                             .font(.system(size: fontSize, weight: .bold))
                             .foregroundStyle(Self.ink)
                             .fixedSize()
