@@ -87,4 +87,48 @@ struct WheelLabelTests {
         #expect(WheelLabel.rotation(midAngle: 270) == 360)
         #expect(WheelLabel.rotation(midAngle: 315) == 405)
     }
+
+    // MARK: 絵文字の項目
+
+    @Test func 絵文字の項目は絵文字をラベルの前に付ける() {
+        let sep = WheelLabel.emojiSeparator
+        #expect(WheelLabel.decorated("寿司", appearance: .emoji("🍣")) == "🍣" + sep + "寿司")
+        #expect(WheelLabel.decorated("寿司", appearance: .auto) == "寿司")
+        #expect(WheelLabel.decorated("寿司", appearance: .color(.blue)) == "寿司")
+        // 空のラベルは絵文字だけ
+        #expect(WheelLabel.decorated("", appearance: .emoji("🍣")) == "🍣")
+        // 全文は省略しない
+        let long = String(repeating: "あ", count: 20)
+        #expect(WheelLabel.decorated(long, appearance: .emoji("🍣")) == "🍣" + sep + long)
+    }
+
+    @Test func 自動と色の項目の盤面ラベルは今の省略のまま() {
+        for appearance in [ItemAppearance.auto, .color(.red)] {
+            #expect(WheelLabel.display("ラーメン大盛りセット追加", appearance: appearance, limit: 10) == "ラーメン大盛りセット…")
+            #expect(WheelLabel.display("寿司", appearance: appearance, limit: 5) == "寿司")
+        }
+    }
+
+    @Test func 絵文字の項目の盤面ラベルは絵文字ぶん1文字短く省略する() {
+        let sep = WheelLabel.emojiSeparator
+        // 10 / 7 / 5 文字の上限で、ラベルは 9 / 6 / 4 文字まで
+        #expect(WheelLabel.display("ラーメン大盛りセット", appearance: .emoji("🍜"), limit: 10) == "🍜" + sep + "ラーメン大盛りセッ…")
+        #expect(WheelLabel.display("ラーメン大盛りセッ", appearance: .emoji("🍜"), limit: 10) == "🍜" + sep + "ラーメン大盛りセッ")
+        #expect(WheelLabel.display("ハンバーグ定食", appearance: .emoji("🍖"), limit: 7) == "🍖" + sep + "ハンバーグ定…")
+        #expect(WheelLabel.display("ハンバーグ定", appearance: .emoji("🍖"), limit: 7) == "🍖" + sep + "ハンバーグ定")
+        #expect(WheelLabel.display("カレーライス", appearance: .emoji("🍛"), limit: 5) == "🍛" + sep + "カレーラ…")
+        #expect(WheelLabel.display("カレー", appearance: .emoji("🍛"), limit: 5) == "🍛" + sep + "カレー")
+        #expect(WheelLabel.display("", appearance: .emoji("🍛"), limit: 5) == "🍛")
+    }
+
+    @Test func 絵文字の項目の盤面ラベルは省略記号を除いて上限の文字数に収まる() {
+        let label = String(repeating: "あ", count: 30)
+        for limit in [5, 6, 7, 8, 10, 12, 14] {
+            let shown = WheelLabel.display(label, appearance: .emoji("🍣"), limit: limit)
+            // 絵文字 1 + 空白 1 + ラベル + 省略記号 1
+            #expect(shown.count == 1 + 1 + (limit - 1) + 1, "limit=\(limit)")
+            #expect(shown.hasPrefix("🍣"))
+            #expect(shown.hasSuffix("…"))
+        }
+    }
 }

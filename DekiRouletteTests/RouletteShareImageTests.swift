@@ -103,10 +103,22 @@ struct RouletteShareImageTests {
         #expect(isClose(dimmedAuto, composite(Theme.sliceDim, over: Theme.sliceColor(at: 2, count: 4))), "\(dimmedAuto)")
     }
 
+    @Test func 絵文字の項目は結果の帯で絵文字が描かれる() throws {
+        // 止まる添字 3 を絵文字 🟦（青い四角）、ラベルは空にする。帯の中央は絵文字だけになり、帯の地や文字の色ではなく青になる
+        let styled = [Item(label: ""), Item(label: ""), Item(label: ""), Item(label: "", appearance: .emoji("🟦"))]
+        let pixels = try render(items: styled, outcome: SpinOutcome(index: 3, label: ""))
+        let layout = ShareImageLayout.roulette(side: ShareImageLayout.defaultSide)
+        let center = pixels.color(at: layout.bandCenter)
+        #expect(center.z > center.x + 0.3, "\(center)")
+        #expect(!isClose(center, srgb(Theme.resultBandFill)), "\(center)")
+    }
+
     // MARK: 計算
 
-    private func render(items: [Item]? = nil) throws -> Pixels {
-        let image = try #require(ShareImageRenderer.roulette(items: items ?? self.items, outcome: outcome, rotation: rotation))
+    private func render(items: [Item]? = nil, outcome: SpinOutcome? = nil) throws -> Pixels {
+        let image = try #require(
+            ShareImageRenderer.roulette(items: items ?? self.items, outcome: outcome ?? self.outcome, rotation: rotation)
+        )
         let cgImage = try #require(image.cgImage)
         let width = cgImage.width, height = cgImage.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
