@@ -121,7 +121,7 @@ struct WheelLabelTests {
         #expect(WheelLabel.display("", appearance: .emoji("🍛"), limit: 5) == "🍛")
     }
 
-    @Test func 絵文字の項目の盤面ラベルは省略記号を除いて上限の文字数に収まる() {
+    @Test func 絵文字の項目の盤面ラベルは絵文字と空白と上限より1文字短いラベルと省略記号になる() {
         let label = String(repeating: "あ", count: 30)
         for limit in [5, 6, 7, 8, 10, 12, 14] {
             let shown = WheelLabel.display(label, appearance: .emoji("🍣"), limit: limit)
