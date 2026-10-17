@@ -25,7 +25,7 @@ enum Theme {
     /// 補助テキスト。
     static let muted = Color(light: 0x655877, dark: 0xA99BBD)
 
-    /// 順番決めの 1 位とフォーカスリング専用。ルーレットの結果は `sliceAccent(at:count:)` を使う。
+    /// 順番決めの 1 位とフォーカスリング専用。ルーレットの結果は止まったスライスの色（`sliceColor(in:at:)`）を使う。
     static let gold = Color(light: 0x8A6410, dark: 0xFFC94A)
 
     /// スピン・並べ替えの操作専用。塗りは両モードで同じ色。
@@ -79,8 +79,8 @@ enum Theme {
     /// 文字・色見本・細い枠に使うスライス色。指定中の印にも専用色は使わずこれを流用する。
     static let sliceAccents: [Color] = zip(sliceInks, slicePaints).map { Color(light: $0, dark: $1) }
 
-    /// 件数だけで引くスライス色（継ぎ目の色を `SlicePalette` がずらすため、必ず件数つきで引く）。
-    /// 項目の見た目（色の項目）を踏まえるところは `sliceColor(in:at:)` / `sliceAccent(in:at:)` を使う。
+    /// 自動の項目の規則（並び順と件数）だけで引くスライス色。継ぎ目の色を `SlicePalette` がずらすため、必ず件数つきで引く。
+    /// 描画は項目の見た目（色の項目）を踏まえる `sliceColor(in:at:)` / `sliceAccent(in:at:)` を使う（これはその自動の規則と、テストの基準）。
     static func sliceColor(at index: Int, count: Int) -> Color {
         sliceColors[SlicePalette.index(at: index, count: count, paletteSize: sliceColors.count)]
     }
@@ -139,7 +139,7 @@ enum Theme {
     // MARK: 3D の盤面
 
     /// 3D 表示の盤面の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）と見え方。
-    /// 盤の塗りは 2D と同じトークン（`sliceColor(at:count:)` / `wheel*` / `onSlice`）で、外観に依らず固定する。
+    /// 盤の塗りは 2D と同じトークン（`sliceColor(in:at:)` / `wheel*` / `onSlice`）で、外観に依らず固定する。
     enum Wheel3D {
         /// 盤（スライスの円板）の厚み。
         static let thickness: CGFloat = 14
@@ -201,7 +201,7 @@ enum Theme {
 
     // 結果が出ている間、盤面の中心より下に重ねて結果のラベルを全文で出す帯（寸法と位置は `ResultBand`）。
     // 盤面に重ねるので外観に依らず固定し、白系の地に盤面と同じ暗い文字で載せる。枠は止まったスライスの塗り
-    // （`sliceColor(at:count:)`）にして、どのスライスの結果かを帯からも読み取れるようにする。
+    // （`sliceColor(in:at:)`）にして、どのスライスの結果かを帯からも読み取れるようにする。
 
     /// 帯の地。
     static let resultBandFill = Color(hex: 0xF5EFE6)

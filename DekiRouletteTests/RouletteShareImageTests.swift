@@ -113,12 +113,33 @@ struct RouletteShareImageTests {
         #expect(!isClose(center, srgb(Theme.resultBandFill)), "\(center)")
     }
 
+    @Test func 光彩を止まったスライスの色にすると色の項目は選んだ色で光る() throws {
+        // 止まる添字 3（12 時）に紫を選ぶ。境目（45 度）から隣へ少し入った位置の青みを、自動の色のときと比べる
+        let styled = [Item(label: ""), Item(label: ""), Item(label: ""), Item(label: "", appearance: .color(.purple))]
+        let layout = ShareImageLayout.roulette(side: ShareImageLayout.defaultSide)
+        let point = location(angle: 48, fraction: 0.8, layout: layout)
+        let withColor = try #require(
+            ShareImageRenderer.roulette(items: styled, outcome: outcome, rotation: rotation, glowStyle: .slice)
+        )
+        let withAuto = try #require(
+            ShareImageRenderer.roulette(items: items, outcome: outcome, rotation: rotation, glowStyle: .slice)
+        )
+        let near = try pixels(of: withColor).color(at: point)
+        let nearAuto = try pixels(of: withAuto).color(at: point)
+        // 紫（#CE8CEE）は自動の添字 3（#A3DB6B）より青みが強い
+        #expect(near.z > nearAuto.z + 0.05, "color: \(near) auto: \(nearAuto)")
+    }
+
     // MARK: 計算
 
     private func render(items: [Item]? = nil, outcome: SpinOutcome? = nil) throws -> Pixels {
         let image = try #require(
             ShareImageRenderer.roulette(items: items ?? self.items, outcome: outcome ?? self.outcome, rotation: rotation)
         )
+        return try pixels(of: image)
+    }
+
+    private func pixels(of image: UIImage) throws -> Pixels {
         let cgImage = try #require(image.cgImage)
         let width = cgImage.width, height = cgImage.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
