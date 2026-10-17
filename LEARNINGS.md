@@ -41,5 +41,6 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 
 - SwiftUI の `TextField` の binding は、かな入力の変換中（未確定の文字）でも更新される。入力のたびに値を判定して書き戻すと変換が壊れる（「すし」→ 🍣 の「す」で弾く）。
   1 文字に絞るなどの判定は、Return（`onSubmit`）・フォーカスが外れたとき・画面を離れたときの確定時に行う（2026-10-18）
-- `.github/workflows/build.yml` は `**/*.md` と `docs/**` だけの変更では走らない（`paths-ignore`）。PR の最後のコミットがドキュメントだけだと、
-  `gh pr checks` には PR 側のスキップしか出ない。その前のコードのコミットの push の Build の結果を見る（2026-10-18）
+- `.github/workflows/build.yml` の PR 側のジョブは、同じリポジトリのブランチでは `if` で常にスキップされ、push 側だけで走る。push 側は `paths-ignore` で
+  `**/*.md` と `docs/**` だけの変更では走らないので、最後のコミットがドキュメントだけだと `gh pr checks` にはスキップしか出ない。
+  その前のコードのコミットの push の Build の結果を見る（2026-10-18）

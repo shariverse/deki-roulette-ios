@@ -49,7 +49,7 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
   （演出中は変えず、指定と結果は残す）。絵文字の入力欄は確定したとき（Return・フォーカスが外れた・画面を離れた）だけ
   `EmojiInput.commit` で判定する（入力のたびに判定すると、かな入力の変換「すし」→ 🍣 の途中で弾いてしまう）。シートには項目だけを渡し、指定・印は渡さない。
   仕様は `docs/SPEC.md` の §4.7。
-  項目リストの行（`ItemRow`）と順番決めの結果の行は、色見本（`MarkDot`。印の出し方は変えない）の右・ラベルの前に絵文字を置き、読み上げからは外す。
+  項目リストの行（`ItemRow`）は色見本（`MarkDot`。印の出し方は変えない）の右、順番決めの結果の行は順位の右に、ラベルの前に絵文字を置き、読み上げからは外す。
   順番決めの共有画像は並べ替え後のラベルと見た目（`appearances`）だけを受け取り、「1. 🍣 ラベル」の形にする。
 - 同名の項目は禁止せず警告だけ出す。判定は `DuplicateLabels`（`Core/`、正規化後のラベルの完全一致で、大文字小文字・全角半角は別物）。
   `ItemListView` が `ids(in:)` を描画のたびに求めて同名の行すべてのラベルの下に注意を出し（追加・読み込み・復元・元に戻すの
@@ -167,16 +167,17 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 - 描画は `RouletteShareImageView` と `OrderShareImageView`（`Features/Shared/`）。ルーレットの盤面は画面と同じ `WheelFaceView`（`RouletteWheelView` から
   切り出した面。縁・スライス・ラベル・ハブ・停止の強調）を `animated: false`・`highlightScale: Theme.stopHoldScale` で描き、針は `WheelPointerView` を
   直径に比例した大きさで、帯は画面と同じ `ResultBandLabel` を置く。盤面の影は付けない。3D 表示（`wheel3DEnabled`）が ON でも 2D で描き、SceneKit の
-  画面外描画は使わない。順番決めの行は `OrderResultView` と同じトークン（1 位は `gold`、他は `ivory` / `muted`、地は `ink800`）で「1. ラベル」の並び。
+  画面外描画は使わない。順番決めの行は `OrderResultView` と同じトークン（1 位は `gold`、他は `ivory` / `muted`、地は `ink800`）で「1. ラベル」の並び（絵文字の項目は `WheelLabel.display` で「1. 🍣 ラベル」）。
 - 配色は外観に依らず固定で、地は `Theme.shareBackground`（ダークの `ink900` と同じ値）、アプリ名は `Theme.shareInk`（ダークの `ivory` と同じ値）の文字だけ
   （アイコンは `UIImage(named:)` で読めないので置かない）。`ShareImageRenderer.render` が `ImageRenderer` を `scale = 1`・`.fontDesign(.rounded)`・
   `.environment(\.colorScheme, .dark)` で焼くので、外観で変わるトークンもダーク値に解決され、端末の画面倍率に依らず一辺 px の画像になる。
   追加した配色は `ThemeContrastTests` で検証する。見た目は `RouletteShareImageTests` / `OrderShareImageTests` が画素で確かめる（光彩は半径の 2〜3 倍まで届くので、
   「地」を見る画素は光彩の外に置く）。
-- 画像の生成は `@MainActor` の `ShareImageRenderer`（`roulette(items:outcome:rotation:glowStyle:)` / `order(labels:)`）を、各 Screen が
-  `.task(id: shareImageKey)` で呼んで `@State` に持つ。鍵は結果の表示の `.id` と同じ（ルーレットは `outcome.label + spinCount`、順番決めは `resultId`）で、
+- 画像の生成は `@MainActor` の `ShareImageRenderer`（`roulette(items:outcome:rotation:glowStyle:)` / `order(labels:appearances:side:)`）を、各 Screen が
+  `.task(id: shareImageKey)` で呼んで `@State` に持つ。鍵（`ShareImageKey`）は結果の表示の `.id` の元（ルーレットは `outcome.label + spinCount`、順番決めは `resultId`）と
+  項目の見た目で、結果を出したまま見た目を変えたら画像だけ描き直す（結果の表示は出し直さない）。
   結果が出て演出が終わった後だけ値を持つ。スピン中・演出中・結果が無いときは描かず前の画像も捨てる（重い描画をスピンの演出・触覚・回転音の時刻に重ねない）。
-- ステルスの制約: 画像を描く View の入力は項目（id とラベル）・結果・回転角、または並べ替え後のラベルだけで、`targetId` / `firstId` / `lastId` / 印を
+- ステルスの制約: 画像を描く View の入力は項目（id・ラベル・見た目）・結果・回転角、または並べ替え後のラベルと見た目だけで、`targetId` / `firstId` / `lastId` / 印を
   受け取る口を作らない。画像にも本文にも項目リスト・印・指定の有無・「当たり」「必ず」等の語を載せない。画面のスクリーンショットは使わず描き直すので
   `ScreenCaptureMonitor` とは干渉しない。
 - 共有シートの投稿先（X・Instagram・LINE）での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。
