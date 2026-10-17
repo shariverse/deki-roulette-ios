@@ -44,6 +44,9 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
 - 名前を付けて保存したリストは `SavedListStore`（`Core/`）が 1 つのキーに保存し、`SavedListsModel` を `RootView` が
   生成して environment で両画面に配る。項目リストの見出し行のメニューから保存・読み込み・管理（`SavedListsView`）する。
   ここにも指定は含めない。メニューは見出し行にだけ置き、行本体の挙動には触れない。
+- 項目の見た目（`ItemAppearance`: 自動 / 10 色の `SliceColor` / 絵文字 1 文字）は、同じ見出し行のメニューの「色と絵文字を編集」で開く
+  `ItemAppearanceEditor`（全項目の一覧 → 1 項目の編集）で変え、`onSetAppearance` から各モデルの `setAppearance(_:for:)` を呼ぶ
+  （演出中は変えず、指定と結果は残す）。絵文字の入力は `EmojiInput.normalize` を通す。シートには項目だけを渡し、指定・印は渡さない。
 - 同名の項目は禁止せず警告だけ出す。判定は `DuplicateLabels`（`Core/`、正規化後のラベルの完全一致で、大文字小文字・全角半角は別物）。
   `ItemListView` が `ids(in:)` を描画のたびに求めて同名の行すべてのラベルの下に注意を出し（追加・読み込み・復元・元に戻すの
   どの経路でも反映される）、追加時は `conflicts(adding:to:)` が真のときだけ確認の `alert` を挟む（読み込み・復元・元に戻すでは出さない）。

@@ -38,7 +38,8 @@ struct RouletteScreen: View {
                     onRemoveAll: { model.removeAll() },
                     onRestore: { model.restore($0, at: $1) },
                     onLongPress: { model.toggleTarget(id: $0) },
-                    onLoad: { model.replaceItems($0) }
+                    onLoad: { model.replaceItems($0) },
+                    onSetAppearance: { model.setAppearance($1, for: $0) }
                 )
                 .frame(maxWidth: regular ? Theme.Layout.listWidthRegular : .infinity)
             }
@@ -78,9 +79,15 @@ struct RouletteScreen: View {
     }
 
     /// 共有画像を描き直す鍵。結果が出て演出が終わった後だけ値を持ち、結果ごと（`spinCount`）に変わる（結果の表示の `.id` と同じ）。
-    private var shareImageKey: String? {
+    /// 結果を出したまま項目の見た目を変えたときも描き直す（結果の表示は出し直さない）。
+    private var shareImageKey: ShareImageKey? {
         guard let outcome = model.outcome, !model.spinning else { return nil }
-        return outcome.label + "\(model.spinCount)"
+        return ShareImageKey(result: outcome.label + "\(model.spinCount)", appearances: model.items.map(\.appearance))
+    }
+
+    private struct ShareImageKey: Hashable {
+        let result: String
+        let appearances: [ItemAppearance]
     }
 
     private var regular: Bool { sizeClass == .regular }

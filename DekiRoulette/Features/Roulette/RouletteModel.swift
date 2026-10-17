@@ -123,6 +123,13 @@ final class RouletteModel {
         persist()
     }
 
+    /// 項目の見た目（色・絵文字）を変える。見た目だけなので、指定と結果はそのまま残す。スピン中は変えない。
+    func setAppearance(_ appearance: ItemAppearance, for id: UUID) {
+        guard !spinning, items.contains(where: { $0.id == id }) else { return }
+        items = items.settingAppearance(appearance, for: id)
+        persist()
+    }
+
     /// 項目を初期状態に戻す。保存データも消すので、以降は言語設定に応じた初期項目に追従する。
     func resetItems() {
         guard let store else { return }

@@ -11,6 +11,18 @@ struct Item: Identifiable, Hashable, Sendable {
         self.label = label
         self.appearance = appearance
     }
+
+    /// 見た目だけを差し替えた項目。`id` とラベルは保つ。
+    func with(appearance: ItemAppearance) -> Item {
+        Item(id: id, label: label, appearance: appearance)
+    }
+}
+
+extension Array where Element == Item {
+    /// `id` の項目の見た目を差し替えた配列。該当が無いときはそのまま返す。並びと他の項目は変えない。
+    func settingAppearance(_ appearance: ItemAppearance, for id: UUID) -> [Item] {
+        map { $0.id == id ? $0.with(appearance: appearance) : $0 }
+    }
 }
 
 /// 削除した項目と、削除前にあった位置。「元に戻す」で同じ位置に差し戻すために使う。
