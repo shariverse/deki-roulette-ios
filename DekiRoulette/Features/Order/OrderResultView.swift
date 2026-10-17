@@ -52,6 +52,12 @@ struct OrderResultView: View {
                 .foregroundStyle(top ? Theme.gold : Theme.muted)
                 .frame(width: rankWidth, alignment: .trailing)
                 .accessibilityLabel(L10n.orderRankAccessibilityLabel(rank))
+            // 絵文字の項目はラベルの前に絵文字を置く（項目リストの行と同じ。読み上げはラベルだけ）
+            if case .emoji(let emoji) = item.appearance {
+                Text(String(emoji))
+                    .font(.subheadline)
+                    .accessibilityHidden(true)
+            }
             Text(item.label)
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(top ? Theme.gold : Theme.ivory)

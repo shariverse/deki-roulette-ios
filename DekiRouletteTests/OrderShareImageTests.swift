@@ -107,10 +107,25 @@ struct OrderShareImageTests {
         #expect(width <= layout.rankWidth, "\(width) > \(layout.rankWidth)")
     }
 
+    @Test func 絵文字の項目の行にだけ絵文字が描かれる() throws {
+        // 3 位だけ青い四角の絵文字。他の行に青い画素は無い
+        let appearances: [ItemAppearance] = [.color(.blue), .auto, .emoji("🟦")]
+        let pixels = try render(labels, appearances: appearances)
+        let layout = ShareImageLayout.order(side: side)
+        for index in labels.indices {
+            let blue = count(in: rowRect(index: index, count: labels.count, layout: layout), pixels: pixels) { $0.z > $0.x + 0.3 }
+            if index == 2 {
+                #expect(blue > 30, "\(index): \(blue)")
+            } else {
+                #expect(blue == 0, "\(index): \(blue)")
+            }
+        }
+    }
+
     // MARK: 計算
 
-    private func render(_ labels: [String]) throws -> Pixels {
-        let image = try #require(ShareImageRenderer.order(labels: labels))
+    private func render(_ labels: [String], appearances: [ItemAppearance] = []) throws -> Pixels {
+        let image = try #require(ShareImageRenderer.order(labels: labels, appearances: appearances))
         let cgImage = try #require(image.cgImage)
         let width = cgImage.width, height = cgImage.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
@@ -137,9 +152,14 @@ struct OrderShareImageTests {
 
     /// `rect` の中で `color` に近い画素の数。
     private func count(in rect: CGRect, near color: SIMD3<Double>, pixels: Pixels) -> Int {
+        count(in: rect, pixels: pixels) { isClose($0, color) }
+    }
+
+    /// `rect` の中で `matches` を満たす画素の数（2px おきに数える）。
+    private func count(in rect: CGRect, pixels: Pixels, where matches: (SIMD3<Double>) -> Bool) -> Int {
         var total = 0
         for y in stride(from: Int(rect.minY), to: Int(rect.maxY), by: 2) {
-            for x in stride(from: Int(rect.minX), to: Int(rect.maxX), by: 2) where isClose(pixels.color(at: x, y), color) {
+            for x in stride(from: Int(rect.minX), to: Int(rect.maxX), by: 2) where matches(pixels.color(at: x, y)) {
                 total += 1
             }
         }

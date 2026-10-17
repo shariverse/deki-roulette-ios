@@ -487,6 +487,12 @@ private struct ItemRow: View {
         HStack(spacing: 0) {
             HStack(spacing: 10) {
                 MarkDot(color: color, mark: showMark ? mark : nil)
+                // 絵文字の項目は色見本（印）を残したまま、その右に絵文字を置く。読み上げはラベルだけにする
+                if case .emoji(let emoji) = item.appearance {
+                    Text(String(emoji))
+                        .font(.subheadline)
+                        .accessibilityHidden(true)
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.label)
                         .font(.subheadline)
