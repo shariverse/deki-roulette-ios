@@ -46,4 +46,19 @@ enum WheelLabel {
     static func truncate(_ label: String, limit: Int) -> String {
         label.count > limit ? String(label.prefix(limit)) + "…" : label
     }
+
+    /// 絵文字とラベルの間に置く空白。ふつうの空白より狭い（U+2009）。
+    static let emojiSeparator = "\u{2009}"
+
+    /// 見た目の絵文字をラベルの前に付けた全文。結果の帯など、省略しないところで使う。絵文字の項目でなければラベルのまま。
+    static func decorated(_ label: String, appearance: ItemAppearance) -> String {
+        guard case .emoji(let emoji) = appearance else { return label }
+        return label.isEmpty ? String(emoji) : String(emoji) + emojiSeparator + label
+    }
+
+    /// 盤面に出すラベル。絵文字の項目は絵文字ぶん 1 文字短く省略してから前に絵文字を付ける（絵文字と省略したラベルで `limit` 文字に収める）。
+    static func display(_ label: String, appearance: ItemAppearance, limit: Int) -> String {
+        guard case .emoji = appearance else { return truncate(label, limit: limit) }
+        return decorated(truncate(label, limit: max(1, limit - 1)), appearance: appearance)
+    }
 }

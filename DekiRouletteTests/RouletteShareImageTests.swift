@@ -82,10 +82,64 @@ struct RouletteShareImageTests {
         #expect(!isClose(center, composite(Theme.sliceDim, over: Theme.sliceColor(at: 1, count: 4))))
     }
 
+    @Test func 色の項目は選んだ色で塗り他は今の規則で沈める() throws {
+        // 止まる添字 3 に紫、沈める添字 0 に水色を選ぶ。添字 2 は自動のまま
+        let styled = [
+            Item(label: "", appearance: .color(.cyan)),
+            Item(label: ""),
+            Item(label: ""),
+            Item(label: "", appearance: .color(.purple)),
+        ]
+        let pixels = try render(items: styled)
+        let layout = ShareImageLayout.roulette(side: ShareImageLayout.defaultSide)
+        let purple = Theme.sliceColors[SliceColor.purple.paletteIndex]
+        let stopped = pixels.color(at: location(angle: 0, fraction: 0.8, layout: layout))
+        #expect(isClose(stopped, srgb(purple)), "\(stopped)")
+        #expect(!isClose(stopped, srgb(Theme.sliceColor(at: 3, count: 4))), "\(stopped)")
+        let cyan = Theme.sliceColors[SliceColor.cyan.paletteIndex]
+        let dimmedCyan = pixels.color(at: location(angle: 90, fraction: 0.8, layout: layout))
+        #expect(isClose(dimmedCyan, composite(Theme.sliceDim, over: cyan)), "\(dimmedCyan)")
+        let dimmedAuto = pixels.color(at: location(angle: 270, fraction: 0.8, layout: layout))
+        #expect(isClose(dimmedAuto, composite(Theme.sliceDim, over: Theme.sliceColor(at: 2, count: 4))), "\(dimmedAuto)")
+    }
+
+    @Test func 絵文字の項目は結果の帯で絵文字が描かれる() throws {
+        // 止まる添字 3 を絵文字 🟦（青い四角）、ラベルは空にする。帯の中央は絵文字だけになり、帯の地や文字の色ではなく青になる
+        let styled = [Item(label: ""), Item(label: ""), Item(label: ""), Item(label: "", appearance: .emoji("🟦"))]
+        let pixels = try render(items: styled, outcome: SpinOutcome(index: 3, label: ""))
+        let layout = ShareImageLayout.roulette(side: ShareImageLayout.defaultSide)
+        let center = pixels.color(at: layout.bandCenter)
+        #expect(center.z > center.x + 0.3, "\(center)")
+        #expect(!isClose(center, srgb(Theme.resultBandFill)), "\(center)")
+    }
+
+    @Test func 光彩を止まったスライスの色にすると色の項目は選んだ色で光る() throws {
+        // 止まる添字 3（12 時）に紫を選ぶ。境目（45 度）から隣へ少し入った位置の青みを、自動の色のときと比べる
+        let styled = [Item(label: ""), Item(label: ""), Item(label: ""), Item(label: "", appearance: .color(.purple))]
+        let layout = ShareImageLayout.roulette(side: ShareImageLayout.defaultSide)
+        let point = location(angle: 48, fraction: 0.8, layout: layout)
+        let withColor = try #require(
+            ShareImageRenderer.roulette(items: styled, outcome: outcome, rotation: rotation, glowStyle: .slice)
+        )
+        let withAuto = try #require(
+            ShareImageRenderer.roulette(items: items, outcome: outcome, rotation: rotation, glowStyle: .slice)
+        )
+        let near = try pixels(of: withColor).color(at: point)
+        let nearAuto = try pixels(of: withAuto).color(at: point)
+        // 紫（#CE8CEE）は自動の添字 3（#A3DB6B）より青みが強い
+        #expect(near.z > nearAuto.z + 0.05, "color: \(near) auto: \(nearAuto)")
+    }
+
     // MARK: 計算
 
-    private func render() throws -> Pixels {
-        let image = try #require(ShareImageRenderer.roulette(items: items, outcome: outcome, rotation: rotation))
+    private func render(items: [Item]? = nil, outcome: SpinOutcome? = nil) throws -> Pixels {
+        let image = try #require(
+            ShareImageRenderer.roulette(items: items ?? self.items, outcome: outcome ?? self.outcome, rotation: rotation)
+        )
+        return try pixels(of: image)
+    }
+
+    private func pixels(of image: UIImage) throws -> Pixels {
         let cgImage = try #require(image.cgImage)
         let width = cgImage.width, height = cgImage.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)

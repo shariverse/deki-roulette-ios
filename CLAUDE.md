@@ -28,19 +28,29 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
 - 配色・アニメーションは `Theme` に集約。`gold` は順番決めの 1 位とフォーカスリング専用（ルーレットの結果表示は止まったスライスと同じ色）、`flare` は開始ボタン専用。印に専用色は使わない。
 - 色は端末の外観設定に従う。トークンは `Color(light:dark:)` で 2 値を持ち、アプリ内に切替は置かない。
   盤面と開始ボタンの塗りは外観に依らず固定（`onSlice` / `wheel*` / `onFlare`）で、スライス色を文字や
-  色見本に使うところは `sliceColor(at:count:)` ではなく `sliceAccent(at:count:)` を使う。追加した配色は
+  色見本に使うところは `sliceColor` ではなく `sliceAccent` を使う。追加した配色は
   `ThemeContrastTests` でコントラスト比を検証する。
-- スライス色は必ず件数つきで引く（`Theme.sliceColor(at:count:)` / `sliceAccent(at:count:)`）。添字は
-  `SlicePalette`（`Core/`）が決め、件数が `n % 色数 == 1` のときだけ末尾をずらして環の継ぎ目が同じ色にならないようにする。
-  盤面の塗り（`RouletteWheelView`）・行の色見本（`ItemListView`）・結果の帯の枠（`RouletteScreen`）は同じ関数で引く。
+- スライス色は項目リストごと渡して引く（`Theme.sliceColor(in:at:)` / `sliceAccent(in:at:)`）。添字は
+  `SlicePalette.index(for:at:count:paletteSize:)`（`Core/`）が決め、色の項目（`ItemAppearance.color`）は選んだ色、自動・絵文字の項目は
+  件数つきの規則（`n % 色数 == 1` のときだけ末尾をずらして環の継ぎ目が同じ色にならないようにする）で引く。
+  盤面の塗り・光彩（`WheelFaceView`）・行の色見本（`ItemListView`）・結果の帯の枠（`RouletteScreen`）・共有画像は同じ関数で引く。
+  3D の盤面（`Wheel3DView`）の塗り・停止の強調・ラベル画像も同じ関数と `WheelLabel.display` で引く。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
-- 項目リストは `ItemStore`（`Core/`）が画面ごとに `UserDefaults` へ保存する。保存するのは `id` と `label` だけで、
-  指定（`targetId` / `firstId` / `lastId`）は保存しない。保存データが無い・読めないときだけ `L10n` の初期項目を使う。
+  絵文字の項目は `WheelLabel.display` が絵文字ぶん 1 文字短く省略して前に絵文字を付け、結果の帯（2D・3D・共有画像）は `WheelLabel.decorated` の全文を出す（読み上げと共有の本文はラベルのまま）。
+- 項目リストは `ItemStore`（`Core/`）が画面ごとに `UserDefaults` へ保存する。保存するのは `id`・`label` と見た目（`StoredAppearance`。
+  自動のときは書かず、読めない値は自動として読む）だけで、指定（`targetId` / `firstId` / `lastId`）は保存しない。保存データが無い・読めないときだけ `L10n` の初期項目を使う。
   両モデルは `RootView` が生成して各 Screen に渡し、設定シートが両方を初期化できるよう environment にも流す。
 - 名前を付けて保存したリストは `SavedListStore`（`Core/`）が 1 つのキーに保存し、`SavedListsModel` を `RootView` が
   生成して environment で両画面に配る。項目リストの見出し行のメニューから保存・読み込み・管理（`SavedListsView`）する。
   ここにも指定は含めない。メニューは見出し行にだけ置き、行本体の挙動には触れない。
+- 項目の見た目（`ItemAppearance`: 自動 / 10 色の `SliceColor` / 絵文字 1 文字）は、同じ見出し行のメニューの「色と絵文字を編集」で開く
+  `ItemAppearanceEditor`（全項目の一覧 → 1 項目の編集）で変え、`onSetAppearance` から各モデルの `setAppearance(_:for:)` を呼ぶ
+  （演出中は変えず、指定と結果は残す）。絵文字の入力欄は確定したとき（Return・フォーカスが外れた・画面を離れた）だけ
+  `EmojiInput.commit` で判定する（入力のたびに判定すると、かな入力の変換「すし」→ 🍣 の途中で弾いてしまう）。シートには項目だけを渡し、指定・印は渡さない。
+  仕様は `docs/SPEC.md` の §4.7。
+  項目リストの行（`ItemRow`）は色見本（`MarkDot`。印の出し方は変えない）の右、順番決めの結果の行は順位の右に、ラベルの前に絵文字を置き、読み上げからは外す。
+  順番決めの共有画像は並べ替え後のラベルと見た目（`appearances`）だけを受け取り、「1. 🍣 ラベル」の形にする。
 - 同名の項目は禁止せず警告だけ出す。判定は `DuplicateLabels`（`Core/`、正規化後のラベルの完全一致で、大文字小文字・全角半角は別物）。
   `ItemListView` が `ids(in:)` を描画のたびに求めて同名の行すべてのラベルの下に注意を出し（追加・読み込み・復元・元に戻すの
   どの経路でも反映される）、追加時は `conflicts(adding:to:)` が真のときだけ確認の `alert` を挟む（読み込み・復元・元に戻すでは出さない）。
@@ -115,7 +125,7 @@ ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚
 設定の「3D 表示」（`@AppStorage(Config.wheel3DEnabledKey)`、既定 OFF）が ON のとき、`RouletteScreen` は `RouletteWheelView` の代わりに
 `Wheel3DView` を出す（OFF のときの 2D は変えない。描画経路は二重になる）。SceneKit（`SCNView` を `UIViewRepresentable` で包む。
 iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・盤を裏の中心 1 点で支える支柱を描く（寸法は `Theme.Wheel3D`、メッシュは
-`WheelGeometry`）。スライスの塗りは 2D と同じ `Theme.sliceColor(at:count:)` で、表面は照明に依らない塗り（`.constant`）、側面・縁・
+`WheelGeometry`）。スライスの塗りは 2D と同じ `Theme.sliceColor(in:at:)`（項目の見た目を踏まえる）で、表面は照明に依らない塗り（`.constant`）、側面・縁・
 支柱だけ陰影を付ける。ラベルは `WheelLabel` の省略・文字サイズで 1 枚の画像に焼いて表面に貼る。
 場面は盤面の枠より `Theme.Wheel3D.overscan` だけ広く描き（触れた操作は受けない）、傾いた盤や針が切れないようにする。
 
@@ -157,16 +167,17 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 - 描画は `RouletteShareImageView` と `OrderShareImageView`（`Features/Shared/`）。ルーレットの盤面は画面と同じ `WheelFaceView`（`RouletteWheelView` から
   切り出した面。縁・スライス・ラベル・ハブ・停止の強調）を `animated: false`・`highlightScale: Theme.stopHoldScale` で描き、針は `WheelPointerView` を
   直径に比例した大きさで、帯は画面と同じ `ResultBandLabel` を置く。盤面の影は付けない。3D 表示（`wheel3DEnabled`）が ON でも 2D で描き、SceneKit の
-  画面外描画は使わない。順番決めの行は `OrderResultView` と同じトークン（1 位は `gold`、他は `ivory` / `muted`、地は `ink800`）で「1. ラベル」の並び。
+  画面外描画は使わない。順番決めの行は `OrderResultView` と同じトークン（1 位は `gold`、他は `ivory` / `muted`、地は `ink800`）で「1. ラベル」の並び（絵文字の項目は `WheelLabel.display` で「1. 🍣 ラベル」）。
 - 配色は外観に依らず固定で、地は `Theme.shareBackground`（ダークの `ink900` と同じ値）、アプリ名は `Theme.shareInk`（ダークの `ivory` と同じ値）の文字だけ
   （アイコンは `UIImage(named:)` で読めないので置かない）。`ShareImageRenderer.render` が `ImageRenderer` を `scale = 1`・`.fontDesign(.rounded)`・
   `.environment(\.colorScheme, .dark)` で焼くので、外観で変わるトークンもダーク値に解決され、端末の画面倍率に依らず一辺 px の画像になる。
   追加した配色は `ThemeContrastTests` で検証する。見た目は `RouletteShareImageTests` / `OrderShareImageTests` が画素で確かめる（光彩は半径の 2〜3 倍まで届くので、
   「地」を見る画素は光彩の外に置く）。
-- 画像の生成は `@MainActor` の `ShareImageRenderer`（`roulette(items:outcome:rotation:glowStyle:)` / `order(labels:)`）を、各 Screen が
-  `.task(id: shareImageKey)` で呼んで `@State` に持つ。鍵は結果の表示の `.id` と同じ（ルーレットは `outcome.label + spinCount`、順番決めは `resultId`）で、
+- 画像の生成は `@MainActor` の `ShareImageRenderer`（`roulette(items:outcome:rotation:glowStyle:)` / `order(labels:appearances:side:)`）を、各 Screen が
+  `.task(id: shareImageKey)` で呼んで `@State` に持つ。鍵（`ShareImageKey`）は結果の表示の `.id` の元（ルーレットは `outcome.label + spinCount`、順番決めは `resultId`）と
+  項目の見た目で、結果を出したまま見た目を変えたら画像だけ描き直す（結果の表示は出し直さない）。
   結果が出て演出が終わった後だけ値を持つ。スピン中・演出中・結果が無いときは描かず前の画像も捨てる（重い描画をスピンの演出・触覚・回転音の時刻に重ねない）。
-- ステルスの制約: 画像を描く View の入力は項目（id とラベル）・結果・回転角、または並べ替え後のラベルだけで、`targetId` / `firstId` / `lastId` / 印を
+- ステルスの制約: 画像を描く View の入力は項目（id・ラベル・見た目）・結果・回転角、または並べ替え後のラベルと見た目だけで、`targetId` / `firstId` / `lastId` / 印を
   受け取る口を作らない。画像にも本文にも項目リスト・印・指定の有無・「当たり」「必ず」等の語を載せない。画面のスクリーンショットは使わず描き直すので
   `ScreenCaptureMonitor` とは干渉しない。
 - 共有シートの投稿先（X・Instagram・LINE）での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。

@@ -6,10 +6,14 @@ import SwiftUI
 /// 行の色のトークンは外観で変わるが、`ShareImageRenderer` がダークに固定して焼くので画像は端末の外観に依らない。
 /// 行数が上限を超えるときは上限より 1 つ少ない件数を並べ、最後の行を「ほか M 件」にする（`Order.rows(count:)`）。長いラベルは `labelLimit` で省略する。
 ///
-/// 入力は並べ替え後のラベルの配列だけで、先頭・末尾の指定や印を受け取る口は持たない（SPEC §6.5・§7.3）。
+/// 絵文字の項目は「1. 🍣 ラベル」の形にする（`WheelLabel.display` で絵文字ぶん 1 文字短く省略する）。
+///
+/// 入力は並べ替え後のラベルと見た目の配列だけで、先頭・末尾の指定や印を受け取る口は持たない（SPEC §6.5・§7.3）。
 struct OrderShareImageView: View {
     /// 並べ替え後のラベル（1 位から順）。
     let labels: [String]
+    /// `labels` と同じ並びの見た目。足りない分は自動として扱う。
+    var appearances: [ItemAppearance] = []
     /// 画像の一辺（描画の単位。`ShareImageRenderer` が `scale` 1 で焼くので px と一致する）。
     var side = ShareImageLayout.defaultSide
 
@@ -26,7 +30,7 @@ struct OrderShareImageView: View {
             Theme.shareBackground
 
             ForEach(0..<rows.shown, id: \.self) { index in
-                row(rank: index + 1, text: WheelLabel.truncate(labels[index], limit: layout.labelLimit), layout: layout)
+                row(rank: index + 1, text: WheelLabel.display(labels[index], appearance: appearance(at: index), limit: layout.labelLimit), layout: layout)
                     .position(x: layout.rowsLeft + layout.rowWidth / 2, y: layout.rowTop(index: index, count: count) + layout.rowHeight / 2)
             }
             if rows.omitted > 0 {
@@ -41,6 +45,10 @@ struct OrderShareImageView: View {
                 .position(x: side / 2, y: ShareImageLayout.brandCenterY(side: side))
         }
         .frame(width: side, height: side)
+    }
+
+    private func appearance(at index: Int) -> ItemAppearance {
+        appearances.indices.contains(index) ? appearances[index] : .auto
     }
 
     /// 順位の行。`rank` が nil のときは省略した件数の行（順位の欄は空、文字は `muted`）。
@@ -69,9 +77,11 @@ struct OrderShareImageView: View {
 }
 
 extension ShareImageRenderer {
-    /// 順番決めの結果画像。`labels` は並べ替え後のラベル（1 位から順）。
-    static func order(labels: [String], side: Double = ShareImageLayout.defaultSide) -> UIImage? {
-        render(OrderShareImageView(labels: labels, side: side), side: side)
+    /// 順番決めの結果画像。`labels` は並べ替え後のラベル（1 位から順）、`appearances` は同じ並びの見た目。
+    static func order(
+        labels: [String], appearances: [ItemAppearance] = [], side: Double = ShareImageLayout.defaultSide
+    ) -> UIImage? {
+        render(OrderShareImageView(labels: labels, appearances: appearances, side: side), side: side)
     }
 }
 
