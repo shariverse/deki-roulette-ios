@@ -44,6 +44,22 @@ struct SavedListsModelTests {
         #expect(SavedListStore(storage: storage).load().map(\.name) == ["B"])
     }
 
+    @Test func 保存と名前の変更と次の起動で見た目が保たれる() throws {
+        let styled = [Item(label: "A", appearance: .color(.cyan)), Item(label: "B", appearance: .emoji("🍕")), Item(label: "C")]
+        let storage = InMemoryStorage()
+        let model = SavedListsModel(store: SavedListStore(storage: storage))
+        model.save(name: "ランチ", items: styled)
+        let saved = try #require(model.lists.first)
+        #expect(model.rename(id: saved.id, to: "夕食"))
+        #expect(model.list(id: saved.id)?.items == styled)
+        let next = SavedListsModel(store: SavedListStore(storage: storage))
+        #expect(next.list(id: saved.id)?.items == styled)
+
+        let roulette = RouletteModel(items: ItemLabel.makeItems(["X"]))
+        roulette.replaceItems(next.lists[0].items)
+        #expect(roulette.items.map(\.appearance) == styled.map(\.appearance))
+    }
+
     @Test func 読み込んだ項目で置き換えると指定と結果が消える() {
         let saved = SavedListsModel(lists: [SavedList(name: "ランチ", items: items)])
         let roulette = RouletteModel(items: ItemLabel.makeItems(["X", "Y"]))
