@@ -79,13 +79,30 @@ enum Theme {
     /// 文字・色見本・細い枠に使うスライス色。指定中の印にも専用色は使わずこれを流用する。
     static let sliceAccents: [Color] = zip(sliceInks, slicePaints).map { Color(light: $0, dark: $1) }
 
-    /// 盤面の塗り・行の色見本・結果表示の枠は、必ず件数つきで引く（継ぎ目の色を `SlicePalette` がずらすため）。
+    /// 件数だけで引くスライス色（継ぎ目の色を `SlicePalette` がずらすため、必ず件数つきで引く）。
+    /// 項目の見た目（色の項目）を踏まえるところは `sliceColor(in:at:)` / `sliceAccent(in:at:)` を使う。
     static func sliceColor(at index: Int, count: Int) -> Color {
         sliceColors[SlicePalette.index(at: index, count: count, paletteSize: sliceColors.count)]
     }
 
     static func sliceAccent(at index: Int, count: Int) -> Color {
         sliceAccents[SlicePalette.index(at: index, count: count, paletteSize: sliceAccents.count)]
+    }
+
+    /// 項目リスト `items` の `index` 番目のスライスの塗り。色の項目は選んだ色、自動・絵文字の項目は並び順と件数から引く。
+    /// 件数は `items.count` を使うので、盤面の塗り・結果の帯の枠・光彩・共有画像は同じ項目リストを渡す。
+    static func sliceColor(in items: [Item], at index: Int) -> Color {
+        sliceColors[paletteIndex(in: items, at: index, paletteSize: sliceColors.count)]
+    }
+
+    /// `sliceColor(in:at:)` の文字・色見本用（`sliceAccent(at:count:)` と同じ使い分け）。
+    static func sliceAccent(in items: [Item], at index: Int) -> Color {
+        sliceAccents[paletteIndex(in: items, at: index, paletteSize: sliceAccents.count)]
+    }
+
+    private static func paletteIndex(in items: [Item], at index: Int, paletteSize: Int) -> Int {
+        let appearance = items.indices.contains(index) ? items[index].appearance : .auto
+        return SlicePalette.index(for: appearance, at: index, count: items.count, paletteSize: paletteSize)
     }
 
     /// 曲線は `Config.spinEasing` に置き、触覚の発火時刻（`HapticSchedule`）とクリック音の時刻（`SpinTicks`）の逆算と同じ形を共有する。

@@ -154,7 +154,7 @@ struct RouletteScreen: View {
             id: outcome.label + "\(model.spinCount)",
             label: outcome.label,
             // 項目を変えると `outcome` は消えるので、件数はスピン開始時と同じ
-            accent: Theme.sliceColor(at: outcome.index, count: model.items.count)
+            accent: Theme.sliceColor(in: model.items, at: outcome.index)
         )
     }
 
@@ -169,7 +169,7 @@ struct RouletteScreen: View {
                 ResultBandLabel(
                     label: outcome.label,
                     // 項目を変えると `outcome` は消えるので、件数はスピン開始時と同じ
-                    accent: Theme.sliceColor(at: outcome.index, count: model.items.count),
+                    accent: Theme.sliceColor(in: model.items, at: outcome.index),
                     diameter: diameter
                 )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
