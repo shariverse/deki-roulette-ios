@@ -365,13 +365,39 @@ struct Wheel3DSceneTests {
         #expect(label.z > label.x + 0.2, "\(label)")
     }
 
-    @Test func 同じ結果で帯の文字と枠が変わると焼き直す() throws {
+    @Test func 結果を出したまま見た目が変わると帯を動かさずに焼き直す() throws {
+        // アプリと同じ順（盤の更新 → 強調 → 帯）で、結果を出したあとに止まった項目の見た目を変える
         let scene = makeScene(count: 4, rotation: 0)
-        scene.show(result: Wheel3DResult(id: "a1", label: "\u{3000}", accent: Theme.sliceColor(at: 2, count: 4)), reduceMotion: true)
-        scene.show(result: Wheel3DResult(id: "a1", label: "🟦", accent: purple), reduceMotion: false)
+        let highlight = Wheel3DHighlight(index: 1, glowStyle: .white)
+        scene.highlight(highlight, reduceMotion: false)
+        scene.show(result: Wheel3DResult(id: "a1", label: "\u{3000}", accent: Theme.sliceColor(at: 1, count: 4)), reduceMotion: false)
+        #expect(scene.bandRevealCount == 1)
+
+        scene.update(items: [Item(label: ""), Item(label: "", appearance: .emoji("🟦")), Item(label: ""), Item(label: "")], diameter: size)
+        scene.highlight(highlight, reduceMotion: false)
+        scene.show(result: Wheel3DResult(id: "a1", label: "🟦", accent: Theme.sliceColor(at: 1, count: 4)), reduceMotion: false)
+        #expect(scene.bandRevealCount == 1)
         let pixels = try render(scene)
         let color = pixels.color(at: location(x: 0, y: bandCenterY, pixels: pixels))
-        // 出し直しの動き（透明から）ではなく、すぐに新しい帯が見える
         #expect(color.z > color.x + 0.2, "\(color)")
+    }
+
+    @Test func 結果を出したまま他の項目の見た目が変わっても帯の動きは繰り返さない() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        let result = Wheel3DResult(id: "a1", label: "\u{3000}", accent: Theme.sliceColor(at: 1, count: 4))
+        scene.show(result: result, reduceMotion: false)
+        scene.update(items: styledItems, diameter: size)
+        scene.show(result: result, reduceMotion: false)
+        #expect(scene.bandRevealCount == 1)
+        let pixels = try render(scene)
+        #expect(isClose(pixels.color(at: location(x: 0, y: bandCenterY, pixels: pixels)), srgb(Theme.resultBandFill)))
+    }
+
+    @Test func 新しい結果では帯の登場の動きを流す() {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.show(result: Wheel3DResult(id: "a1", label: "\u{3000}", accent: Theme.sliceColor(at: 1, count: 4)), reduceMotion: false)
+        scene.show(result: nil, reduceMotion: false)
+        scene.show(result: Wheel3DResult(id: "a2", label: "\u{3000}", accent: Theme.sliceColor(at: 1, count: 4)), reduceMotion: false)
+        #expect(scene.bandRevealCount == 2)
     }
 }

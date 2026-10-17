@@ -181,6 +181,8 @@ final class Wheel3DScene {
     /// 出している結果の帯。
     private var bandNode: SCNNode?
     private var shownResult: Wheel3DResult?
+    /// 結果の帯の登場の動きを流した回数（テストで、出し直しの動きを繰り返していないかを見る）。
+    private(set) var bandRevealCount = 0
     /// 盤を回すノード。スライス・縁・ハブを載せる。
     private let spinNode = SCNNode()
     /// 止まっていないスライスに重ねて暗くする層と、前に出した止まったスライス（どちらも `spinNode` に載せる）。
@@ -198,10 +200,10 @@ final class Wheel3DScene {
         var count: Int { items.count }
 
         static func == (lhs: Shape, rhs: Shape) -> Bool {
-            lhs.items.map(\.label) == rhs.items.map(\.label)
-                && lhs.items.map(\.appearance) == rhs.items.map(\.appearance)
-                && lhs.diameter == rhs.diameter
+            // スピン中は毎フレーム比べるので、配列を作らずに比べる
+            lhs.diameter == rhs.diameter
                 && lhs.displayScale == rhs.displayScale
+                && lhs.items.elementsEqual(rhs.items) { $0.label == $1.label && $0.appearance == $1.appearance }
         }
     }
 
@@ -262,7 +264,9 @@ final class Wheel3DScene {
 
     /// 結果の帯を出す・消す。`id` が変わったときだけ焼き直し、2D の `revealOnAppear` と同じ動きで現れる
     /// （動きを減らす設定では即座に出す）。消すときは 2D と同じく即座に消す。
-    /// 同じ結果のまま文字や枠の色が変わった（項目の見た目を変えた）ときは、動かさずに焼き直す。
+    /// 同じ結果のまま文字や枠の色が変わった（結果を出したまま項目の見た目を変えた）ときは、動かさずに焼き直す。
+    /// 見た目が変わると先に `update(items:)` が盤を組み直し、出していた帯を前の文字のまま動かさずに焼き直しているので、
+    /// ここではその帯を新しい文字・枠の色に差し替える。
     func show(result: Wheel3DResult?, reduceMotion: Bool) {
         if let result, result.id == shownResult?.id, result != shownResult, let old = bandNode, let shape = built {
             shownResult = result
@@ -281,6 +285,7 @@ final class Wheel3DScene {
         tiltNode.addChildNode(node)
         bandNode = node
         guard !reduceMotion else { return }
+        bandRevealCount += 1
         let rest = node.position
         node.opacity = 0
         node.scale = SCNVector3(0.96, 0.96, 1)
@@ -340,9 +345,15 @@ final class Wheel3DScene {
         spinNode.childNodes.forEach { $0.removeFromParentNode() }
         postNode.childNodes.forEach { $0.removeFromParentNode() }
         pointerNode.childNodes.forEach { $0.removeFromParentNode() }
-        // 帯は大きさに合わせて焼き直す
+        // 帯は大きさ・見た目に合わせて焼き直す。出していた帯は、組み直しで登場の動きを繰り返さないよう動かさずに出す
         bandNode?.removeFromParentNode()
         bandNode = nil
+        defer {
+            if let shownResult, let node = makeBand(shownResult, shape: shape) {
+                tiltNode.addChildNode(node)
+                bandNode = node
+            }
+        }
 
         let diameter = Double(shape.diameter)
         let scale = diameter / WheelLabel.referenceDiameter
