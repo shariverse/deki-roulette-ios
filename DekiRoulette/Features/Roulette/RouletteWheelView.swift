@@ -36,6 +36,8 @@ struct RouletteWheelView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsing = false
+    /// 結果が出た時刻（`now()` の秒）。電飾の点滅と脈動の経過時間の基準。結果が無いときは nil。
+    @State private var stopStart: TimeInterval?
 
     var body: some View {
         WheelDragArea(
@@ -88,7 +90,8 @@ struct RouletteWheelView: View {
                             rotation: rotation,
                             dragRotation: dragRotation,
                             motion: motion,
-                            showingResult: highlight != nil,
+                            // 指で動かして強調を解いたら点滅・脈動も止める
+                            stoppedAt: highlight != nil ? stopStart : nil,
                             now: now
                         )
                         .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
@@ -114,7 +117,12 @@ struct RouletteWheelView: View {
             }
             .aspectRatio(1, contentMode: .fit)
         }
+        .onAppear {
+            // 結果を出したまま画面に戻った（2D に切り替えた）ときは、停止の瞬間の点滅を飛ばして脈動から始める
+            if highlightedIndex != nil, stopStart == nil { stopStart = now() - WheelLights.blinkDuration }
+        }
         .onChange(of: highlightedIndex) { _, index in
+            stopStart = index != nil ? now() : nil
             // 止まった瞬間だけ押し出す。動きを減らす設定では暗くするだけにする
             guard index != nil, !reduceMotion else {
                 pulsing = false

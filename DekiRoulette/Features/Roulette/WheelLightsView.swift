@@ -5,7 +5,8 @@ import SwiftUI
 /// 補間中の角度は observable でないので、盤面が自分で回っている間（`motion`）は `TimelineView` で毎フレーム、
 /// `now()`（`RouletteModel.now` と同じ時計）から角度と強さを引く。動いていないときは `rotation + dragRotation`。
 /// 待機中・止まり切った惰性・指で動かしている間は `TimelineView` を止め（角度が変われば親の描き直しで足りる）、
-/// 結果表示中は点滅と脈動のために動かす。動きを減らす設定では止めたまま一定の明るさで点ける。
+/// 結果表示中は点滅と脈動のために動かす（点滅の間は毎フレーム、脈動だけになったら `Config.effectPulseFrameInterval` ごと）。
+/// 動きを減らす設定では止めたまま一定の明るさで点ける。
 /// 入力は角度・動き・結果を出しているかだけで、項目・指定（`targetId`）・印は受け取らない。読み上げず、触れられない。
 struct WheelLightsView: View {
     /// 盤面の一辺（pt）。電球の大きさと位置はこれに比例させる。
@@ -14,40 +15,48 @@ struct WheelLightsView: View {
     let dragRotation: Double
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。
     let motion: TimedSpinMotion?
-    /// 結果を出していて、止まったスライスを強調している（指で動かして強調を解いたら false）。
-    let showingResult: Bool
+    /// 結果を出していて止まったスライスを強調している間だけ、結果が出た時刻（`now()` の秒）。点滅と脈動の経過時間の基準。
+    /// 結果が無い・指で動かして強調を解いたら nil。止まったスライスの光彩の余韻と同じ時刻を親（`RouletteWheelView`）から受け取る。
+    let stoppedAt: TimeInterval?
     let now: () -> TimeInterval
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// 結果を出し始めた時刻（`now()` の秒）。点滅と脈動の経過時間の基準。
-    @State private var stopStart: TimeInterval?
+    /// 点滅が終わった結果の `stoppedAt`。点滅の終わりに書いて描き直させ、描き直しの間隔を落とす。
+    @State private var blinkEndedAt: TimeInterval?
     /// 止まり切った動き。惰性は止まり切っても `motion` に残り、親が描き直さないので、止まり切ったらここに入れて
     /// 描き直させ、`TimelineView` を止める。
     @State private var settledMotion: TimedSpinMotion?
 
     var body: some View {
         let moving = motion.map { $0 != settledMotion && $0.isMoving(now: now()) } ?? false
-        let animates = WheelLights.animates(reduceMotion: reduceMotion, moving: moving, showingResult: showingResult)
-        TimelineView(.animation(paused: !animates)) { _ in
+        let animates = WheelLights.animates(reduceMotion: reduceMotion, moving: moving, showingResult: stoppedAt != nil)
+        // 点滅が終わるまでは毎フレーム。終わりは下の `.task(id: stoppedAt)` が待って `blinkEndedAt` に書く
+        let interval = WheelLights.frameInterval(
+            moving: moving,
+            stoppedElapsed: stoppedAt.map { blinkEndedAt == $0 ? WheelLights.blinkDuration : 0 }
+        )
+        TimelineView(.animation(minimumInterval: interval, paused: !animates)) { _ in
             // 時刻は `TimelineView` の日付ではなく、動きの開始時刻と同じ時計で取る
             let time = now()
             let scene = WheelLights.scene(
                 reduceMotion: reduceMotion,
                 angle: (motion?.angle(now: time) ?? rotation) + dragRotation,
                 intensity: motion?.intensity(now: time) ?? 0,
-                stoppedElapsed: showingResult ? stopStart.map { time - $0 } : nil
+                stoppedElapsed: stoppedAt.map { time - $0 }
             )
             Canvas { context, size in
                 draw(scene: scene, in: &context, size: size)
             }
         }
         .frame(width: side, height: side)
-        .onAppear {
-            // 結果を出したまま画面に戻った・設定を変えたときは点滅を飛ばして脈動から始める
-            if showingResult { stopStart = now() - WheelLights.blinkDuration }
-        }
-        .onChange(of: showingResult) { _, showing in
-            stopStart = showing ? now() : nil
+        .task(id: stoppedAt) {
+            guard let stoppedAt, !reduceMotion else { return }
+            let remaining = stoppedAt + WheelLights.blinkDuration - now()
+            if remaining > 0 {
+                try? await Task.sleep(for: .seconds(remaining))
+                guard !Task.isCancelled else { return }
+            }
+            blinkEndedAt = stoppedAt
         }
         .task(id: motion) {
             guard let motion, !reduceMotion else { return }

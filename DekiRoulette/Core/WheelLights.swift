@@ -22,8 +22,9 @@ enum WheelLights {
     /// 結果表示中の脈動の明るいとき（暗いときは `blinkLowLevel` で、点滅の終わりからそのままつながる）。
     static let afterglowHighLevel = 0.7
 
-    /// 停止の瞬間の点滅の長さ（秒）。過ぎたら結果表示中の脈動に移る。
-    static var blinkDuration: TimeInterval { Config.wheelLightBlinkPeriod * Double(Config.wheelLightBlinkCount) }
+    /// 停止の瞬間の点滅の長さ（秒）。明るいところから始めて `Config.wheelLightBlinkCount` 回目の明るいところのあと、
+    /// 半周期で暗いところに下りて終える（0.6 秒 × 1.5 = 0.9 秒）。過ぎたら結果表示中の脈動に移る。
+    static var blinkDuration: TimeInterval { Config.wheelLightBlinkPeriod * (Double(Config.wheelLightBlinkCount) - 0.5) }
 
     /// 電飾の場面。
     enum Scene: Equatable, Sendable {
@@ -57,6 +58,14 @@ enum WheelLights {
         return .running(angle: angle, intensity: min(max(intensity, 0), 1))
     }
 
+    /// 描き直しの最短間隔（秒）。nil なら毎フレーム。盤面が自分で回っている間と停止の点滅の間は毎フレーム、
+    /// 点滅が終わって脈動だけになったら `Config.effectPulseFrameInterval` に落として負荷を下げる（ゆっくりした脈動なので段差は見えない）。
+    /// `stoppedElapsed` は結果を出している間の停止からの経過（秒）。
+    static func frameInterval(moving: Bool, stoppedElapsed: TimeInterval?) -> TimeInterval? {
+        guard !moving, let stoppedElapsed, stoppedElapsed >= blinkDuration else { return nil }
+        return Config.effectPulseFrameInterval
+    }
+
     /// 毎フレーム描き直す必要があるか（`TimelineView` を止める条件の反対）。動きを減らす設定では描き直さない。
     /// 盤面が自分で回っている間と、結果表示中（点滅と脈動）だけ描き直す。待機中・止まり切った惰性・指で動かしている間は
     /// 角度が変わったときに親の描き直しで足りるので止める。
@@ -81,12 +90,13 @@ enum WheelLights {
         return max(0, 1 - distance)
     }
 
-    /// 停止の瞬間の全灯の点滅の明るさ。暗いところから始めて `Config.wheelLightBlinkCount` 回明るくし、暗いところで終える。
-    /// 点滅の長さを過ぎたら nil（脈動に移る）。始まる前（0 未満）は暗いとき。
+    /// 停止の瞬間の全灯の点滅の明るさ。明るいところから始めて `Config.wheelLightBlinkCount` 回明るくし、暗いところで終える。
+    /// 1 回目の明るいところは停止の瞬間で、画面のフラッシュ（`WheelStopEffects.flashOpacity`）と重ねて 1 回の明滅に数える
+    /// （フラッシュと点滅を合わせても 1 秒の間の明滅は 2 回まで）。点滅の長さを過ぎたら nil（脈動に移る）。始まる前（0 未満）は明るいとき。
     static func stopBlink(at elapsed: TimeInterval) -> Double? {
         guard elapsed < blinkDuration else { return nil }
         let t = max(elapsed, 0)
-        let wave = 0.5 - 0.5 * cos(2 * .pi * t / Config.wheelLightBlinkPeriod)
+        let wave = 0.5 + 0.5 * cos(2 * .pi * t / Config.wheelLightBlinkPeriod)
         return blinkLowLevel + (blinkHighLevel - blinkLowLevel) * wave
     }
 
