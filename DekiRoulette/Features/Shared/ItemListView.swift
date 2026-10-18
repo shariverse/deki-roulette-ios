@@ -18,6 +18,8 @@ struct ItemListView: View {
     let onLongPress: (UUID) -> Void
     /// 保存したリストで項目を置き換える。
     let onLoad: ([Item]) -> Void
+    /// 項目の見た目（色・絵文字）を変える。見出し行のメニューから開く編集シートが呼ぶ。
+    let onSetAppearance: (UUID, ItemAppearance) -> Void
 
     @Environment(SavedListsModel.self) private var savedLists
 
@@ -35,6 +37,7 @@ struct ItemListView: View {
     @State private var listName = ""
     @State private var listsFull = false
     @State private var managingLists = false
+    @State private var editingAppearance = false
     @State private var markToggleCount = 0
     /// 左スワイプで削除ボタンを出している行。開いておくのは常に 1 行だけ。
     @State private var swipedId: UUID?
@@ -112,6 +115,10 @@ struct ItemListView: View {
             Text(L10n.savedListsFullMessage(Config.maxSavedLists))
         }
         .sheet(isPresented: $managingLists) { SavedListsView() }
+        // 指定・印は渡さない。行の長押しの挙動にも触れない
+        .sheet(isPresented: $editingAppearance) {
+            ItemAppearanceEditor(items: items, onChange: onSetAppearance)
+        }
         // スピン／並べ替えを始めたら取り消せなくする。結果と項目リストの整合を保つため
         .onChange(of: busy) { _, isBusy in
             if isBusy {
@@ -152,7 +159,7 @@ struct ItemListView: View {
         }
     }
 
-    /// 見出し行のメニュー。保存・読み込み・管理だけを置き、行本体の挙動には触れない。
+    /// 見出し行のメニュー。保存・読み込み・管理と色と絵文字の編集だけを置き、行本体の挙動には触れない。
     private var listMenu: some View {
         Menu {
             Button(action: beginSaveList) {
@@ -184,6 +191,15 @@ struct ItemListView: View {
             } label: {
                 Label(L10n.manageListsAction, systemImage: "list.bullet.rectangle")
             }
+
+            Divider()
+
+            Button {
+                editingAppearance = true
+            } label: {
+                Label(L10n.appearanceEditAction, systemImage: "paintpalette")
+            }
+            .disabled(items.isEmpty)
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.body.weight(.semibold))
@@ -280,7 +296,7 @@ struct ItemListView: View {
                 let mark = marks[item.id]
                 ItemRow(
                     item: item,
-                    color: Theme.sliceAccent(at: index, count: items.count),
+                    color: Theme.sliceAccent(in: items, at: index),
                     mark: mark,
                     showMark: revealMarks && mark != nil,
                     duplicate: duplicateIds.contains(item.id),
@@ -471,6 +487,12 @@ private struct ItemRow: View {
         HStack(spacing: 0) {
             HStack(spacing: 10) {
                 MarkDot(color: color, mark: showMark ? mark : nil)
+                // 絵文字の項目は色見本（印）を残したまま、その右に絵文字を置く。読み上げはラベルだけにする
+                if case .emoji(let emoji) = item.appearance {
+                    Text(String(emoji))
+                        .font(.subheadline)
+                        .accessibilityHidden(true)
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.label)
                         .font(.subheadline)
@@ -616,7 +638,8 @@ private struct DuplicateNoticeLabelStyle: LabelStyle {
         onRemoveAll: {},
         onRestore: { _, _ in },
         onLongPress: { _ in },
-        onLoad: { _ in }
+        onLoad: { _ in },
+        onSetAppearance: { _, _ in }
     )
     .environment(SavedListsModel(lists: []))
     .padding()
@@ -635,7 +658,8 @@ private struct DuplicateNoticeLabelStyle: LabelStyle {
         onRemoveAll: {},
         onRestore: { _, _ in },
         onLongPress: { _ in },
-        onLoad: { _ in }
+        onLoad: { _ in },
+        onSetAppearance: { _, _ in }
     )
     .environment(SavedListsModel(lists: []))
     .padding()
@@ -655,7 +679,8 @@ private struct DuplicateNoticeLabelStyle: LabelStyle {
         onRemoveAll: {},
         onRestore: { _, _ in },
         onLongPress: { _ in },
-        onLoad: { _ in }
+        onLoad: { _ in },
+        onSetAppearance: { _, _ in }
     )
     .environment(SavedListsModel(lists: []))
     .padding()

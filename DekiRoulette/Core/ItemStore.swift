@@ -16,14 +16,64 @@ extension UserDefaults: ItemStorage {
 struct StoredItem: Codable, Equatable {
     let id: UUID
     let label: String
+    /// 見た目。自動のときは書かない（見た目が入る前の保存データと同じ形になる）。
+    let appearance: StoredAppearance?
 
     init(_ item: Item) {
         id = item.id
         label = item.label
+        appearance = StoredAppearance(item.appearance)
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        // 見た目が読めなくても項目は捨てず、自動として読む。
+        appearance = (try? container.decodeIfPresent(StoredAppearance.self, forKey: .appearance)) ?? nil
     }
 }
 
-/// 画面ごとの項目リストの保存と復元。保存するのは `id` と `label` だけで、
+/// 保存する見た目の形。`{"kind": "color", "value": "blue"}` / `{"kind": "emoji", "value": "🍣"}`。
+/// 色は並びの添字ではなく `SliceColor.rawValue` で持つ（パレットの並びを変えても保存済みの色が変わらないように）。
+struct StoredAppearance: Codable, Equatable {
+    let kind: String
+    let value: String
+
+    static let colorKind = "color"
+    static let emojiKind = "emoji"
+
+    init(kind: String, value: String) {
+        self.kind = kind
+        self.value = value
+    }
+
+    /// 自動のときは nil（保存しない）。
+    init?(_ appearance: ItemAppearance) {
+        switch appearance {
+        case .auto:
+            return nil
+        case .color(let color):
+            self.init(kind: Self.colorKind, value: color.rawValue)
+        case .emoji(let emoji):
+            self.init(kind: Self.emojiKind, value: String(emoji))
+        }
+    }
+
+    /// 読み込んだ値を見た目に戻す。知らない種類・範囲外の色・絵文字でない文字列は自動として読む。
+    var appearance: ItemAppearance {
+        switch kind {
+        case Self.colorKind:
+            SliceColor(rawValue: value).map(ItemAppearance.color) ?? .auto
+        case Self.emojiKind:
+            EmojiInput.normalize(value).map(ItemAppearance.emoji) ?? .auto
+        default:
+            .auto
+        }
+    }
+}
+
+/// 画面ごとの項目リストの保存と復元。保存するのは `id`・`label` と見た目（自動以外のとき）だけで、
 /// 当たり・先頭・末尾の指定は含めない（前回の仕込みが次の起動に残らないようにする）。
 struct ItemStore {
     /// 保存キー。ルーレットと順番決めは別のリストを持つ。
@@ -84,7 +134,7 @@ struct ItemStore {
         for entry in stored {
             let label = ItemLabel.normalize(entry.label)
             guard !label.isEmpty, seen.insert(entry.id).inserted else { continue }
-            items.append(Item(id: entry.id, label: label))
+            items.append(Item(id: entry.id, label: label, appearance: entry.appearance?.appearance ?? .auto))
             if items.count == Config.maxItems { break }
         }
         return items

@@ -4,6 +4,7 @@ import SwiftUI
 /// ドラッグ中は追従で回した角度（`dragRotation`）を `content` に渡して盤面を指に追従させ、指を離したら、追従で回した角度と、
 /// 離す直前の動きから出した角速度（度/秒、時計回りが正）を `onRelease` に伝える。指を離さずにジェスチャが取り消されたときは
 /// 角速度を nil で伝える。追従した角度は親が `rotation` に取り込むまでこのビューが持つ。
+/// 追従を始める直前に `onGrab` を呼ぶ（親は惰性で回っている盤面をその場で止め、止めた角度を返す）。
 /// `interactive` が false の間（演出中）は追従もフリックもしない。
 /// 追従で針がスライスの境目を越えたら、その時刻（秒）を `onBoundaryCross` に伝える（親が回転音と触覚を鳴らす）。
 /// 結果が出たあと（`highlightedIndex` が nil でない）に指で動かしたら `displacedByDrag` を立てる（盤面は強調を解く）。
@@ -14,6 +15,7 @@ struct WheelDragArea<Content: View>: View {
     let highlightedIndex: Int?
     let interactive: Bool
     let onBoundaryCross: ((_ time: TimeInterval) -> Void)?
+    let onGrab: (() -> Double?)?
     let onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)?
     @ViewBuilder let content: (_ dragRotation: Double, _ displacedByDrag: Bool) -> Content
 
@@ -55,6 +57,8 @@ struct WheelDragArea<Content: View>: View {
                 if !dragSession.started {
                     dragSession.started = true
                     dragSession.ignored = !interactive
+                    // 惰性の途中なら親がその場で止める。止めた角度は描き直すまで `rotation` に届かないので、最初の追従の基準にする
+                    if !dragSession.ignored { dragSession.grabbedRotation = onGrab?() ?? nil }
                 }
                 guard !dragSession.ignored else { return }
                 follow(
@@ -82,10 +86,13 @@ struct WheelDragArea<Content: View>: View {
         dragSession.lastLocation = location
         let delta = WheelDrag.rotationDelta(from: previous, to: location, center: center)
         guard delta != 0 else { return }
-        let before = rotation + dragRotation
+        // 惰性を止めた直後は、`rotation` がまだ惰性の行き先なので、止めた角度を基準に境目を数える
+        let base = dragSession.grabbedRotation ?? rotation
+        dragSession.grabbedRotation = nil
+        let before = base + dragRotation
         dragRotation += delta
         if highlightedIndex != nil { displacedByDrag = true }
-        if WheelDrag.boundaryCrossings(from: before, to: rotation + dragRotation, count: count) > 0 {
+        if WheelDrag.boundaryCrossings(from: before, to: base + dragRotation, count: count) > 0 {
             onBoundaryCross?(time)
         }
     }
@@ -112,10 +119,13 @@ final class WheelDragSession {
     var ignored = false
     /// 直前に追従した指の位置。nil ならまだ追従していない（最初の 1 回は `startLocation` から測る）。
     var lastLocation: CGPoint?
+    /// 惰性を止めた角度。止めた直後の追従で、まだ描き直されていない `rotation` の代わりに境目の判定の基準にする。
+    var grabbedRotation: Double?
 
     func reset() {
         started = false
         ignored = false
         lastLocation = nil
+        grabbedRotation = nil
     }
 }

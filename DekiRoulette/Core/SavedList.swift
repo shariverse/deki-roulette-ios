@@ -1,7 +1,7 @@
 import Foundation
 
 /// 名前を付けて保存した項目リスト。ルーレットと順番決めで共通に使う。
-/// 項目の `id` と `label` だけを持ち、当たり・先頭・末尾の指定は含めない。
+/// 項目の `id`・`label`・見た目だけを持ち、当たり・先頭・末尾の指定は含めない。
 struct SavedList: Identifiable, Equatable, Sendable {
     let id: UUID
     var name: String

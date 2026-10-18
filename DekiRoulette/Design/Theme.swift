@@ -25,7 +25,7 @@ enum Theme {
     /// 補助テキスト。
     static let muted = Color(light: 0x655877, dark: 0xA99BBD)
 
-    /// 順番決めの 1 位とフォーカスリング専用。ルーレットの結果は `sliceAccent(at:count:)` を使う。
+    /// 順番決めの 1 位とフォーカスリング専用。ルーレットの結果は止まったスライスの色（`sliceColor(in:at:)`）を使う。
     static let gold = Color(light: 0x8A6410, dark: 0xFFC94A)
 
     /// スピン・並べ替えの操作専用。塗りは両モードで同じ色。
@@ -79,7 +79,8 @@ enum Theme {
     /// 文字・色見本・細い枠に使うスライス色。指定中の印にも専用色は使わずこれを流用する。
     static let sliceAccents: [Color] = zip(sliceInks, slicePaints).map { Color(light: $0, dark: $1) }
 
-    /// 盤面の塗り・行の色見本・結果表示の枠は、必ず件数つきで引く（継ぎ目の色を `SlicePalette` がずらすため）。
+    /// 自動の項目の規則（並び順と件数）だけで引くスライス色。継ぎ目の色を `SlicePalette` がずらすため、必ず件数つきで引く。
+    /// 描画は項目の見た目（色の項目）を踏まえる `sliceColor(in:at:)` / `sliceAccent(in:at:)` を使う（これはその自動の規則と、テストの基準）。
     static func sliceColor(at index: Int, count: Int) -> Color {
         sliceColors[SlicePalette.index(at: index, count: count, paletteSize: sliceColors.count)]
     }
@@ -88,12 +89,29 @@ enum Theme {
         sliceAccents[SlicePalette.index(at: index, count: count, paletteSize: sliceAccents.count)]
     }
 
+    /// 項目リスト `items` の `index` 番目のスライスの塗り。色の項目は選んだ色、自動・絵文字の項目は並び順と件数から引く。
+    /// 件数は `items.count` を使うので、盤面の塗り・結果の帯の枠・光彩・共有画像は同じ項目リストを渡す。
+    static func sliceColor(in items: [Item], at index: Int) -> Color {
+        sliceColors[paletteIndex(in: items, at: index, paletteSize: sliceColors.count)]
+    }
+
+    /// `sliceColor(in:at:)` の文字・色見本用（`sliceAccent(at:count:)` と同じ使い分け）。
+    static func sliceAccent(in items: [Item], at index: Int) -> Color {
+        sliceAccents[paletteIndex(in: items, at: index, paletteSize: sliceAccents.count)]
+    }
+
+    private static func paletteIndex(in items: [Item], at index: Int, paletteSize: Int) -> Int {
+        let appearance = items.indices.contains(index) ? items[index].appearance : .auto
+        return SlicePalette.index(for: appearance, at: index, count: items.count, paletteSize: paletteSize)
+    }
+
     /// 曲線は `Config.spinEasing` に置き、触覚の発火時刻（`HapticSchedule`）とクリック音の時刻（`SpinTicks`）の逆算と同じ形を共有する。
     static let spinAnimation = spinAnimation(easing: Config.spinEasing)
 
     /// フリックで始めたスピンは、離した瞬間の速さに合わせた曲線（`RouletteModel.spinEasing`）で回す。長さは同じ。
-    static func spinAnimation(easing: CubicBezierCurve) -> Animation {
-        .timingCurve(easing.x1, easing.y1, easing.x2, easing.y2, duration: Config.spinDuration)
+    /// 勢いが足りずに惰性で回すときは、曲線と長さを `FlickCoast` が決める（`RouletteModel.rotationDuration`）。
+    static func spinAnimation(easing: CubicBezierCurve, duration: TimeInterval = Config.spinDuration) -> Animation {
+        .timingCurve(easing.x1, easing.y1, easing.x2, easing.y2, duration: duration)
     }
 
     /// 結果が現れる演出。両画面で使い回す。
@@ -122,7 +140,7 @@ enum Theme {
     // MARK: 3D の盤面
 
     /// 3D 表示の盤面の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）と見え方。
-    /// 盤の塗りは 2D と同じトークン（`sliceColor(at:count:)` / `wheel*` / `onSlice`）で、外観に依らず固定する。
+    /// 盤の塗りは 2D と同じトークン（`sliceColor(in:at:)` / `wheel*` / `onSlice`）で、外観に依らず固定する。
     enum Wheel3D {
         /// 盤（スライスの円板）の厚み。
         static let thickness: CGFloat = 14
@@ -184,7 +202,7 @@ enum Theme {
 
     // 結果が出ている間、盤面の中心より下に重ねて結果のラベルを全文で出す帯（寸法と位置は `ResultBand`）。
     // 盤面に重ねるので外観に依らず固定し、白系の地に盤面と同じ暗い文字で載せる。枠は止まったスライスの塗り
-    // （`sliceColor(at:count:)`）にして、どのスライスの結果かを帯からも読み取れるようにする。
+    // （`sliceColor(in:at:)`）にして、どのスライスの結果かを帯からも読み取れるようにする。
 
     /// 帯の地。
     static let resultBandFill = Color(hex: 0xF5EFE6)
@@ -195,6 +213,16 @@ enum Theme {
 
     /// 削除を元に戻すトーストの出入り。
     static let undoToastAnimation = Animation.easeOut(duration: 0.2)
+
+    // MARK: 共有画像
+
+    // 共有シートに渡す結果の画像（`RouletteShareImageView`。寸法は `ShareImageLayout`）。アプリの外で見られるので外観に依らず固定し、
+    // 盤面の固定色（`wheel*` / `onSlice` / スライスの塗り）がなじむダークの地に、白系の文字でアプリ名だけを載せる（アイコンは置かない）。
+
+    /// 共有画像の地。ダークの `ink900` と同じ値を固定で持つ。
+    static let shareBackground = Color(hex: 0x17111F)
+    /// 共有画像の文字（アプリ名）。ダークの `ivory` と同じ値を固定で持つ。
+    static let shareInk = Color(hex: 0xF5EFE6)
 
     // MARK: スワイプ削除
 

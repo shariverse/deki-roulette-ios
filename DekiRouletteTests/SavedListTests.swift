@@ -105,4 +105,24 @@ struct SavedListTests {
         let first = try #require((entry["items"] as? [[String: Any]])?.first)
         #expect(Set(first.keys) == ["id", "label"])
     }
+
+    @Test func 保存したリストは項目の見た目ごと戻る() throws {
+        let items = [
+            Item(label: "A", appearance: .color(.pink)),
+            Item(label: "B", appearance: .emoji("🇯🇵")),
+            Item(label: "C"),
+        ]
+        let data = try #require(SavedListStore.encode([SavedList(name: "ランチ", items: items)]))
+        let lists = try #require(SavedListStore.decode(data))
+        #expect(lists.first?.items == items)
+    }
+
+    @Test func 見た目の無い古い保存データの項目は自動として読む() throws {
+        let json = #"""
+        [{"id":"00000000-0000-0000-0000-000000000010","name":"ランチ",
+          "items":[{"id":"00000000-0000-0000-0000-000000000001","label":"A"}]}]
+        """#
+        let lists = try #require(SavedListStore.decode(Data(json.utf8)))
+        #expect(lists.first?.items.map(\.appearance) == [.auto])
+    }
 }

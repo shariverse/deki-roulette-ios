@@ -94,13 +94,26 @@ struct ThemeContrastTests {
         }
     }
 
+    // MARK: 共有画像
+
+    @Test(arguments: styles)
+    func 共有画像のアプリ名は地に対して4_5対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.shareInk, on: Theme.shareBackground, style) >= 4.5)
+    }
+
+    /// 共有画像の地は盤面の縁より暗く、盤面の輪郭（外周線）が地から見分けられること。
+    @Test(arguments: styles)
+    func 共有画像の地に対して盤面の外周線は1_5対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.wheelEdge, on: Theme.shareBackground, style) >= 1.5)
+    }
+
     // MARK: 盤面は外観に依らない
 
     @Test func 盤面の色は外観設定で変わらない() {
         let fixed = [
             Theme.onSlice, Theme.wheelRim, Theme.wheelEdge, Theme.wheelHub, Theme.wheelHubMark,
             Theme.flare, Theme.onFlare, Theme.destructive, Theme.onDestructive, Theme.stopOutline,
-            Theme.resultBandFill, Theme.resultBandInk,
+            Theme.resultBandFill, Theme.resultBandInk, Theme.shareBackground, Theme.shareInk,
         ] + Theme.sliceColors
         for color in fixed {
             #expect(resolve(color, .light) == resolve(color, .dark))

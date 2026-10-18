@@ -9,7 +9,8 @@ xcodegen generate   # project.yml から DekiRoulette.xcodeproj を生成（.xco
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=visionOS Simulator,name=Apple Vision Pro' test  # visionOS も同じスキーム・同じテスト
-swift scripts/make-icon.swift DekiRoulette/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png DekiRoulette/Resources/Assets.xcassets/AppIcon.solidimagestack  # アイコン再生成（第 2 引数の visionOS 用は省略可）
+swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（DekiRoulette/Resources の AppIcon.icon・代替アイコンの AppIcon-<名前>.icon・visionOS 用の Assets.xcassets/AppIcon.solidimagestack と、設定画面の見本の imageset を書き出す）
+dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"  # アイコンの案と一覧の画像（案はアプリに入れない）
 swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 回転音の再生成（--preview で 1 スピン分の試聴用）
 ```
 
@@ -21,10 +22,12 @@ swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 
 Web 版（React + Vite、b7b3936 以前の履歴にある）から README の対応表どおりにファイルを対応させて移植した。
 プラットフォーム固有の差分は SPEC.md の「iOS 版との対応」「visionOS 版との対応」に追記する。
 
-visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 3 つ: `UIScreen` が無い（画面キャプチャの検知は
+visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIScreen` が無い（画面キャプチャの検知は
 `UIWindowScene` の trait から読み、変化の通知も無いので trait の購読とアクティブ復帰時に読み直す）、
 ソフトウェアキーボードが無い（`scrollDismissesKeyboard` を付けない）、Vision Pro に触覚と姿勢センサが無い
-（`sensoryFeedback` と `CMMotionManager` の呼び出しは共通のまま。効果は無い）。
+（`sensoryFeedback` と `CMMotionManager` の呼び出しは共通のまま。効果は無い）、代替アイコンの仕組みが無い
+（`UIApplicationIconSource` が非対応として振る舞い、設定の「アプリアイコン」を出さない。アプリアイコンは `.icon` では
+なく `Assets.xcassets/AppIcon.solidimagestack` を使う。`scripts/make-icon.swift` が `.icon` と同じ絵から書き出す）。
 
 - SwiftUI + `@Observable`（iOS 17+）。`ObservableObject` は使わない。
 - モデル (`RouletteModel` / `OrderModel`) は `@MainActor` で、View は薄く保つ。
@@ -33,23 +36,41 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 3 つ: `UIS
 - 配色・アニメーションは `Theme` に集約。`gold` は順番決めの 1 位とフォーカスリング専用（ルーレットの結果表示は止まったスライスと同じ色）、`flare` は開始ボタン専用。印に専用色は使わない。
 - 色は端末の外観設定に従う。トークンは `Color(light:dark:)` で 2 値を持ち、アプリ内に切替は置かない。
   盤面と開始ボタンの塗りは外観に依らず固定（`onSlice` / `wheel*` / `onFlare`）で、スライス色を文字や
-  色見本に使うところは `sliceColor(at:count:)` ではなく `sliceAccent(at:count:)` を使う。追加した配色は
+  色見本に使うところは `sliceColor` ではなく `sliceAccent` を使う。追加した配色は
   `ThemeContrastTests` でコントラスト比を検証する。
-- スライス色は必ず件数つきで引く（`Theme.sliceColor(at:count:)` / `sliceAccent(at:count:)`）。添字は
-  `SlicePalette`（`Core/`）が決め、件数が `n % 色数 == 1` のときだけ末尾をずらして環の継ぎ目が同じ色にならないようにする。
-  盤面の塗り（`RouletteWheelView`）・行の色見本（`ItemListView`）・結果の帯の枠（`RouletteScreen`）は同じ関数で引く。
+- スライス色は項目リストごと渡して引く（`Theme.sliceColor(in:at:)` / `sliceAccent(in:at:)`）。添字は
+  `SlicePalette.index(for:at:count:paletteSize:)`（`Core/`）が決め、色の項目（`ItemAppearance.color`）は選んだ色、自動・絵文字の項目は
+  件数つきの規則（`n % 色数 == 1` のときだけ末尾をずらして環の継ぎ目が同じ色にならないようにする）で引く。
+  盤面の塗り・光彩（`WheelFaceView`）・行の色見本（`ItemListView`）・結果の帯の枠（`RouletteScreen`）・共有画像は同じ関数で引く。
+  3D の盤面（`Wheel3DView`）の塗り・停止の強調・ラベル画像も同じ関数と `WheelLabel.display` で引く。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
-- 項目リストは `ItemStore`（`Core/`）が画面ごとに `UserDefaults` へ保存する。保存するのは `id` と `label` だけで、
-  指定（`targetId` / `firstId` / `lastId`）は保存しない。保存データが無い・読めないときだけ `L10n` の初期項目を使う。
+  絵文字の項目は `WheelLabel.display` が絵文字ぶん 1 文字短く省略して前に絵文字を付け、結果の帯（2D・3D・共有画像）は `WheelLabel.decorated` の全文を出す（読み上げと共有の本文はラベルのまま）。
+- 項目リストは `ItemStore`（`Core/`）が画面ごとに `UserDefaults` へ保存する。保存するのは `id`・`label` と見た目（`StoredAppearance`。
+  自動のときは書かず、読めない値は自動として読む）だけで、指定（`targetId` / `firstId` / `lastId`）は保存しない。保存データが無い・読めないときだけ `L10n` の初期項目を使う。
   両モデルは `RootView` が生成して各 Screen に渡し、設定シートが両方を初期化できるよう environment にも流す。
 - 名前を付けて保存したリストは `SavedListStore`（`Core/`）が 1 つのキーに保存し、`SavedListsModel` を `RootView` が
   生成して environment で両画面に配る。項目リストの見出し行のメニューから保存・読み込み・管理（`SavedListsView`）する。
   ここにも指定は含めない。メニューは見出し行にだけ置き、行本体の挙動には触れない。
+- 項目の見た目（`ItemAppearance`: 自動 / 10 色の `SliceColor` / 絵文字 1 文字）は、同じ見出し行のメニューの「色と絵文字を編集」で開く
+  `ItemAppearanceEditor`（全項目の一覧 → 1 項目の編集）で変え、`onSetAppearance` から各モデルの `setAppearance(_:for:)` を呼ぶ
+  （演出中は変えず、指定と結果は残す）。絵文字の入力欄は確定したとき（Return・フォーカスが外れた・画面を離れた）だけ
+  `EmojiInput.commit` で判定する（入力のたびに判定すると、かな入力の変換「すし」→ 🍣 の途中で弾いてしまう）。シートには項目だけを渡し、指定・印は渡さない。
+  仕様は `docs/SPEC.md` の §4.7。
+  項目リストの行（`ItemRow`）は色見本（`MarkDot`。印の出し方は変えない）の右、順番決めの結果の行は順位の右に、ラベルの前に絵文字を置き、読み上げからは外す。
+  順番決めの共有画像は並べ替え後のラベルと見た目（`appearances`）だけを受け取り、「1. 🍣 ラベル」の形にする。
 - 同名の項目は禁止せず警告だけ出す。判定は `DuplicateLabels`（`Core/`、正規化後のラベルの完全一致で、大文字小文字・全角半角は別物）。
   `ItemListView` が `ids(in:)` を描画のたびに求めて同名の行すべてのラベルの下に注意を出し（追加・読み込み・復元・元に戻すの
   どの経路でも反映される）、追加時は `conflicts(adding:to:)` が真のときだけ確認の `alert` を挟む（読み込み・復元・元に戻すでは出さない）。
   注意は指定の有無で変えない（印とは独立。色は `muted`）。
+- アプリアイコンは `scripts/make-icon.swift` が Core Graphics でレイヤーを描き、Icon Composer の `.icon`（既定は `Resources/AppIcon.icon`、
+  代替アイコンは `Resources/AppIcon-<名前>.icon`）と、設定画面の見本（`Assets.xcassets/<名前>-Preview.imageset`。`ictool` で書き出す）を作る。
+  代替アイコンの名前は `project.yml` の `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES`・スクリプトの `alternateIcons`・`AppIconChoice`（`Core/`）で
+  そろえ（`AppIconChoiceTests` がビルドした Info.plist と突き合わせる）、リリースしたら変えない。設定シートの「アプリアイコン」で選び、
+  `AppIconModel` が `AppIconSource`（実体は `UIApplication`）の `setAlternateIconName` を呼ぶ。選択はシステムが覚えるので `UserDefaults` には持たない。
+  アイコンそのものを `UIImage(named:)` で読まない（iOS 26 で UIKit のアサーションで落ち、iOS 18 では nil）。
+  visionOS には `.icon` が適用されない（アイコン無しのアプリになる）ため、既定のアイコンは `.icon` と同じ絵から
+  `Assets.xcassets/AppIcon.solidimagestack`（`Front` = 盤面と針、`Back` = 背景）も書き出す。代替アイコンは visionOS に無い仕組み。
 
 ### スピンの仕組み
 
@@ -61,8 +82,8 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 3 つ: `UIS
 完了コールバックが来ない場合の保険として `Config.spinFallback` のタイマーを持つ。
 `accessibilityReduceMotion` のときは回さず、`reducedMotionSpinDuration` 後に完了扱いにする。
 
-盤面の `rotationEffect` には `.animation(Theme.spinAnimation(easing: spinEasing), value: rotation)` を付けてある（`reduceMotion` では `nil`。
-`spinEasing` は `withAnimation` と同じ `model.spinEasing` を渡す）。
+盤面の `rotationEffect` には `.animation(Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)` を付けてある（`reduceMotion` では `nil`。
+`spinEasing` / `rotationDuration` は `withAnimation` と同じ `model.spinEasing` / `model.rotationDuration` を渡す。長さはスピンでは `Config.spinDuration`、惰性では `FlickCoast` が決める）。
 キーボードが出た状態でスピンを始めると、演出開始で入力欄が無効になってキーボードが閉じ、その安全領域の変化が
 `withAnimation` の更新に重なって補間が落ちる（盤面が最終角度へ飛び、音だけが鳴る）ため、回転の値の変化だけは
 外側のトランザクションに依らずスピンの曲線で補間させる。回り始めとキーボードの閉じ始めは同時で、音・触覚の時刻は変えない。
@@ -82,12 +103,22 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 3 つ: `UIS
 `Config.flickSampleWindow` に中心のまわりを回った角度から `FlickSpin.angularVelocity` で角速度を出す（離した瞬間の
 `velocity` は揺れが大きく、同じフリックでも回らないことがあるので使わない）。それを
 `FlickSpin.spin` で周回数と向き（`SpinDirection`、角速度の符号）に写し、角速度そのものと一緒に
-`beginSpin(reducedMotion:fullSpins:direction:releaseVelocity:)` に渡す（閾値未満でも `FlickSpin.releaseSpin` が最小の周回数で、ドラッグで回した向きに回す。指を離さずにジェスチャが取り消されたときは
+`beginSpin(reducedMotion:fullSpins:direction:releaseVelocity:)` に渡す（閾値未満なら `FlickSpin.spin` が nil で `beginSpin` を呼ばず、`model.beginCoast` で少しだけ惰性で回す（下記）。指を離さずにジェスチャが取り消されたときは
 `onRelease` の角速度が nil で、追従した角度を残すだけで回さない）。
 強さは周回数と回り始めの速さ（`spinEasing`）にだけ効き、止まる位置の式は変えない。反時計回りでは `RouletteMath.nextRotation` が
 累積角を減らす向きに決め、`SpinTicks` / `HapticSchedule` は `to < from` を符号を反転して同じ式で数える。モデルは直前のフリックの
 向きを `lastDirection` に覚え、「スピン」ボタンはその向きで回す（初期値は時計回り、保存しない）。停止後は `outcome.index` を `highlightedIndex` として渡し、
 他のスライスを `Theme.sliceDim` で強く沈め、止まったスライスに白系の縁取り（`stopOutline`）と光彩（既定は `stopGlow`。色は `@AppStorage(Config.glowStyleKey)` の `GlowStyle` で、設定の「ルーレットの詳細設定」から選ぶ）を付ける（結果が出たあとに指で動かしたら強調だけ解く）。停止の瞬間に `stopPulseScale` で押し出して針を跳ねさせ、スライスはそのあと結果が出ている間 `stopHoldScale` で前に出したままにする（強調が解けたら戻す）。拡大と針の跳ねは `accessibilityReduceMotion` では省く。
+
+閾値未満で離したときの惰性（抽選しない）は、`FlickCoast.coast` が角速度から角度（`Config.flickCoastFactor` × 角速度、`flickCoastMaxAngle` で上限、
+`flickCoastMinAngle` 未満なら付けない）・時間（初速が離した角速度になる `2 × 角度 ÷ 角速度`）・曲線（2 次の ease-out の `FlickCoast.easing`）を決める。
+`RouletteModel.beginCoast` が `spinEasing` と `rotationDuration` をその曲線と長さにして行き先の角度を返し、View が
+`withAnimation(Theme.spinAnimation(easing:duration:))` で `rotation` を書く（2D・3D の盤面の `.animation(…, value: rotation)` も同じ曲線と長さなので、同じ時刻に同じ角度で止まる）。
+`outcome` / `spinCount` / `pendingOutcome` / `lastDirection` は変えず、`spinning` も立てない（結果の表示は残り、強調は解けたまま。押し出しや針の跳ねも出ない）。
+惰性の途中で盤面に触れたら、`WheelDragArea` の `onGrab` で `model.stopCoast()` が曲線から今の角度を逆算し、`disablesAnimations` の
+トランザクションで補間なしに書いて止める（止めた角度を `onGrab` が返し、`WheelDragArea` は描き直し前の最初の追従の境目をその角度から数える）。
+惰性の途中で `beginSpin` を呼ぶと惰性を打ち切り（止まる位置は行き先の `rotation` から）、曲線と長さをスピンのものに戻す。`reducedMotion` では付けない。
+惰性で回る間もスピンと同じ方式で回転音と触覚を鳴らす（下記「触覚の仕組み」「回転音の仕組み」）。
 
 ### 触覚の仕組み
 
@@ -97,6 +128,9 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 3 つ: `UIS
 先に求め、`TickScheduler` の `Task` でカウンタを刻む。完了・中断でキャンセルし、`reducedMotion` では刻まない。
 指で盤面を動かしている間の境目は別のカウンタ `dragBoundaryTick` で、スピン中の `.selection` より強い
 `.impact(weight: Config.hapticDragBoundaryWeight)` を返す（利用者の操作なので `reducedMotion` でも鳴らす）。
+閾値未満で離したあとの惰性の間は、盤面が自分で回っているのでスピン中と同じ `boundaryTick`（`.selection`）を刻む。`beginCoast` が
+惰性の曲線（`FlickCoast.easing`・その長さ）で `HapticSchedule.boundaryCrossings` を求めて `TickScheduler` に渡し、
+`stopCoast`（惰性の途中で盤面に触れた・画面を離れた）と `beginSpin`（刻みをスピンのものに差し替える）でキャンセルする。
 ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚フィードバック」だけで、長押しには触れない。
 
 ### 回転音の仕組み
@@ -107,19 +141,22 @@ ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚
 リズムが揺れるため）。`Config.clickMinInterval` より詰まった時刻は間引く。音源は `Resources/Sounds/click.wav`
 （`scripts/make-click-sound.swift` で再生成）。`AVAudioSession` は `.ambient` で、消音スイッチに従い他アプリの
 音も止めない。`reducedMotion` では鳴らさない。指で盤面を動かしている間は、境目を越えたその場で `playClick()` で 1 回ずつ
-鳴らす（`reducedMotion` でも鳴らす）。ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
+鳴らす（`reducedMotion` でも鳴らす）。閾値未満で離したあとの惰性の間も、`beginCoast` が惰性の曲線で `SpinTicks.boundaryCrossings` を
+求めた `clickTimes` を `play(at:)` で一度に流す（1 発ずつタイマーでは鳴らさない）。惰性の途中で盤面に触れたら `RouletteScreen.grab` が
+`sound.stop()` で残りを止め、スピンを始めたら次の `play(at:)` が差し替える。惰性は `reducedMotion` では付かないので鳴らない。
+ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 
 ### 3D 表示の仕組み
 
 設定の「3D 表示」（`@AppStorage(Config.wheel3DEnabledKey)`、既定 OFF）が ON のとき、`RouletteScreen` は `RouletteWheelView` の代わりに
 `Wheel3DView` を出す（OFF のときの 2D は変えない。描画経路は二重になる）。SceneKit（`SCNView` を `UIViewRepresentable` で包む。
 iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・盤を裏の中心 1 点で支える支柱を描く（寸法は `Theme.Wheel3D`、メッシュは
-`WheelGeometry`）。スライスの塗りは 2D と同じ `Theme.sliceColor(at:count:)` で、表面は照明に依らない塗り（`.constant`）、側面・縁・
+`WheelGeometry`）。スライスの塗りは 2D と同じ `Theme.sliceColor(in:at:)`（項目の見た目を踏まえる）で、表面は照明に依らない塗り（`.constant`）、側面・縁・
 支柱だけ陰影を付ける。ラベルは `WheelLabel` の省略・文字サイズで 1 枚の画像に焼いて表面に貼る。
 場面は盤面の枠より `Theme.Wheel3D.overscan` だけ広く描き（触れた操作は受けない）、傾いた盤や針が切れないようにする。
 
 回転は 2D と同じ `rotation` / `dragRotation` / `spinEasing` から決める。補間は SwiftUI に任せ（`Wheel3DSurface` の
-`animatableData` と `.animation(Theme.spinAnimation(easing:), value: rotation)`）、毎フレームの角度を盤のノードに写すだけなので、
+`animatableData` と `.animation(Theme.spinAnimation(easing:duration:), value: rotation)`。惰性も同じ曲線と長さ）、毎フレームの角度を盤のノードに写すだけなので、
 2D と同じ時刻に同じ角度で止まる。スピンの完了は今どおり `withAnimation … completion:` と `Config.spinFallback` で判定し、
 3D 側の描画の完了には依らない。ドラッグ追従とフリックは 2D と同じ `WheelDragArea` が盤面の枠（overscan を含まない正方形）で受け、
 角速度は画面平面上の指の動きのまま。
@@ -142,6 +179,34 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 持ち方の基準は盤面が画面に出たときとアプリに戻ったときに取り直す。`WheelMotionModel` は `Wheel3DView` が最初に画面に出たときに
 1 つだけ作る（`CMMotionManager` を作り直さない）。傾きと揺れは見た目だけで、止まる位置・結果・触覚・回転音の時刻には影響させない。
 3D の盤面も `accessibilityHidden` で、指定（`targetId`）は渡さない。見た目は `Wheel3DSceneTests` が `SCNRenderer` の画面外描画の画素で確かめる。
+
+### 共有画像の仕組み
+
+両画面の「共有」（`ResultActions`、`Features/Shared/`）は、`shareImage` があれば `ShareLink(item: ShareImageFile, message: 本文, preview:)` で
+結果の画像（PNG）を本体にし本文（`ResultText.share`）を添えて共有シートに渡す。無ければ今までどおり本文だけ。
+プレビューの題名は `L10n.appName`、画像は結果画像そのもの。X・Instagram の専用ボタン（ディープリンク）は置かない。
+
+- 寸法とレイアウトは `ShareImageLayout`（`Core/`）が画像の一辺から決める純粋関数。基本は 1080×1080 px（`defaultSide`）、余白 8%、アプリ名の文字 3.6% で
+  下の余白のすぐ上。ルーレット（`roulette(side:)`）は盤面の直径と中心・針（基準直径での 22×26pt に比例）・帯の中心（`ResultBand.centerOffset`）、
+  順番決め（`order(side:)`）は行の高さ 6.4%・間隔 1.2%・文字 3%・順位の欄（「10.」が入る幅）と、行数の上限（範囲に入る行数。1080px で 10 行）。
+  上限を超えるときは `rows(count:)` が上限より 1 つ少ない件数を並べて最後を「ほか M 件」（`L10n.shareOrderOthers`）にする。テストは `ShareImageLayoutTests`。
+- 描画は `RouletteShareImageView` と `OrderShareImageView`（`Features/Shared/`）。ルーレットの盤面は画面と同じ `WheelFaceView`（`RouletteWheelView` から
+  切り出した面。縁・スライス・ラベル・ハブ・停止の強調）を `animated: false`・`highlightScale: Theme.stopHoldScale` で描き、針は `WheelPointerView` を
+  直径に比例した大きさで、帯は画面と同じ `ResultBandLabel` を置く。盤面の影は付けない。3D 表示（`wheel3DEnabled`）が ON でも 2D で描き、SceneKit の
+  画面外描画は使わない。順番決めの行は `OrderResultView` と同じトークン（1 位は `gold`、他は `ivory` / `muted`、地は `ink800`）で「1. ラベル」の並び（絵文字の項目は `WheelLabel.display` で「1. 🍣 ラベル」）。
+- 配色は外観に依らず固定で、地は `Theme.shareBackground`（ダークの `ink900` と同じ値）、アプリ名は `Theme.shareInk`（ダークの `ivory` と同じ値）の文字だけ
+  （アイコンは `UIImage(named:)` で読めないので置かない）。`ShareImageRenderer.render` が `ImageRenderer` を `scale = 1`・`.fontDesign(.rounded)`・
+  `.environment(\.colorScheme, .dark)` で焼くので、外観で変わるトークンもダーク値に解決され、端末の画面倍率に依らず一辺 px の画像になる。
+  追加した配色は `ThemeContrastTests` で検証する。見た目は `RouletteShareImageTests` / `OrderShareImageTests` が画素で確かめる（光彩は半径の 2〜3 倍まで届くので、
+  「地」を見る画素は光彩の外に置く）。
+- 画像の生成は `@MainActor` の `ShareImageRenderer`（`roulette(items:outcome:rotation:glowStyle:)` / `order(labels:appearances:side:)`）を、各 Screen が
+  `.task(id: shareImageKey)` で呼んで `@State` に持つ。鍵（`ShareImageKey`）は結果の表示の `.id` の元（ルーレットは `outcome.label + spinCount`、順番決めは `resultId`）と
+  項目の見た目で、結果を出したまま見た目を変えたら画像だけ描き直す（結果の表示は出し直さない）。
+  結果が出て演出が終わった後だけ値を持つ。スピン中・演出中・結果が無いときは描かず前の画像も捨てる（重い描画をスピンの演出・触覚・回転音の時刻に重ねない）。
+- ステルスの制約: 画像を描く View の入力は項目（id・ラベル・見た目）・結果・回転角、または並べ替え後のラベルと見た目だけで、`targetId` / `firstId` / `lastId` / 印を
+  受け取る口を作らない。画像にも本文にも項目リスト・印・指定の有無・「当たり」「必ず」等の語を載せない。画面のスクリーンショットは使わず描き直すので
+  `ScreenCaptureMonitor` とは干渉しない。
+- 共有シートの投稿先（X・Instagram・LINE）での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。
 
 ### 並べ替えの仕組み
 

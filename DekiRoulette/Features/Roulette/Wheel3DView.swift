@@ -21,11 +21,14 @@ struct Wheel3DView: View {
     var highlightedIndex: Int? = nil
     var interactive = true
     var spinEasing = Config.spinEasing
+    /// 回転の補間の長さ。スピンは `Config.spinDuration`、勢いが足りずに惰性で回すときは親が `FlickCoast` から決める。
+    var rotationDuration = Config.spinDuration
     /// 止まったスライスの光彩の色（設定の「ルーレットの詳細設定」）。
     var glowStyle = GlowStyle.default
     /// 結果の帯。結果が出ている間だけ渡す。
     var result: Wheel3DResult? = nil
     var onBoundaryCross: ((_ time: TimeInterval) -> Void)? = nil
+    var onGrab: (() -> Double?)? = nil
     var onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -48,7 +51,7 @@ struct Wheel3DView: View {
     var body: some View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
-            onBoundaryCross: onBoundaryCross, onRelease: onRelease
+            onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease
         ) { dragRotation, displacedByDrag in
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
@@ -68,7 +71,7 @@ struct Wheel3DView: View {
             }
             // 2D の盤面と同じく、回転の値の変化だけは外側のトランザクションに依らずスピンの曲線で補間させる
             // （キーボードが閉じる更新に重なっても盤面が最終角度へ飛ばない）。動きを減らす設定では親が値を直接書くので付けない
-            .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing), value: rotation)
+            .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)
             .aspectRatio(1, contentMode: .fit)
         }
         .onAppear {
@@ -162,7 +165,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: SCNView, context: Context) {
-        context.coordinator.update(labels: items.map(\.label), diameter: diameter, displayScale: displayScale)
+        context.coordinator.update(items: items, diameter: diameter, displayScale: displayScale)
         context.coordinator.spin(to: rotation)
         context.coordinator.tilt(to: tilt)
         context.coordinator.highlight(highlight, reduceMotion: reduceMotion)
@@ -170,7 +173,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
     }
 }
 
-/// 盤面の 3D の場面。項目のラベルと大きさが変わったときだけ組み直し、回転は盤のノードの角度を書き換えるだけにする。
+/// 盤面の 3D の場面。項目のラベル・見た目と大きさが変わったときだけ組み直し、回転は盤のノードの角度を書き換えるだけにする。
 @MainActor
 final class Wheel3DScene {
     let scene = SCNScene()
@@ -181,6 +184,8 @@ final class Wheel3DScene {
     /// 出している結果の帯。
     private var bandNode: SCNNode?
     private var shownResult: Wheel3DResult?
+    /// 結果の帯の登場の動きを流した回数（テストで、出し直しの動きを繰り返していないかを見る）。
+    private(set) var bandRevealCount = 0
     /// 盤を回すノード。スライス・縁・ハブを載せる。
     private let spinNode = SCNNode()
     /// 止まっていないスライスに重ねて暗くする層と、前に出した止まったスライス（どちらも `spinNode` に載せる）。
@@ -190,11 +195,19 @@ final class Wheel3DScene {
     private let postNode = SCNNode()
 
     private struct Shape: Equatable {
-        let labels: [String]
+        /// 項目。比べるのはラベルと見た目だけ（`id` が変わっても見た目が同じなら組み直さない）。
+        let items: [Item]
         let diameter: CGFloat
         let displayScale: CGFloat
 
-        var count: Int { labels.count }
+        var count: Int { items.count }
+
+        static func == (lhs: Shape, rhs: Shape) -> Bool {
+            // スピン中は毎フレーム比べるので、配列を作らずに比べる
+            lhs.diameter == rhs.diameter
+                && lhs.displayScale == rhs.displayScale
+                && lhs.items.elementsEqual(rhs.items) { $0.label == $1.label && $0.appearance == $1.appearance }
+        }
     }
 
     private var built: Shape?
@@ -226,12 +239,18 @@ final class Wheel3DScene {
         scene.rootNode.addChildNode(postNode)
     }
 
-    /// 項目のラベル（件数）か大きさが変わっていれば盤を組み直す。`displayScale` はラベルを焼く画像の倍率。
-    func update(labels: [String], diameter: CGFloat, displayScale: CGFloat = 2) {
-        let shape = Shape(labels: labels, diameter: diameter, displayScale: max(displayScale, 1))
+    /// 項目のラベル（件数）・見た目か大きさが変わっていれば盤を組み直す。`displayScale` はラベルを焼く画像の倍率。
+    /// 塗りは `Theme.sliceColor(in:at:)`、ラベルは `WheelLabel.display` で 2D と同じに引く。
+    func update(items: [Item], diameter: CGFloat, displayScale: CGFloat = 2) {
+        let shape = Shape(items: items, diameter: diameter, displayScale: max(displayScale, 1))
         guard shape != built, diameter > 0 else { return }
         built = shape
         build(shape)
+    }
+
+    /// 見た目の無い（自動の）項目として組む。
+    func update(labels: [String], diameter: CGFloat, displayScale: CGFloat = 2) {
+        update(items: ItemLabel.makeItems(labels), diameter: diameter, displayScale: displayScale)
     }
 
     /// 盤を累積の回転角 `rotation`（度、時計回りが正）まで回す。
@@ -248,7 +267,18 @@ final class Wheel3DScene {
 
     /// 結果の帯を出す・消す。`id` が変わったときだけ焼き直し、2D の `revealOnAppear` と同じ動きで現れる
     /// （動きを減らす設定では即座に出す）。消すときは 2D と同じく即座に消す。
+    /// 同じ結果のまま文字や枠の色が変わった（結果を出したまま項目の見た目を変えた）ときは、動かさずに焼き直す。
+    /// 見た目が変わると先に `update(items:)` が盤を組み直し、出していた帯を前の文字のまま動かさずに焼き直しているので、
+    /// ここではその帯を新しい文字・枠の色に差し替える。
     func show(result: Wheel3DResult?, reduceMotion: Bool) {
+        if let result, result.id == shownResult?.id, result != shownResult, let old = bandNode, let shape = built {
+            shownResult = result
+            guard let node = makeBand(result, shape: shape) else { return }
+            old.removeFromParentNode()
+            tiltNode.addChildNode(node)
+            bandNode = node
+            return
+        }
         guard result?.id != shownResult?.id || (result != nil && bandNode == nil) else { return }
         bandNode?.removeFromParentNode()
         bandNode = nil
@@ -258,6 +288,7 @@ final class Wheel3DScene {
         tiltNode.addChildNode(node)
         bandNode = node
         guard !reduceMotion else { return }
+        bandRevealCount += 1
         let rest = node.position
         node.opacity = 0
         node.scale = SCNVector3(0.96, 0.96, 1)
@@ -317,9 +348,15 @@ final class Wheel3DScene {
         spinNode.childNodes.forEach { $0.removeFromParentNode() }
         postNode.childNodes.forEach { $0.removeFromParentNode() }
         pointerNode.childNodes.forEach { $0.removeFromParentNode() }
-        // 帯は大きさに合わせて焼き直す
+        // 帯は大きさ・見た目に合わせて焼き直す。出していた帯は、組み直しで登場の動きを繰り返さないよう動かさずに出す
         bandNode?.removeFromParentNode()
         bandNode = nil
+        defer {
+            if let shownResult, let node = makeBand(shownResult, shape: shape) {
+                tiltNode.addChildNode(node)
+                bandNode = node
+            }
+        }
 
         let diameter = Double(shape.diameter)
         let scale = diameter / WheelLabel.referenceDiameter
@@ -344,7 +381,7 @@ final class Wheel3DScene {
                 let start = Double(index) * sliceAngle
                 spinNode.addChildNode(sliceNode(
                     start: start, end: start + sliceAngle, radius: radius, thickness: thickness,
-                    color: Theme.sliceColor(at: index, count: count)
+                    color: Theme.sliceColor(in: shape.items, at: index)
                 ))
             }
             if count > 1 {
@@ -441,7 +478,7 @@ final class Wheel3DScene {
         let group = SCNNode()
         group.position.z = Float(lift)
 
-        let color = Theme.sliceColor(at: highlight.index, count: count)
+        let color = Theme.sliceColor(in: shape.items, at: highlight.index)
         let sliceAngle = 360 / Double(max(count, 1))
         let start = count == 1 ? 0 : Double(highlight.index) * sliceAngle
         let mesh = WheelGeometry.sliceMesh(start: start, end: start + sliceAngle, radius: radius, thickness: lift)
@@ -462,7 +499,7 @@ final class Wheel3DScene {
         // 光彩が切れないよう、焼く範囲を光彩の分だけ広げる
         let margin = Double(Theme.stopGlowRadius) * scale * 3
         let content = StoppedSlice(
-            labels: shape.labels, index: highlight.index, diameter: diameter, glowStyle: highlight.glowStyle
+            items: shape.items, index: highlight.index, diameter: diameter, glowStyle: highlight.glowStyle
         )
         .padding(margin)
         let face = Self.imagePlane(content, side: diameter + margin * 2, displayScale: shape.displayScale)
@@ -572,7 +609,7 @@ final class Wheel3DScene {
     private func addLabels(_ shape: Shape, radius: Double) {
         let diameter = Double(shape.diameter)
         let image = WheelLabelImage.render(
-            labels: shape.labels, diameter: diameter, radius: radius, displayScale: shape.displayScale
+            items: shape.items, diameter: diameter, radius: radius, displayScale: shape.displayScale
         )
         let plane = SCNPlane(width: diameter, height: diameter)
         let material = Self.material(.white, lit: false)
@@ -677,7 +714,7 @@ private struct DimmedSlices: View {
 /// 止まったスライスの表面。2D の `RouletteWheelView` の強調したスライスと同じ塗り・境目の線・ラベル・縁取り・光彩
 /// （`StopGlow`）を、盤面の枠と同じ大きさで描く。
 private struct StoppedSlice: View {
-    let labels: [String]
+    let items: [Item]
     let index: Int
     let diameter: Double
     let glowStyle: GlowStyle
@@ -686,8 +723,8 @@ private struct StoppedSlice: View {
         let side = CGFloat(diameter)
         let scale = side / CGFloat(WheelLabel.referenceDiameter)
         let radius = side / 2 - 16 * scale
-        let count = labels.count
-        let color = Theme.sliceColor(at: index, count: count)
+        let count = items.count
+        let color = Theme.sliceColor(in: items, at: index)
         let limit = WheelLabel.limit(count: count, diameter: diameter)
         let font = Font.system(size: WheelLabel.fontSize(count: count, diameter: diameter), weight: .bold)
         ZStack {
@@ -699,7 +736,7 @@ private struct StoppedSlice: View {
                         radius: Theme.stopGlowRadius * scale
                     ))
                     .frame(width: radius * 2, height: radius * 2)
-                Text(WheelLabel.truncate(labels[0], limit: limit))
+                Text(WheelLabel.display(items[0].label, appearance: items[0].appearance, limit: limit))
                     .font(font)
                     .foregroundStyle(Theme.onSlice)
             } else {
@@ -711,7 +748,7 @@ private struct StoppedSlice: View {
                 ZStack {
                     slice.fill(color)
                         .overlay(slice.stroke(Theme.onSlice, lineWidth: 2 * scale))
-                    Text(WheelLabel.truncate(labels[index], limit: limit))
+                    Text(WheelLabel.display(items[index].label, appearance: items[index].appearance, limit: limit))
                         .font(font)
                         .foregroundStyle(Theme.onSlice)
                         .fixedSize()
@@ -734,8 +771,8 @@ private struct StoppedSlice: View {
 /// （画像の上が 12 時。y は下向きなので、2D の座標の取り方がそのまま使える）。
 @MainActor
 private enum WheelLabelImage {
-    static func render(labels: [String], diameter: Double, radius: Double, displayScale: CGFloat) -> UIImage {
-        let count = labels.count
+    static func render(items: [Item], diameter: Double, radius: Double, displayScale: CGFloat) -> UIImage {
+        let count = items.count
         let side = CGFloat(diameter)
         let format = UIGraphicsImageRendererFormat()
         format.scale = displayScale
@@ -746,8 +783,9 @@ private enum WheelLabelImage {
         return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { renderer in
             let context = renderer.cgContext
             let sliceAngle = count > 0 ? 360 / Double(count) : 360
-            for (index, label) in labels.enumerated() {
-                let text = NSAttributedString(string: WheelLabel.truncate(label, limit: limit), attributes: attributes)
+            for (index, item) in items.enumerated() {
+                let label = WheelLabel.display(item.label, appearance: item.appearance, limit: limit)
+                let text = NSAttributedString(string: label, attributes: attributes)
                 let size = text.size()
                 context.saveGState()
                 if count == 1 {

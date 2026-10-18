@@ -12,4 +12,13 @@ enum SlicePalette {
         // 先頭は添字 0、前隣は添字 k - 1。パレットは色相順に並んでいるので、両方から最も離れた真ん中を使う。
         return (paletteSize - 1) / 2
     }
+
+    /// 項目の見た目を踏まえた添字。色の項目は選んだ色、自動・絵文字の項目は `index(at:count:paletteSize:)` の規則で引く。
+    /// 利用者が選んだ色なので、隣り合うスライスや環の継ぎ目が同じ色になっても変えない。
+    static func index(for appearance: ItemAppearance, at index: Int, count: Int, paletteSize: Int) -> Int {
+        if case .color(let color) = appearance {
+            return color.paletteIndex % paletteSize
+        }
+        return self.index(at: index, count: count, paletteSize: paletteSize)
+    }
 }

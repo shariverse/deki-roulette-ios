@@ -9,6 +9,8 @@ struct RouletteScreen: View {
     @AppStorage(Config.wheel3DEnabledKey) private var wheel3DEnabled = false
     let model: RouletteModel
     @State private var sound = SpinSoundPlayer()
+    /// 共有シートに本文と一緒に渡す結果の画像。結果ごとに 1 回だけ描く（`shareImageKey` の変化で `.task` が描き直す）。
+    @State private var shareImage: UIImage?
 
     var body: some View {
         PageFrame(
@@ -36,7 +38,8 @@ struct RouletteScreen: View {
                     onRemoveAll: { model.removeAll() },
                     onRestore: { model.restore($0, at: $1) },
                     onLongPress: { model.toggleTarget(id: $0) },
-                    onLoad: { model.replaceItems($0) }
+                    onLoad: { model.replaceItems($0) },
+                    onSetAppearance: { model.setAppearance($1, for: $0) }
                 )
                 .frame(maxWidth: regular ? Theme.Layout.listWidthRegular : .infinity)
             }
@@ -61,7 +64,34 @@ struct RouletteScreen: View {
             hapticsEnabled && outcome != nil ? .success : nil
         }
         .onAppear { if soundEnabled { sound.prepare() } }
-        .onDisappear { sound.stop() }
+        .onDisappear {
+            sound.stop()
+            // 惰性の残りの触覚の刻みも止める
+            model.stopCoast()
+        }
+        // 結果が出て演出が終わったあとに 1 回だけ共有画像を描く。スピン中・結果が無いときは描かず、前の画像も捨てる。
+        // 3D 表示が ON でも 2D の盤面で描く。光彩は画面の設定に合わせる
+        .task(id: shareImageKey) {
+            guard shareImageKey != nil, let outcome = model.outcome else {
+                shareImage = nil
+                return
+            }
+            shareImage = ShareImageRenderer.roulette(
+                items: model.items, outcome: outcome, rotation: model.rotation, glowStyle: glowStyle
+            )
+        }
+    }
+
+    /// 共有画像を描き直す鍵。結果が出て演出が終わった後だけ値を持ち、結果ごと（`spinCount`）に変わる（結果の表示の `.id` と同じ）。
+    /// 結果を出したまま項目の見た目を変えたときも描き直す（結果の表示は出し直さない）。
+    private var shareImageKey: ShareImageKey? {
+        guard let outcome = model.outcome, !model.spinning else { return nil }
+        return ShareImageKey(result: outcome.label + "\(model.spinCount)", appearances: model.items.map(\.appearance))
+    }
+
+    private struct ShareImageKey: Hashable {
+        let result: String
+        let appearances: [ItemAppearance]
     }
 
     private var regular: Bool { sizeClass == .regular }
@@ -87,7 +117,7 @@ struct RouletteScreen: View {
                 // 結果が出ている間だけ出す。順番決めと同じ位置・同じ見た目
                 if let outcome = model.outcome, !model.spinning {
                     let text = ResultText.roulette(label: outcome.label, heading: L10n.resultHeading)
-                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName))
+                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
                         .id(outcome.label + "\(model.spinCount)")
                 }
             }
@@ -107,10 +137,12 @@ struct RouletteScreen: View {
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
                 spinEasing: model.spinEasing,
+                rotationDuration: model.rotationDuration,
                 glowStyle: glowStyle,
                 result: wheel3DResult,
                 // 2D と同じく、指を離した角度からフリックのスピンを始める
                 onBoundaryCross: dragCrossedBoundary,
+                onGrab: grab,
                 onRelease: release
             )
         } else {
@@ -121,8 +153,10 @@ struct RouletteScreen: View {
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
                 spinEasing: model.spinEasing,
+                rotationDuration: model.rotationDuration,
                 glowStyle: glowStyle,
                 onBoundaryCross: dragCrossedBoundary,
+                onGrab: grab,
                 onRelease: release
             )
         }
@@ -133,10 +167,16 @@ struct RouletteScreen: View {
         guard let outcome = model.outcome, !model.spinning else { return nil }
         return Wheel3DResult(
             id: outcome.label + "\(model.spinCount)",
-            label: outcome.label,
-            // 項目を変えると `outcome` は消えるので、件数はスピン開始時と同じ
-            accent: Theme.sliceColor(at: outcome.index, count: model.items.count)
+            label: bandLabel(outcome),
+            // 項目を足し引きすると `outcome` は消えるので、項目リスト（件数）はスピン開始時と同じ
+            accent: Theme.sliceColor(in: model.items, at: outcome.index)
         )
+    }
+
+    /// 結果の帯に出す全文。絵文字の項目は前に絵文字を付ける（読み上げと共有の本文はラベルのまま）。
+    private func bandLabel(_ outcome: SpinOutcome) -> String {
+        let appearance = model.items.indices.contains(outcome.index) ? model.items[outcome.index].appearance : .auto
+        return WheelLabel.decorated(outcome.label, appearance: appearance)
     }
 
     /// 盤面の中心より下に重ねる結果の帯。盤面の下に結果の領域は持たず、結果のラベルはここで全文を出す（盤面のラベルは省略される）。
@@ -148,9 +188,9 @@ struct RouletteScreen: View {
             GeometryReader { proxy in
                 let diameter = Double(min(proxy.size.width, proxy.size.height))
                 ResultBandLabel(
-                    label: outcome.label,
-                    // 項目を変えると `outcome` は消えるので、件数はスピン開始時と同じ
-                    accent: Theme.sliceColor(at: outcome.index, count: model.items.count),
+                    label: bandLabel(outcome),
+                    // 項目を足し引きすると `outcome` は消えるので、項目リスト（件数）はスピン開始時と同じ
+                    accent: Theme.sliceColor(in: model.items, at: outcome.index),
                     diameter: diameter
                 )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -174,22 +214,48 @@ struct RouletteScreen: View {
         if model.crossDragBoundary(at: time), soundEnabled { sound.playClick() }
     }
 
-    /// 盤面から指を離した。追従で回した角度を取り込み、その角度からフリックのスピンを始める。
+    /// 盤面から指を離した。追従で回した角度を取り込み、勢いがあればその角度からフリックのスピンを始める。
     /// `dragRotation` の取り込みとスピンの開始は同じ更新に入れる（盤面が離した位置から回り出す）。
     /// 指を離さずにジェスチャが取り消されたとき（`angularVelocity` が nil）は、追従した角度を残すだけで回さない。
     private func release(angularVelocity: Double?, dragRotation: Double) {
         model.rotate(by: dragRotation)
         guard let angularVelocity else { return }
-        flick(angularVelocity: angularVelocity, dragRotation: dragRotation)
+        flick(angularVelocity: angularVelocity)
     }
 
     /// 盤面のフリック。強さは周回数にだけ反映し、フリックした向きに回す。盤面は離した瞬間の速さで回り出し、そこから減速する。
-    /// 閾値未満の弱いドラッグでも、最小の周回数で動かした向きに回す（`FlickSpin.releaseSpin`）。
-    private func flick(angularVelocity: Double, dragRotation: Double) {
-        let flick = FlickSpin.releaseSpin(
-            angularVelocity: angularVelocity, dragRotation: dragRotation, fallback: model.lastDirection
-        )
+    /// 閾値未満（ゆっくり動かして離した、止めてから離した）ならスピンを始めず、離した速さに応じて少しだけ惰性で回して止める。
+    private func flick(angularVelocity: Double) {
+        guard let flick = FlickSpin.spin(angularVelocity: angularVelocity) else {
+            coast(angularVelocity: angularVelocity)
+            return
+        }
         spin(fullSpins: flick.fullSpins, direction: flick.direction, releaseVelocity: angularVelocity)
+    }
+
+    /// 勢いの足りないフリックの惰性。抽選しないので、結果の表示・`spinCount`・「スピン」ボタンの向きは変わらない。
+    /// 盤面は離した瞬間の速さで回り出して止まる（`FlickCoast`）。動きを減らす設定では付けない（離した角度のまま）。
+    private func coast(angularVelocity: Double) {
+        guard let next = model.beginCoast(angularVelocity: angularVelocity, reducedMotion: reduceMotion) else { return }
+        // 惰性で回る間も、針が境目を越えるたびに鳴らす（時刻は惰性の曲線から先に求めてある。触覚はモデルが刻む）
+        if soundEnabled { sound.play(at: model.clickTimes) }
+        withAnimation(Theme.spinAnimation(easing: model.spinEasing, duration: model.rotationDuration)) {
+            model.rotation = next
+        }
+    }
+
+    /// 盤面に再び触れた。惰性で回っている途中なら、今の角度で止めてから指に追従させる。
+    /// 補間中の角度は observable でないので、モデルが曲線から逆算した角度を補間なしで書く（盤面の `.animation` も掛けない）。
+    /// 惰性の残りの回転音と触覚の刻みも止める。止めた角度を返す（追従の境目の判定の基準にする）。止めるものが無ければ nil。
+    private func grab() -> Double? {
+        guard let angle = model.stopCoast() else { return nil }
+        sound.stop()
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            model.rotation = angle
+        }
+        return angle
     }
 
     private func spin(fullSpins: Int?, direction: SpinDirection?, releaseVelocity: Double?) {

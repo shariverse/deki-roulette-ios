@@ -6,6 +6,8 @@ struct OrderScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     let model: OrderModel
     @AppStorage(Config.hapticsEnabledKey) private var hapticsEnabled = true
+    /// 共有シートに本文と一緒に渡す結果の画像。結果ごとに 1 回だけ描く（`shareImageKey` の変化で `.task` が描き直す）。
+    @State private var shareImage: UIImage?
 
     var body: some View {
         PageFrame(
@@ -33,7 +35,8 @@ struct OrderScreen: View {
                     onRemoveAll: { model.removeAll() },
                     onRestore: { model.restore($0, at: $1) },
                     onLongPress: { model.cycleMark(id: $0) },
-                    onLoad: { model.replaceItems($0) }
+                    onLoad: { model.replaceItems($0) },
+                    onSetAppearance: { model.setAppearance($1, for: $0) }
                 )
                 .frame(maxWidth: regular ? Theme.Layout.listWidthRegular : .infinity)
             }
@@ -45,6 +48,27 @@ struct OrderScreen: View {
         .sensoryFeedback(trigger: model.revealing) { wasRevealing, revealing in
             hapticsEnabled && wasRevealing && !revealing ? .success : nil
         }
+        // 演出が終わって結果が出ているときに 1 回だけ共有画像を描く。演出中・結果が無いときは描かず、前の画像も捨てる。
+        // 渡すのは並べ替え後のラベルと見た目だけ（先頭・末尾の指定や印は渡さない）
+        .task(id: shareImageKey) {
+            guard shareImageKey != nil, let ordered = model.ordered else {
+                shareImage = nil
+                return
+            }
+            shareImage = ShareImageRenderer.order(labels: ordered.map(\.label), appearances: ordered.map(\.appearance))
+        }
+    }
+
+    /// 共有画像を描き直す鍵。演出が終わって結果が出ている間だけ値を持ち、並べ替えるたび（`resultId`）に変わる（結果の表示の `.id` と同じ）。
+    /// 結果を出したまま項目の見た目を変えたときも描き直す（結果の表示は出し直さない）。
+    private var shareImageKey: ShareImageKey? {
+        guard let ordered = model.ordered, !model.revealing else { return nil }
+        return ShareImageKey(resultId: model.resultId, appearances: ordered.map(\.appearance))
+    }
+
+    private struct ShareImageKey: Hashable {
+        let resultId: UUID
+        let appearances: [ItemAppearance]
     }
 
     private var regular: Bool { sizeClass == .regular }
@@ -70,7 +94,7 @@ struct OrderScreen: View {
                 // 「コピーしました」も自然に戻る
                 if let ordered = model.ordered, !model.revealing {
                     let text = ResultText.order(ordered.map(\.label))
-                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName))
+                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
                         .id(model.resultId)
                 }
             }
