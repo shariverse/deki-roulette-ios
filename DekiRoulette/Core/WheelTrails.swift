@@ -92,7 +92,8 @@ enum WheelTrails {
         Config.wheelTrailMaxLength * min(max(strength, 0), 1)
     }
 
-    /// 時刻 `now` に描くもの。動きを減らす設定・盤面が自分で回っていない（`motion` が nil。指で動かしている間も含む）・
+    /// 時刻 `now` に描くもの。`motion` は区間の列（`SpinPath`）の動きで、焦らしの区間も同じ時刻の角度・角速度で引く。
+    /// 動きを減らす設定・盤面が自分で回っていない（`motion` が nil。指で動かしている間も含む）・
     /// 止まり切った・閾値未満のときは何も描かない。`dragRotation` は指で回した角度（回っている間はふつう 0）で、残像の角度に足す。
     static func frame(
         motion: TimedSpinMotion?,

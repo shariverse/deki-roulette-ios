@@ -144,6 +144,20 @@ struct WheelTrailsTests {
         #expect(result.ghosts.allSatisfy { $0.angle.isFinite && $0.opacity.isFinite })
     }
 
+    @Test(arguments: SpinTease.allCases, [2, 8, 24])
+    func 焦らしの区間は閾値に届かないので描かない(tease: SpinTease, count: Int) {
+        for direction in [1.0, -1.0] {
+            let path = SpinPath.teased(tease, from: 30, to: 30 + direction * (360 * 5 + 200), count: count)
+            let spin = TimedSpinMotion(path: path, start: 0)
+            // 回り始めは描き、焦らしの区間（主の区間のあと）は描かない
+            #expect(!frame(spin, now: 0.2, sliceCount: count).isEmpty)
+            for step in 0...Int(Config.spinTeaseDuration * 100) {
+                let now = Config.spinDuration + Double(step) / 100
+                #expect(frame(spin, now: now, sliceCount: count).isEmpty)
+            }
+        }
+    }
+
     // MARK: 出さないとき
 
     @Test func 低電力モードでは残像を1枚に減らす() {
