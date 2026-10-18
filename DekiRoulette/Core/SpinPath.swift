@@ -4,9 +4,10 @@ import Foundation
 /// 1 本の曲線では表せず、区間ごとに単調な曲線をつなぐ。区間は時刻順で、前の区間の `to` が次の区間の `from` になる。
 /// 焦らしの無いスピンは区間 1 つ（今の `SpinMotion` と同じ角度）。
 ///
-/// 2D・3D の盤面・回転音・触覚が同じ時刻に同じ角度になるよう、描画（`TimelineView` で `angle(at:)` を引く・区間ごとの補間）と
-/// 境目を越える時刻（`boundaryCrossings(count:minInterval:)`）はどちらもこの区間の列から求める。項目・指定・印は持たない。
-struct SpinPath: Equatable, Sendable {
+/// 2D・3D の盤面・回転音・触覚が同じ時刻に同じ角度になるよう、盤面の補間（`SpinPathAnimation` が `progress(at:)` を引く）・
+/// 演出の角度（`TimedSpinMotion` を `TimelineView` で引く）・境目を越える時刻（`boundaryCrossings(count:minInterval:)`）はどれもこの区間の列から求める。
+/// 項目・指定・印は持たない。
+struct SpinPath: Hashable, Sendable {
     /// 時刻順の区間。空にはしない。
     let segments: [SpinMotion]
     /// 入れた焦らしの入り方。焦らしの無い動きは nil。
@@ -22,6 +23,9 @@ struct SpinPath: Equatable, Sendable {
     init(_ motion: SpinMotion) {
         self.init(segments: [motion])
     }
+
+    /// まだ回していないときの動き。`Config.spinDuration` 秒・`Config.spinEasing` の、回らない区間 1 つ。
+    static let idle = SpinPath(SpinMotion(from: 0, to: 0, duration: Config.spinDuration, easing: Config.spinEasing))
 
     /// 回り始めの累積回転角（度）。
     var from: Double { segments[0].from }
@@ -59,6 +63,14 @@ struct SpinPath: Equatable, Sendable {
             start += segment.duration
         }
         return to
+    }
+
+    /// 開始から `elapsed` 秒後の進み具合。`(angle(at:) - from) / (to - from)` で、始点で 0、止まったら 1。
+    /// 焦らしでは途中で戻ったり（行き過ぎでは）1 を超えたりする。SwiftUI の補間（`SpinPathAnimation`）が、
+    /// 補間する値の差をこの割合で縮めて今の値にする。回らない動き（`to == from`）は常に 1。
+    func progress(at elapsed: TimeInterval) -> Double {
+        guard to != from else { return 1 }
+        return (angle(at: elapsed) - from) / (to - from)
     }
 
     /// 開始から `elapsed` 秒後の角速度（度/秒、累積回転角が増える向きが正）。範囲外は 0。

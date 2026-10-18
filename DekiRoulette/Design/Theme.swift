@@ -108,10 +108,20 @@ enum Theme {
     /// 曲線は `Config.spinEasing` に置き、触覚の発火時刻（`HapticSchedule`）とクリック音の時刻（`SpinTicks`）の逆算と同じ形を共有する。
     static let spinAnimation = spinAnimation(easing: Config.spinEasing)
 
-    /// フリックで始めたスピンは、離した瞬間の速さに合わせた曲線（`RouletteModel.spinEasing`）で回す。長さは同じ。
-    /// 勢いが足りずに惰性で回すときは、曲線と長さを `FlickCoast` が決める（`RouletteModel.rotationDuration`）。
+    /// 曲線 `easing` で `duration` 秒の補間。フリックで始めたスピンは離した瞬間の速さに合わせた曲線、
+    /// 勢いが足りずに惰性で回すときは `FlickCoast` が決めた曲線と長さを渡す（`spinAnimation(path:)` が区間 1 つの動きで使う）。
     static func spinAnimation(easing: CubicBezierCurve, duration: TimeInterval = Config.spinDuration) -> Animation {
         .timingCurve(easing.x1, easing.y1, easing.x2, easing.y2, duration: duration)
+    }
+
+    /// 盤面の動き（`RouletteModel.rotationPath`）の補間。区間 1 つ（演出「なし」のスピン・惰性）は今までどおり
+    /// `spinAnimation(easing:duration:)` の `timingCurve` で、焦らしを入れた区間の列は `SpinPathAnimation` で補間する。
+    static func spinAnimation(path: SpinPath) -> Animation {
+        guard path.segments.count > 1 else {
+            let motion = path.segments[0]
+            return spinAnimation(easing: motion.easing, duration: motion.duration)
+        }
+        return Animation(SpinPathAnimation(path: path))
     }
 
     /// 結果が現れる演出。両画面で使い回す。

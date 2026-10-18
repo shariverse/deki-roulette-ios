@@ -4,7 +4,7 @@ import Foundation
 /// 端点は (0, 0) と (1, 1) に固定。`Theme.spinAnimation` の `timingCurve` と同じ形なので、
 /// `withAnimation` の補間中の角度（observable ではない）をこの曲線から逆算できる。
 /// 制御点は x, y とも 0...1 に収まり、両成分が単調増加である前提（CSS と同じ制約）。
-struct CubicBezierCurve: Equatable, Sendable {
+struct CubicBezierCurve: Hashable, Sendable {
     let x1: Double
     let y1: Double
     let x2: Double
