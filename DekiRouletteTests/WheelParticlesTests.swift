@@ -359,4 +359,58 @@ struct WheelParticlesTests {
         #expect(!WheelParticles.animates(reduceMotion: false, moving: false, bursting: false))
         #expect(!WheelParticles.animates(reduceMotion: true, moving: true, bursting: true))
     }
+
+    // MARK: 1 フレーム
+
+    @Test(arguments: [CGFloat(320), 480])
+    func 火花は針の先から出る(side: CGFloat) {
+        let origin = WheelParticles.sparkOrigin(side: side)
+        #expect(abs(origin.x - side / 2) < 1e-9)
+        // 針は盤面の大きさに依らず、枠の上端から 6pt はみ出した 26pt の高さ
+        #expect(abs(origin.y - 20) < 1e-9)
+    }
+
+    @Test(arguments: [false, true])
+    func フレームは火花と紙吹雪を同じ関数で引く(lowPower: Bool) {
+        let side: CGFloat = 480
+        let motion = steady(velocity(intensity: 1))
+        let burst = WheelParticles.Burst(start: 4.8, seed: 7)
+        let frame = WheelParticles.frame(
+            motion: motion, drag: nil, burst: burst, now: 5, spinSeed: 42, dragSeed: 1, side: side,
+            colorCount: 10, lowPower: lowPower, reduceMotion: false
+        )
+        let sparks = WheelParticles.sparks(
+            motion: motion, drag: nil, now: 5, spinSeed: 42, dragSeed: 1, origin: WheelParticles.sparkOrigin(side: side),
+            scale: side / CGFloat(WheelLabel.referenceDiameter), lowPower: lowPower, reduceMotion: false
+        )
+        let confetti = WheelParticles.confetti(
+            elapsed: 0.2, seed: 7, side: side, colorCount: 10, lowPower: lowPower, reduceMotion: false
+        )
+        #expect(!frame.sparks.isEmpty)
+        #expect(frame.sparks == sparks)
+        #expect(frame.confetti == confetti)
+        #expect(frame.sparks.count <= WheelParticles.sparkCapacity(lowPower: lowPower))
+        #expect(frame.confetti.count <= WheelParticles.confettiCapacity(lowPower: lowPower))
+    }
+
+    @Test func はじけていなければ紙吹雪は出さず動きを減らす設定では何も出さない() {
+        let motion = steady(velocity(intensity: 1))
+        let calm = WheelParticles.frame(
+            motion: nil, drag: nil, burst: nil, now: 5, spinSeed: 42, dragSeed: 1, side: 320,
+            colorCount: 10, lowPower: false, reduceMotion: false
+        )
+        #expect(calm == .none)
+        #expect(calm.isEmpty)
+        let reduced = WheelParticles.frame(
+            motion: motion, drag: nil, burst: WheelParticles.Burst(start: 4.8, seed: 7), now: 5, spinSeed: 42, dragSeed: 1,
+            side: 320, colorCount: 10, lowPower: false, reduceMotion: true
+        )
+        #expect(reduced == .none)
+        // 消え切ったあと
+        let gone = WheelParticles.frame(
+            motion: nil, drag: nil, burst: WheelParticles.Burst(start: 0, seed: 7), now: Config.wheelConfettiDuration,
+            spinSeed: 42, dragSeed: 1, side: 320, colorCount: 10, lowPower: false, reduceMotion: false
+        )
+        #expect(gone.isEmpty)
+    }
 }

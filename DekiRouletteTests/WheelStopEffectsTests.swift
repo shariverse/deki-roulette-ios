@@ -113,4 +113,117 @@ struct WheelStopEffectsTests {
         let maxRate = (1 - WheelStopEffects.afterglowLowLevel) * .pi / Config.wheelLightAfterglowPeriod
         #expect(maxRate * Theme.stopGlowOpacity * Config.effectPulseFrameInterval < 0.04)
     }
+
+    // MARK: 毎フレームの値
+
+    @Test func フレームは停止からの経過でフラッシュと余韻を引く() {
+        let frame = WheelStopEffects.frame(enabled: true, reduceMotion: false, flashStart: 10, afterglowStart: 10, now: 10.1)
+        #expect(abs(frame.flashOpacity - WheelStopEffects.flashOpacity(at: 0.1)) < 1e-9)
+        #expect(abs(frame.glowLevel - WheelStopEffects.afterglowLevel(at: 0.1)) < 1e-9)
+        // フラッシュが消えたあとは余韻だけ
+        let later = WheelStopEffects.frame(enabled: true, reduceMotion: false, flashStart: 10, afterglowStart: 10, now: 12)
+        #expect(later.flashOpacity == 0)
+        #expect(abs(later.glowLevel - WheelStopEffects.afterglowLevel(at: 2)) < 1e-9)
+        // 強調を解いた（余韻の基準が無い）ときは光彩は今のまま。フラッシュは最後まで消す
+        let released = WheelStopEffects.frame(enabled: true, reduceMotion: false, flashStart: 10, afterglowStart: nil, now: 10.1)
+        #expect(released.glowLevel == 1)
+        #expect(released.flashOpacity > 0)
+    }
+
+    @Test func なしと動きを減らす設定では何も足さない() {
+        #expect(WheelStopEffects.frame(enabled: false, reduceMotion: false, flashStart: 10, afterglowStart: 10, now: 10) == .none)
+        #expect(WheelStopEffects.frame(enabled: true, reduceMotion: true, flashStart: 10, afterglowStart: 10, now: 10) == .none)
+        #expect(WheelStopEffects.Frame.none.flashOpacity == 0)
+        #expect(WheelStopEffects.Frame.none.glowLevel == 1)
+    }
+
+    @Test func フラッシュの間は毎フレーム余韻だけなら間隔を落とす() {
+        #expect(WheelStopEffects.frameInterval(flashing: true) == nil)
+        #expect(WheelStopEffects.frameInterval(flashing: false) == Config.effectPulseFrameInterval)
+    }
+
+    // MARK: 停止の時刻
+
+    @Test func 結果が出た時刻を停止の時刻にし消えたら捨てる() {
+        var stop = WheelStopMoment()
+        stop.resultChanged(showingResult: true, now: 10)
+        #expect(stop.start == 10)
+        #expect(stop.witnessed)
+        stop.resultChanged(showingResult: false, now: 12)
+        #expect(stop.start == nil)
+        #expect(!stop.witnessed)
+    }
+
+    @Test func 結果を出したまま画面に出たら点滅を飛ばし見ていない停止にする() {
+        var stop = WheelStopMoment()
+        stop.appear(showingResult: true, now: 10)
+        #expect(abs((stop.start ?? 0) - (10 - WheelLights.blinkDuration)) < 1e-9)
+        #expect(!stop.witnessed)
+        // すでに時刻を持っていれば変えない（画面に戻った）
+        var seen = WheelStopMoment()
+        seen.resultChanged(showingResult: true, now: 10)
+        seen.appear(showingResult: true, now: 30)
+        #expect(seen.start == 10)
+        #expect(seen.witnessed)
+        // 結果が無ければ何もしない
+        var empty = WheelStopMoment()
+        empty.appear(showingResult: false, now: 10)
+        #expect(empty.start == nil)
+    }
+
+    private func stopped(at time: TimeInterval = 10) -> WheelStopMoment {
+        var stop = WheelStopMoment()
+        stop.resultChanged(showingResult: true, now: time)
+        return stop
+    }
+
+    @Test func 全部入りでは停止の時刻をすべての演出に渡す() {
+        let cues = stopped().cues(style: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        #expect(cues == WheelStopCues(
+            highlight: 2, lightsStoppedAt: 10, afterglowStart: 10, flashStart: 10, confettiStart: 10
+        ))
+    }
+
+    @Test func 指で強調を解いたら電飾と余韻は止めフラッシュと紙吹雪は止めない() {
+        let cues = stopped().cues(style: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: true)
+        #expect(cues == WheelStopCues(
+            highlight: nil, lightsStoppedAt: nil, afterglowStart: nil, flashStart: 10, confettiStart: 10
+        ))
+    }
+
+    @Test func スタイルに含まない演出には時刻を渡さない() {
+        let none = stopped().cues(style: .none, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        #expect(none == WheelStopCues(highlight: 2))
+        let lights = stopped().cues(style: .lights, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        #expect(lights == WheelStopCues(highlight: 2, lightsStoppedAt: 10, afterglowStart: 10, flashStart: 10))
+        let trails = stopped().cues(style: .trails, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        #expect(trails == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10))
+        let confetti = stopped().cues(style: .confetti, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        #expect(confetti == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10, confettiStart: 10))
+    }
+
+    @Test func 動きを減らす設定ではフラッシュ_紙吹雪_余韻を渡さない() {
+        let cues = stopped().cues(style: .all, reduceMotion: true, highlightedIndex: 2, displacedByDrag: false)
+        // 電飾は点けたまま動かさない（`WheelLights` が動きを減らす設定の明るさにする）ので、時刻はそのまま渡す
+        #expect(cues == WheelStopCues(highlight: 2, lightsStoppedAt: 10))
+    }
+
+    @Test func 見ていない停止ではフラッシュと紙吹雪を出さず脈動から始める() {
+        var stop = WheelStopMoment()
+        stop.appear(showingResult: true, now: 10)
+        let cues = stop.cues(style: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        #expect(cues.flashStart == nil)
+        #expect(cues.confettiStart == nil)
+        #expect(cues.lightsStoppedAt == stop.start)
+        #expect(cues.afterglowStart == stop.start)
+    }
+
+    @Test func 結果が無ければ何も渡さない() {
+        let cues = WheelStopMoment().cues(style: .all, reduceMotion: false, highlightedIndex: nil, displacedByDrag: false)
+        #expect(cues == WheelStopCues())
+        // 結果が消えた直後（添字が nil になった更新）
+        var stop = stopped()
+        stop.resultChanged(showingResult: false, now: 11)
+        #expect(stop.cues(style: .all, reduceMotion: false, highlightedIndex: nil, displacedByDrag: false) == WheelStopCues())
+    }
 }
