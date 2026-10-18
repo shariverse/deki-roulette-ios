@@ -224,34 +224,13 @@ struct FlickSpinTests {
 
     // MARK: 指を離したとき
 
-    @Test func 閾値以上ならフリックと同じスピン() throws {
-        for velocity in [Config.flickMinAngularVelocity, 900, -1500, Config.flickMaxAngularVelocity * 2] {
-            let expected = try #require(FlickSpin.spin(angularVelocity: velocity))
-            #expect(FlickSpin.releaseSpin(angularVelocity: velocity, dragRotation: -velocity, fallback: .counterclockwise) == expected)
+    @Test func 閾値ちょうどから回し閾値未満では回さない() {
+        let low = Config.flickMinAngularVelocity
+        for velocity in [0, 1, low - 1, low - 0.001, -(low - 1), -(low - 0.001)] {
+            #expect(FlickSpin.spin(angularVelocity: velocity) == nil)
         }
-    }
-
-    @Test func 閾値未満でも最小の周回数で回す() {
-        for velocity in [0, 1, Config.flickMinAngularVelocity - 1, -(Config.flickMinAngularVelocity - 1)] {
-            let spin = FlickSpin.releaseSpin(angularVelocity: velocity, dragRotation: 30, fallback: .clockwise)
-            #expect(spin.fullSpins == Config.fullSpinRange.lowerBound)
-        }
-    }
-
-    @Test func 閾値未満では動かした向きに回す() {
-        // 離す直前に少し戻していても、ドラッグで回した向きを優先する
-        #expect(FlickSpin.releaseSpin(angularVelocity: -50, dragRotation: 40, fallback: .counterclockwise).direction == .clockwise)
-        #expect(FlickSpin.releaseSpin(angularVelocity: 50, dragRotation: -40, fallback: .clockwise).direction == .counterclockwise)
-    }
-
-    @Test func 閾値未満で盤面を動かしていなければ角速度の向き() {
-        #expect(FlickSpin.releaseSpin(angularVelocity: -50, dragRotation: 0, fallback: .clockwise).direction == .counterclockwise)
-        #expect(FlickSpin.releaseSpin(angularVelocity: 50, dragRotation: 0, fallback: .counterclockwise).direction == .clockwise)
-    }
-
-    @Test func 動きが無ければ直前の向きで回す() {
-        #expect(FlickSpin.releaseSpin(angularVelocity: 0, dragRotation: 0, fallback: .counterclockwise).direction == .counterclockwise)
-        #expect(FlickSpin.releaseSpin(angularVelocity: 0, dragRotation: 0, fallback: .clockwise).direction == .clockwise)
+        #expect(FlickSpin.spin(angularVelocity: low) == FlickSpin.Spin(fullSpins: Config.fullSpinRange.lowerBound, direction: .clockwise))
+        #expect(FlickSpin.spin(angularVelocity: -low) == FlickSpin.Spin(fullSpins: Config.fullSpinRange.lowerBound, direction: .counterclockwise))
     }
 
     // MARK: 向き

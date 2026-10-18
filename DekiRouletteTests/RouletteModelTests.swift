@@ -265,6 +265,23 @@ struct RouletteModelTests {
         #expect(model.lastDirection == .clockwise)
     }
 
+    @Test func 勢いの無いまま離しても向きと結果は変わらない() throws {
+        // 閾値未満で離したときは、追従した角度を取り込むだけでスピンを始めない（`RouletteScreen.flick`）
+        let model = makeModel()
+        model.rotation = try #require(model.beginSpin(reducedMotion: false, fullSpins: 4, direction: .counterclockwise))
+        model.finishSpin()
+        let outcome = model.outcome
+        let count = model.spinCount
+        let before = model.rotation
+        #expect(FlickSpin.spin(angularVelocity: Config.flickMinAngularVelocity - 1) == nil)
+        model.rotate(by: 30)
+        #expect(model.rotation == before + 30)
+        #expect(model.lastDirection == .counterclockwise)
+        #expect(model.outcome == outcome)
+        #expect(model.spinCount == count)
+        #expect(!model.spinning)
+    }
+
     @Test func 反時計回りでもクリック音と触覚の時刻が出る() async throws {
         let model = makeModel()
         let from = model.rotation
