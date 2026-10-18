@@ -44,8 +44,18 @@ enum Config {
     /// スピンの周回数の範囲。フリックの強さもこの範囲の中に写す。
     static let fullSpinRange: ClosedRange<Int> = 4...8
 
-    /// 盤面のフリックをスピンとみなす角速度（度/秒）の下限。これ未満では何もしない。
+    /// 盤面のフリックをスピンとみなす角速度（度/秒）の下限。これ未満ではスピンを始めず、少し惰性で回して止める（`FlickCoast`）。
     static let flickMinAngularVelocity: Double = 240
+
+    /// 閾値未満で離したときに惰性で回る角度の係数（秒）。回る角度 = 離した角速度（度/秒）× これ（`FlickCoast`）。
+    /// 閾値ちょうどの手前で 60 度ほど回る。止まるまでの時間は 2 倍の 0.5 秒（等減速なので角速度に依らない）。
+    static let flickCoastFactor: TimeInterval = 0.25
+
+    /// 惰性で回る角度の上限（度）。
+    static let flickCoastMaxAngle: Double = 60
+
+    /// 惰性で回る角度がこれ未満（止めてから離した）なら、惰性を付けずに離した角度のまま止める（度）。
+    static let flickCoastMinAngle: Double = 3
 
     /// 周回数が上限に達する角速度（度/秒）。これ以上はすべて最大の周回数になる。
     static let flickMaxAngularVelocity: Double = 1800
