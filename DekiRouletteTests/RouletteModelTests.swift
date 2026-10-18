@@ -526,9 +526,9 @@ struct RouletteModelTests {
         let next = try #require(model.beginSpin(reducedMotion: false, fullSpins: 5, direction: .counterclockwise, releaseVelocity: -1500))
         let current = try #require(model.currentMotion)
         #expect(current.start == 50)
-        #expect(current.motion == SpinMotion(from: 20, to: next, duration: Config.spinDuration, easing: model.spinEasing))
+        #expect(current.path == SpinPath(SpinMotion(from: 20, to: next, duration: Config.spinDuration, easing: model.spinEasing)))
         // 初速は離した角速度につながる
-        #expect(abs(current.motion.angularVelocity(at: 0) + 1500) < 1e-6)
+        #expect(abs(current.angularVelocity(now: 50) + 1500) < 1e-6)
         model.rotation = next
         model.finishSpin()
         #expect(model.currentMotion == nil)
@@ -549,9 +549,9 @@ struct RouletteModelTests {
         let coast = try #require(FlickCoast.coast(angularVelocity: -200))
         let current = try #require(model.currentMotion)
         #expect(current.start == 10)
-        #expect(current.motion == coast.motion(from: 30))
-        #expect(abs(current.motion.to - next) < 1e-9)
-        #expect(abs(current.motion.angularVelocity(at: 0) + 200) < 1e-6)
+        #expect(current.path == SpinPath(coast.motion(from: 30)))
+        #expect(abs(current.path.to - next) < 1e-9)
+        #expect(abs(current.angularVelocity(now: 10) + 200) < 1e-6)
         model.rotation = next
         clock += coast.duration / 2
         _ = try #require(model.stopCoast())
@@ -565,7 +565,7 @@ struct RouletteModelTests {
         model.rotation = coastTo
         let next = try #require(model.beginSpin(reducedMotion: false))
         let current = try #require(model.currentMotion)
-        #expect(current.motion == SpinMotion(from: coastTo, to: next, duration: Config.spinDuration, easing: Config.spinEasing))
+        #expect(current.path == SpinPath(SpinMotion(from: coastTo, to: next, duration: Config.spinDuration, easing: Config.spinEasing)))
     }
 
     @Test func 指で回したら今の動きを捨てる() throws {

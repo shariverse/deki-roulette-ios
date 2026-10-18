@@ -106,7 +106,7 @@ enum WheelTrails {
         let strength = strength(intensity: motion.intensity(now: now))
         guard strength > 0 else { return .none }
 
-        let velocity = motion.motion.angularVelocity(at: now - motion.start)
+        let velocity = motion.angularVelocity(now: now)
         let direction: SpinDirection = velocity < 0 ? .counterclockwise : .clockwise
         let angle = motion.angle(now: now)
         let count = ghostCount(lowPower: lowPower)

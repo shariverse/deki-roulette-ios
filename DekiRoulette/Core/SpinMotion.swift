@@ -4,7 +4,7 @@ import Foundation
 /// 補間は `withAnimation` に任せていて途中の角度は observable でないので、速さに連動する演出は `TimelineView` で
 /// 毎フレーム、開始からの経過時間でこの動きから角度と角速度を引く（回転音・触覚の時刻の逆算と同じ曲線を使う）。
 /// 項目・指定・印は持たない（角度と曲線だけ）。
-struct SpinMotion: Equatable, Sendable {
+struct SpinMotion: Hashable, Sendable {
     /// 回り始めの累積回転角（度）。
     var from: Double
     /// 止まる累積回転角（度）。`to < from` なら反時計回り。
@@ -65,30 +65,46 @@ enum SpinEffectIntensity {
 }
 
 /// 盤面が自分で回る動き（スピン・惰性）と、その開始時刻（`RouletteModel.now()` の時計の秒）。
+/// 動きは区間をつないだ `SpinPath`（焦らしの無いスピンと惰性は区間 1 つ）。
 /// 演出は `TimelineView` の毎フレームで、同じ時計の今の時刻（`now`）を渡して角度・強さ・動いているかを引く。
 struct TimedSpinMotion: Equatable, Sendable {
-    let motion: SpinMotion
+    let path: SpinPath
     let start: TimeInterval
+
+    init(path: SpinPath, start: TimeInterval) {
+        self.path = path
+        self.start = start
+    }
+
+    /// 区間 1 つの動き。
+    init(motion: SpinMotion, start: TimeInterval) {
+        self.init(path: SpinPath(motion), start: start)
+    }
 
     /// 時刻 `now` の累積回転角（度）。始まる前は `from`、終わったあとは `to`。
     func angle(now: TimeInterval) -> Double {
-        motion.angle(at: now - start)
+        path.angle(at: now - start)
+    }
+
+    /// 時刻 `now` の角速度（度/秒、累積回転角が増える向きが正）。止まり切ったあとは 0。
+    func angularVelocity(now: TimeInterval) -> Double {
+        path.angularVelocity(at: now - start)
     }
 
     /// 時刻 `now` の演出の強さ（0...1）。止まり切ったあとは 0。
     func intensity(now: TimeInterval) -> Double {
-        motion.intensity(at: now - start)
+        path.intensity(at: now - start)
     }
 
     /// 時刻 `now` に盤面がまだ動いているか（開始から長さまでの間）。惰性は止まり切っても次の操作まで
     /// `currentMotion` に残るので、長さを過ぎたら止まっているとみなして毎フレームの描き直しを止める。
     func isMoving(now: TimeInterval) -> Bool {
         let elapsed = now - start
-        return motion.duration > 0 && elapsed >= 0 && elapsed < motion.duration
+        return path.duration > 0 && elapsed >= 0 && elapsed < path.duration
     }
 
     /// 時刻 `now` から止まり切るまでの残りの秒。止まっていれば 0。
     func remaining(now: TimeInterval) -> TimeInterval {
-        max(motion.duration - (now - start), 0)
+        max(path.duration - (now - start), 0)
     }
 }
