@@ -120,6 +120,60 @@ struct WheelParticlesTests {
         }
     }
 
+    // MARK: 焦らしの動き（区間の列）
+
+    @Test func 区間の列では全体の長さまで生まれうる() {
+        // 主の区間（4.5 秒）のあとの区間も速ければ火花が出る（焦らしの 5.7 秒まで生まれうる時刻がある）
+        let path = SpinPath(segments: [
+            SpinMotion(from: 0, to: 4.5 * velocity(intensity: 1), duration: Config.spinDuration, easing: Self.linear),
+            SpinMotion(
+                from: 4.5 * velocity(intensity: 1), to: 5.7 * velocity(intensity: 1),
+                duration: Config.spinTeaseDuration, easing: Self.linear
+            ),
+        ])
+        let motion = TimedSpinMotion(path: path, start: 0)
+        #expect(abs(path.duration - 5.7) < 1e-9)
+        #expect(!sparks(motion, now: 5.6).isEmpty)
+        // 止まり切ってから寿命が過ぎたら出ない
+        #expect(sparks(motion, now: path.duration + Config.wheelSparkLifetime).isEmpty)
+    }
+
+    @Test(arguments: SpinTease.allCases, [2, 8, 24])
+    func 焦らしの区間では火花はごくわずか(tease: SpinTease, count: Int) {
+        for direction in [1.0, -1.0] {
+            let path = SpinPath.teased(tease, from: 30, to: 30 + direction * (360 * 5 + 200), count: count)
+            let motion = TimedSpinMotion(path: path, start: 0)
+            // 焦らしの区間は数十°/秒で、強さは 0.05 に届かない
+            for step in 0...Int(Config.spinTeaseDuration * 1000) {
+                #expect(path.intensity(at: Config.spinDuration + Double(step) / 1000) < 0.05)
+            }
+            // 主の区間で生まれた火花が消えたあと（焦らしの区間で生まれた火花だけ）は、どのフレームでも上限の 1/10 以下
+            for step in 0...Int((path.duration - Config.spinDuration - Config.wheelSparkLifetime) * 20) {
+                let now = Config.spinDuration + Config.wheelSparkLifetime + Double(step) / 20
+                for seed in UInt64(0)..<20 {
+                    #expect(sparks(motion, now: now, seed: seed).count <= WheelParticles.sparkCapacity(lowPower: false) / 10)
+                }
+            }
+        }
+    }
+
+    @Test(arguments: [2, 8, 24])
+    func 焦らしで戻る区間の火花は逆向きに飛ぶ(count: Int) {
+        // 時計回りのスピンの、戻りかけの戻る区間（主の区間のあと 0.4 秒）と、行き過ぎの戻る区間（焦らしの区間すべて）
+        let probes: [(SpinTease, TimeInterval)] = [
+            (.rollBack, Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseRollBackShare),
+            (.overshoot, Config.spinDuration + 0.8),
+        ]
+        for (tease, now) in probes {
+            let path = SpinPath.teased(tease, from: 30, to: 30 + 360 * 5 + 200, count: count)
+            let motion = TimedSpinMotion(path: path, start: 0)
+            let all = (UInt64(0)..<200).flatMap { sparks(motion, now: now, seed: $0) }
+            // 生まれたばかりの粒は針の先にいる。それ以外は左（反時計回りの向き）へ飛んでいる
+            #expect(all.allSatisfy { $0.position.x <= Self.origin.x })
+            #expect(all.contains { $0.position.x < Self.origin.x })
+        }
+    }
+
     // MARK: 紙吹雪
 
     @Test func 紙吹雪の上限は80で低電力モードでは3分の1() {
