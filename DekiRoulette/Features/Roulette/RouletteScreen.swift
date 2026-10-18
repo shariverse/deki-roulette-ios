@@ -12,6 +12,8 @@ struct RouletteScreen: View {
     @State private var sound = SpinSoundPlayer()
     /// 共有シートに本文と一緒に渡す結果の画像。結果ごとに 1 回だけ描く（`shareImageKey` の変化で `.task` が描き直す）。
     @State private var shareImage: UIImage?
+    /// 画面が出ているか。タブを切り替えても画面は階層に残り `onChange` が走るので、離れている間に止まったスピンの決まり音を鳴らさない。
+    @State private var onScreen = false
 
     var body: some View {
         PageFrame(
@@ -67,12 +69,16 @@ struct RouletteScreen: View {
         // 停止時の決まり音。結果（`outcome`）は抽選したスピンの完了（`finishSpin`。保険のタイマーでも同じ）でだけ出るので、
         // 惰性では鳴らない。動きを減らす設定でも鳴らす。判定に指定や結果のラベルは使わない
         .onChange(of: model.outcome) { _, outcome in
-            guard outcome != nil, StopChime.plays(style: spinEffectStyle, soundEnabled: soundEnabled, stop: .spin) else { return }
+            guard onScreen, outcome != nil, StopChime.plays(style: spinEffectStyle, soundEnabled: soundEnabled, stop: .spin) else { return }
             sound.playChime()
         }
         // 「なし」のときは決まり音を読み込まない
-        .onAppear { if soundEnabled { sound.prepare(chime: spinEffectStyle.showsCommonEffects) } }
+        .onAppear {
+            onScreen = true
+            if soundEnabled { sound.prepare(chime: spinEffectStyle.showsCommonEffects) }
+        }
         .onDisappear {
+            onScreen = false
             sound.stop()
             // 惰性の残りの触覚の刻みも止める
             model.stopCoast()
