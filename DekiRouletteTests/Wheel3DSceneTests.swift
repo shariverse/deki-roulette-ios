@@ -499,6 +499,34 @@ struct Wheel3DSceneTests {
         #expect(isClose(color, bulbColor(WheelLights.blinkLowLevel)), "\(color)")
     }
 
+    @Test func 電飾を出さない間は電球を作らない() {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.light(nil)
+        #expect(scene.bulbCount == 0)
+        // 組み直しても作らない
+        scene.update(labels: Array(repeating: "", count: 5), diameter: size)
+        #expect(scene.bulbCount == 0)
+        scene.light(.still)
+        #expect(scene.bulbCount == Config.wheelLightCount)
+    }
+
+    @Test func 明るさの変わらない電球は塗り直さない() {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.light(.still)
+        #expect(scene.bulbColorWriteCount == Config.wheelLightCount)
+        // 止まっている並び（3 個おき）は `still` と同じ 0.6 なので、間の電球だけ塗り直す
+        scene.light(.running(angle: 0, intensity: 0))
+        let lit = (0..<Config.wheelLightCount).filter {
+            WheelLights.bulb(index: $0, scene: .running(angle: 0, intensity: 0)).brightness == WheelLights.stillLevel
+        }.count
+        #expect(lit == Config.wheelLightCount / WheelLights.litStride)
+        #expect(scene.bulbColorWriteCount == Config.wheelLightCount * 2 - lit)
+        // 消して同じ場面に戻しても、明るさが同じなら塗り直さない
+        scene.light(nil)
+        scene.light(.running(angle: 0, intensity: 0))
+        #expect(scene.bulbColorWriteCount == Config.wheelLightCount * 2 - lit)
+    }
+
     @Test func 電球は針の後ろ() throws {
         let scene = makeScene(count: 4, rotation: 0)
         scene.light(.running(angle: 0, intensity: 1))

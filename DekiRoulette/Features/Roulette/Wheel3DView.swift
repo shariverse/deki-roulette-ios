@@ -223,11 +223,18 @@ final class Wheel3DScene {
     private var stoppedNode: SCNNode?
     private var shownHighlight: Wheel3DHighlight?
     private let postNode = SCNNode()
-    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は組み直すたびに作り、出さない間は隠す。
+    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は初めて出すときに作り（「なし」では作らない）、
+    /// 組み直したら作り直し、出さない間は隠す。
     private let lightsNode = SCNNode()
     private var bulbNodes: [SCNNode] = []
     private var haloNodes: [SCNNode] = []
+    /// 電球ごとに最後に塗った明るさ。明るさが変わらない電球の素材は書き換えない。
+    private var bulbLevels: [Double?] = []
     private var shownLights: WheelLights.Scene?
+    /// 電球の素材の色を書き換えた回数（テストで、明るさの変わらない電球を書き換えていないかを見る）。
+    private(set) var bulbColorWriteCount = 0
+    /// 作った電球の数（テストで、電飾を出さない間は作らないことを見る）。
+    var bulbCount: Int { bulbNodes.count }
 
     private struct Shape: Equatable {
         /// 項目。比べるのはラベルと見た目だけ（`id` が変わっても見た目が同じなら組み直さない）。
@@ -430,7 +437,10 @@ final class Wheel3DScene {
         addHub(scale: scale)
         addPost(thickness: thickness, scale: scale)
         addPointer(diameter: diameter, scale: scale)
-        addLights(diameter: diameter, scale: scale, displayScale: shape.displayScale)
+        // 電球は大きさに合わせて作り直す。出していなければ次に出すときに作る
+        removeLights()
+        if shownLights != nil { addLights(shape) }
+        applyLights()
     }
 
     // MARK: 電飾
@@ -440,14 +450,19 @@ final class Wheel3DScene {
     func light(_ scene: WheelLights.Scene?) {
         guard scene != shownLights else { return }
         shownLights = scene
+        if scene != nil, bulbNodes.isEmpty, let shape = built { addLights(shape) }
         applyLights()
     }
+
+    /// 縁と電球の色の sRGB の成分。毎フレーム塗る色を混ぜるのに使うので、一度だけ求める。
+    private static let rimComponents = components(Theme.wheelRim)
+    private static let lightComponents = components(Theme.wheelLight)
 
     /// 電球の色。2D は縁（`wheelRim`）の上に `wheelLight` を明るさの不透明度で重ねるので、その重ねた色（sRGB で混ぜる）を不透明に塗る
     /// （SceneKit は線形の色空間で重ねるので、不透明度で重ねると 2D より明るく見える）。
     static func bulbColor(brightness: Double) -> UIColor {
         let amount = CGFloat(min(max(brightness, 0), 1))
-        let rim = components(Theme.wheelRim), light = components(Theme.wheelLight)
+        let rim = rimComponents, light = lightComponents
         return UIColor(
             red: rim.r + (light.r - rim.r) * amount,
             green: rim.g + (light.g - rim.g) * amount,
@@ -472,7 +487,11 @@ final class Wheel3DScene {
         let haloFull = Theme.LightRing.bulbRadius + Theme.LightRing.haloWidth
         for index in 0..<count {
             let bulb = WheelLights.bulb(index: index, count: count, scene: scene)
-            bulbNodes[index].geometry?.firstMaterial?.diffuse.contents = Self.bulbColor(brightness: bulb.brightness)
+            if bulbLevels[index] != bulb.brightness {
+                bulbLevels[index] = bulb.brightness
+                bulbNodes[index].geometry?.firstMaterial?.diffuse.contents = Self.bulbColor(brightness: bulb.brightness)
+                bulbColorWriteCount += 1
+            }
             let halo = haloNodes[index]
             guard bulb.glow > 0 else {
                 halo.isHidden = true
@@ -488,10 +507,11 @@ final class Wheel3DScene {
 
     /// 電球を縁の上に並べる（2D と同じ数・位置・大きさ。12 時から時計回り）。縁の上面から `Theme.Wheel3D.lightLift` だけ浮かせ、
     /// 持ち上げた止まったスライスの光彩より手前、針・結果の帯より奥に置く。にじみは電球の後ろの板（放射状のグラデーションを焼いた画像）。
-    private func addLights(diameter: Double, scale: Double, displayScale: CGFloat) {
-        lightsNode.childNodes.forEach { $0.removeFromParentNode() }
-        bulbNodes = []
-        haloNodes = []
+    private func addLights(_ shape: Shape) {
+        removeLights()
+        let diameter = Double(shape.diameter)
+        let scale = diameter / WheelLabel.referenceDiameter
+        let displayScale = shape.displayScale
         let side = CGFloat(diameter)
         let ringRadius = Double(Theme.LightRing.ringRadius(diameter: side))
         let bulbRadius = Double(Theme.LightRing.bulbRadius(diameter: side))
@@ -518,6 +538,7 @@ final class Wheel3DScene {
 
             let disc = SCNCylinder(radius: bulbRadius, height: 0.1)
             disc.radialSegmentCount = Theme.Wheel3D.lightSegments
+            // 電球ごとに色を変えるので、素材は電球ごとに持つ（色は `applyLights` が明るさから塗る）
             disc.materials = [Self.material(Theme.wheelLight, lit: false)]
             let bulb = SCNNode(geometry: disc)
             bulb.eulerAngles.x = .pi / 2
@@ -526,7 +547,14 @@ final class Wheel3DScene {
             lightsNode.addChildNode(bulb)
             bulbNodes.append(bulb)
         }
-        applyLights()
+        bulbLevels = Array(repeating: nil, count: count)
+    }
+
+    private func removeLights() {
+        lightsNode.childNodes.forEach { $0.removeFromParentNode() }
+        bulbNodes = []
+        haloNodes = []
+        bulbLevels = []
     }
 
     /// にじみの画像。2D の `WheelLightsView` と同じく、電球の半径の半分から外へ `wheelLight` を透明まで薄める放射状のグラデーション
