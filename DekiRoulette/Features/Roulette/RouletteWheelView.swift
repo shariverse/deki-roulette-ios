@@ -8,16 +8,16 @@ import SwiftUI
 /// nil に戻すと強調も解ける。
 /// ドラッグ追従とフリックは `WheelDragArea`（3D の盤面と共有）が受け、追従で回した角度を盤面に足す。
 /// 結果が出たあとに指で動かしたら強調を解く。`interactive` が false の間（演出中）は追従もフリックもしない。
-/// `spinEasing` はスピンの曲線。フリックでは離した瞬間の速さに合わせて親が決める（ボタンでは `Config.spinEasing`）。
+/// `rotationPath` は回転の動き（`RouletteModel.rotationPath`）。演出「なし」のスピンと惰性は区間 1 つの `timingCurve`、
+/// 焦らしを入れたスピンは区間の列（`SpinPathAnimation`）で補間する。
 /// 盤面の面そのもの（縁・スライス・ラベル・ハブと停止の強調）は `WheelFaceView` で、共有画像（`RouletteShareImageView`）と同じ描画を使う。
 struct RouletteWheelView: View {
     let items: [Item]
     let rotation: Double
     var highlightedIndex: Int? = nil
     var interactive = true
-    var spinEasing = Config.spinEasing
-    /// 回転の補間の長さ。スピンは `Config.spinDuration`、勢いが足りずに惰性で回すときは親が `FlickCoast` から決める。
-    var rotationDuration = Config.spinDuration
+    /// 回転の動き。補間の曲線と長さ（焦らしの区間を含む）はここから決める。
+    var rotationPath = SpinPath.idle
     /// 止まったスライスの光彩の色（設定の「ルーレットの詳細設定」）。
     var glowStyle = GlowStyle.default
     /// 外周の電飾を出すか（「スピンの演出」が電飾・全部入り）。false なら今の盤面のまま何も足さない。
@@ -60,9 +60,9 @@ struct RouletteWheelView: View {
                 .rotationEffect(.degrees(rotation + dragRotation))
                 // キーボードが出た状態で始めると、演出開始で入力欄が無効になってキーボードが閉じ、その安全領域の変化が
                 // `withAnimation` の更新に重なって補間が落ちる（盤面が最終角度へ飛び、音だけが鳴る）。回転の値の変化だけは
-                // 外側のトランザクションに依らずスピンの曲線で補間させる。曲線は親の `withAnimation` と同じ `spinEasing`。
-                // 動きを減らす設定では親が値を直接書くので付けない
-                .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)
+                // 外側のトランザクションに依らずスピンの動きで補間させる。動きは親の `withAnimation` と同じ `rotationPath`
+                // （焦らしの区間を含む）。動きを減らす設定では親が値を直接書くので付けない
+                .animation(reduceMotion ? nil : Theme.spinAnimation(path: rotationPath), value: rotation)
                 .shadow(color: Theme.wheelShadow, radius: 15, y: 10)
 
                 // 光の尾と残像は回らない層に置き、盤面の上に薄く重ねる（残像は遅れた角度の塗りだけで、停止の強調は載せない）。

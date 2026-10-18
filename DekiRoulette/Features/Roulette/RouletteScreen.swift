@@ -154,8 +154,7 @@ struct RouletteScreen: View {
                 // 2D と同じく、結果が出ている間だけ止まったスライスを強調する
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
-                spinEasing: model.spinEasing,
-                rotationDuration: model.rotationDuration,
+                rotationPath: model.rotationPath,
                 glowStyle: glowStyle,
                 result: wheel3DResult,
                 // 2D と同じく、指を離した角度からフリックのスピンを始める
@@ -170,8 +169,7 @@ struct RouletteScreen: View {
                 // 結果が出ている間だけ止まったスライスを強調する。項目を触って結果が消えれば強調も解ける
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
-                spinEasing: model.spinEasing,
-                rotationDuration: model.rotationDuration,
+                rotationPath: model.rotationPath,
                 glowStyle: glowStyle,
                 // 電飾・光の尾・残像・火花・紙吹雪は指定・印を見ない。流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
                 showsLights: spinEffectStyle.showsLights,
@@ -263,7 +261,7 @@ struct RouletteScreen: View {
         guard let next = model.beginCoast(angularVelocity: angularVelocity, reducedMotion: reduceMotion) else { return }
         // 惰性で回る間も、針が境目を越えるたびに鳴らす（時刻は惰性の曲線から先に求めてある。触覚はモデルが刻む）
         if soundEnabled { sound.play(at: model.clickTimes) }
-        withAnimation(Theme.spinAnimation(easing: model.spinEasing, duration: model.rotationDuration)) {
+        withAnimation(Theme.spinAnimation(path: model.rotationPath)) {
             model.rotation = next
         }
     }
@@ -283,15 +281,18 @@ struct RouletteScreen: View {
     }
 
     private func spin(fullSpins: Int?, direction: SpinDirection?, releaseVelocity: Double?) {
+        // 「スピンの演出」が「なし」以外なら止まり際の焦らしが入る（動きを減らす設定では入らない）。指定は渡さない
         guard let next = model.beginSpin(
-            reducedMotion: reduceMotion, fullSpins: fullSpins, direction: direction, releaseVelocity: releaseVelocity
+            reducedMotion: reduceMotion, style: spinEffectStyle, fullSpins: fullSpins, direction: direction,
+            releaseVelocity: releaseVelocity
         ) else { return }
         if soundEnabled { sound.play(at: model.clickTimes) }
         if reduceMotion {
             // 動きを減らす設定では回さずに止まる。終了は保険のタイマーが担う
             model.rotation = next
         } else {
-            withAnimation(Theme.spinAnimation(easing: model.spinEasing)) {
+            // 焦らしを入れたスピンは区間の列で補間する（2D・3D の盤面の `.animation` も同じ動き）
+            withAnimation(Theme.spinAnimation(path: model.rotationPath)) {
                 model.rotation = next
             } completion: {
                 model.finishSpin()
