@@ -107,6 +107,7 @@ final class SpinSoundPlayer {
     }
 
     /// 画面から離れるときなど、鳴らしている途中で止める。決まり音も止める。
+    /// 決まり音は回転音（click.wav）と同じエンジン・セッションで鳴らすので、click が読めていなければ決まり音も鳴っていない。
     func stop() {
         guard click != nil else { return }
         generation += 1
