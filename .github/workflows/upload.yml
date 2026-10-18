@@ -1,6 +1,6 @@
 name: Upload
 
-# TestFlight へのアップロードは develop と release からだけ行う。
+# TestFlight へのアップロードは develop と release からだけ行う（iOS と visionOS の両方）。
 # 作業ブランチも上げていると App Store Connect の 24 時間あたりのアップロード上限に当たるため、
 # 作業ブランチを実機で確認したいときは手動実行でそのブランチを選ぶ。
 on:
@@ -33,7 +33,7 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Archive
+      - name: Archive (iOS)
         run: |
           xcodebuild archive \
             -project DekiRoulette.xcodeproj \
@@ -53,7 +53,7 @@ jobs:
           mkdir private_keys
           echo -n '${{ secrets.APPLE_API_KEY_BASE64 }}' | base64 --decode > ./private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
 
-      - name: Export IPA
+      - name: Export IPA (iOS)
         run: |
           xcodebuild -exportArchive \
             -archivePath build.xcarchive \
@@ -64,16 +64,54 @@ jobs:
             -authenticationKeyID ${{ secrets.APPLE_API_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APPLE_API_ISSUER_ID }}
 
+      # visionOS も同じ手順（アーカイブ → 書き出し）をする。デバイス向けの SDK は iOS の iphoneos に対して xros。
+      # アップロードを iOS と visionOS でまとめて行うのは、どちらかの書き出しが失敗したときに
+      # 片方だけが TestFlight に上がった状態にしないため
+      - name: Archive (visionOS)
+        run: |
+          xcodebuild archive \
+            -project DekiRoulette.xcodeproj \
+            -scheme DekiRoulette \
+            -sdk xros \
+            -configuration Release \
+            -archivePath build-visionos.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }}
+
+      - name: Export IPA (visionOS)
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build-visionos.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath app-visionos.ipa \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$(pwd)/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8" \
+            -authenticationKeyID ${{ secrets.APPLE_API_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APPLE_API_ISSUER_ID }}
+
       # 書き出しと同じ API キーで認証する。Apple ID 認証は Bundle ID からチームを逆引きするため、
       # App Store Connect にアプリが無いと「provider public id を決定できない」で止まる
-      - name: Upload IPA to App Store Connect
+      - name: Upload IPA (iOS) to App Store Connect
         run: |
           xcrun altool --upload-app -f app.ipa/DekiRoulette.ipa --type ios \
             --apiKey ${{ secrets.APPLE_API_KEY_ID }} \
             --apiIssuer ${{ secrets.APPLE_API_ISSUER_ID }}
 
-      - name: Upload IPA to GitHub
+      # visionOS の IPA は --type visionos。同じ Bundle ID のままで、TestFlight ではプラットフォームごとに並ぶ
+      - name: Upload IPA (visionOS) to App Store Connect
+        run: |
+          xcrun altool --upload-app -f app-visionos.ipa/DekiRoulette.ipa --type visionos \
+            --apiKey ${{ secrets.APPLE_API_KEY_ID }} \
+            --apiIssuer ${{ secrets.APPLE_API_ISSUER_ID }}
+
+      - name: Upload IPA (iOS) to GitHub
         uses: actions/upload-artifact@v7
         with:
           name: DekiRoulette.ipa
           path: app.ipa/DekiRoulette.ipa
+
+      - name: Upload IPA (visionOS) to GitHub
+        uses: actions/upload-artifact@v7
+        with:
+          name: DekiRoulette-visionos.ipa
+          path: app-visionos.ipa/DekiRoulette.ipa
