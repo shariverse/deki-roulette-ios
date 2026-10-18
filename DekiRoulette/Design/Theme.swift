@@ -220,6 +220,29 @@ enum Theme {
         static let haloOpacity = 0.6
     }
 
+    // MARK: 光の尾・残像
+
+    // 「スピンの演出」の光の尾・残像（`WheelTrails`）。残像はスライスの塗り（`sliceColor(in:at:)`）だけを薄く重ね、
+    // 光の尾は盤面の縁（スライスの円の外側にある暗い環）の上を針の下から後ろへ伸びる弧にする。
+    // 盤面と同じく外観に依らず固定の冷たい白系にし（電飾の暖かい白と見分ける）、`gold` / `flare` は使わない。
+
+    /// 光の尾の色。濃さ（`WheelTrails.Trail.opacity`）を不透明度にして縁の上に重ねる。縁（`wheelRim`）に対して 3:1 以上（`ThemeContrastTests`）。
+    static let wheelTrail = Color(hex: 0xD8F0FF)
+
+    /// 光の尾・残像の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）。
+    enum TrailRing {
+        /// 光の尾の芯の中心の半径の、スライスの円の半径からの出幅（縁の中央。電飾の電球の環と同じ）。
+        static let ringOffset: CGFloat = 8
+        /// 光の尾の芯の太さ。縁の幅（6pt）に収める。
+        static let coreWidth: CGFloat = 4
+        /// 芯のまわりのにじみの太さ。盤面の枠（スライスの円の外 16pt）を越えない。
+        static let glowWidth: CGFloat = 12
+        /// にじみの不透明度（芯の濃さに掛ける）。
+        static let glowOpacity = 0.35
+        /// 尾を描き分ける区間の数（頭から先へ段階的に薄くする）。
+        static let segments = 24
+    }
+
     // MARK: 結果の帯
 
     // 結果が出ている間、盤面の中心より下に重ねて結果のラベルを全文で出す帯（寸法と位置は `ResultBand`）。

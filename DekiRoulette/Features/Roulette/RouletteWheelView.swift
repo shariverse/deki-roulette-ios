@@ -22,7 +22,9 @@ struct RouletteWheelView: View {
     var glowStyle = GlowStyle.default
     /// 外周の電飾を出すか（「スピンの演出」が電飾・全部入り）。false なら今の盤面のまま何も足さない。
     var showsLights = false
-    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れを毎フレームここから引く。
+    /// 光の尾と残像を出すか（「スピンの演出」が光の尾・全部入り）。false なら今の盤面のまま何も足さない。
+    var showsTrails = false
+    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れ・光の尾・残像を毎フレームここから引く。
     var motion: TimedSpinMotion? = nil
     /// `motion` の開始時刻と同じ時計（`RouletteModel.now`）。
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
@@ -60,6 +62,21 @@ struct RouletteWheelView: View {
                 // 動きを減らす設定では親が値を直接書くので付けない
                 .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)
                 .shadow(color: Theme.wheelShadow, radius: 15, y: 10)
+
+                // 光の尾と残像は回らない層に置き、盤面の上に薄く重ねる（残像は遅れた角度の塗りだけで、停止の強調は載せない）。
+                // 縁の上の光の尾は電飾の電球より奥
+                if showsTrails {
+                    GeometryReader { proxy in
+                        WheelTrailsView(
+                            items: items,
+                            side: min(proxy.size.width, proxy.size.height),
+                            dragRotation: dragRotation,
+                            motion: motion,
+                            now: now
+                        )
+                        .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                    }
+                }
 
                 // 電飾は回らない層に置き、縁の上に並べる（盤面の枠と寸法は変えない）。針はその手前
                 if showsLights {
@@ -314,6 +331,18 @@ private struct Triangle: Shape {
 #Preview("Lights") {
     RouletteWheelView(
         items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, showsLights: true
+    )
+    .padding(40)
+    .background(Theme.ink900)
+}
+
+#Preview("Trails") {
+    RouletteWheelView(
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, showsTrails: true,
+        motion: TimedSpinMotion(
+            motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
+            start: ProcessInfo.processInfo.systemUptime
+        )
     )
     .padding(40)
     .background(Theme.ink900)

@@ -183,6 +183,15 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 （待機中・止まり切った惰性 = `TimedSpinMotion.isMoving(now:)` が偽・動きを減らす設定）は止める。止まり切った惰性は親が描き直さないので、
 `WheelLightsView` が `.task(id: motion)` で残り時間だけ待って `@State` を書き、描き直させて止める。演出は指定・印を受け取らず、`accessibilityHidden`・`allowsHitTesting(false)`。
 
+光の尾・残像（`SpinEffectStyle.showsTrails`）も 2D の `RouletteWheelView` だけに出す（3D は後続）。`RouletteScreen` が `showsTrails` を渡し、`WheelTrailsView` を
+電飾と同じく `rotationEffect` の外（回らない層）で、盤面の面の上・電飾の奥に重ねる。描くもの（残像の角度と不透明度、光の尾の長さ・濃さ・向き）は
+`WheelTrails.frame`（`Core/`）が `currentMotion`・`now()`・スライスの数・低電力モード・動きを減らす設定だけから決め、強さが `Config.wheelTrailThreshold` 未満・
+`motion` が nil（指で動かしている間も含む）・止まり切った・動きを減らす設定では何も描かない（`TimelineView` も止める。止まり切った惰性は電飾と同じく
+`.task(id: motion)` で描き直させる）。残像は `WheelFaceView` を重ねず、`Canvas` にスライスの塗りだけ（ハブの内側は抜く）を `motion.angle(now: now - lag)` の角度で
+描く（ラベル・停止の強調は載せない。軽くするため）。ずらしは `WheelTrails.clampedOffsets` で上限に収め、向きは角速度の符号から取る。光の尾は縁の上を
+針の下から逆向きに伸びる弧（色は `Theme.wheelTrail`、寸法は `Theme.TrailRing`）。低電力モードは `LowPowerModeMonitor`（`@Observable`。`NSProcessInfoPowerStateDidChange`
+で読み直す）を `WheelTrailsView` が最初に画面に出たときに 1 つだけ作って持ち（`@State` の初期値にすると View の値が作られるたびに購読を作り直すため）、`WheelTrails.ghostCount(lowPower:)` で残像を 1 枚に減らす。共有画像には載せない。
+
 ### 3D 表示の仕組み
 
 設定の「3D 表示」（`@AppStorage(Config.wheel3DEnabledKey)`、既定 OFF）が ON のとき、`RouletteScreen` は `RouletteWheelView` の代わりに
