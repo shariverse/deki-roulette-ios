@@ -99,6 +99,11 @@ enum Config {
     /// 止まったスライスの光彩の色（`GlowStyle.rawValue`）を保存する `UserDefaults` のキー。未設定なら `GlowStyle.default`。
     static let glowStyleKey = "glowStyle"
 
+    // MARK: スピンの演出
+
+    /// スピンに付ける演出（`SpinEffectStyle.rawValue`）を保存する `UserDefaults` のキー。未設定なら `SpinEffectStyle.default`（なし）。
+    static let spinEffectStyleKey = "spinEffectStyle"
+
     // MARK: 3D 表示
 
     /// 盤面を 3D で描くかを保存する `UserDefaults` のキー。未設定なら OFF（今の 2D の盤面）。
