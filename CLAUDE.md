@@ -45,6 +45,7 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
   件数つきの規則（`n % 色数 == 1` のときだけ末尾をずらして環の継ぎ目が同じ色にならないようにする）で引く。
   盤面の塗り・光彩（`WheelFaceView`）・行の色見本（`ItemListView`）・結果の帯の枠（`RouletteScreen`）・共有画像は同じ関数で引く。
   3D の盤面（`Wheel3DView`）の塗り・停止の強調・ラベル画像も同じ関数と `WheelLabel.display` で引く。
+  例外はスピンの演出の紙吹雪だけで、特定のスライスを指さないので項目の見た目・件数に依らない固定の 10 色（`Theme.confettiColors` = `sliceColors`）を使う。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
   絵文字の項目は `WheelLabel.display` が絵文字ぶん 1 文字短く省略して前に絵文字を付け、結果の帯（2D・3D・共有画像）は `WheelLabel.decorated` の全文を出す（読み上げと共有の本文はラベルのまま）。
@@ -127,7 +128,7 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 向きを `lastDirection` に覚え、「スピン」ボタンはその向きで回す（初期値は時計回り、保存しない）。停止後は `outcome.index` を `highlightedIndex` として渡し、
 他のスライスを `Theme.sliceDim` で強く沈め、止まったスライスに白系の縁取り（`stopOutline`）と光彩（既定は `stopGlow`。色は `@AppStorage(Config.glowStyleKey)` の `GlowStyle` で、設定の「ルーレットの詳細設定」から選ぶ）を付ける（結果が出たあとに指で動かしたら強調だけ解く）。停止の瞬間に `stopPulseScale` で押し出して針を跳ねさせ、スライスはそのあと結果が出ている間 `stopHoldScale` で前に出したままにする（強調が解けたら戻す）。拡大と針の跳ねは `accessibilityReduceMotion` では省く。
 スピンの演出（`docs/SPEC.md` の §5.5）は `SpinEffectStyle`（`Core/`。なし / 電飾 / 光の尾 / 紙吹雪 / 全部入り、既定は「なし」）を `@AppStorage(Config.spinEffectStyleKey)` で持ち、同じ「ルーレットの詳細設定」で選ぶ。
-付ける演出は `showsLights` / `showsTrails` / `showsParticles` / `showsCommonEffects` で引き、指定は渡さない。`RouletteScreen` は 2D の `RouletteWheelView` と
+付ける演出は `showsLights` / `showsTrails` / `showsParticles` / `showsCommonEffects` で引き、指定は渡さない（SPEC の共通の演出のうち、背景の光の脈動と針を大きく弾く動きは未実装。針の沈みはどのスタイルでも `Theme.pointerBounceOffset`）。`RouletteScreen` は 2D の `RouletteWheelView` と
 3D の `Wheel3DView` に同じ `effectStyle`（`SpinEffectStyle` そのもの）を渡し、どちらの盤面も同じ関数（`effectStyle.tracksDragMotion`・`WheelStopMoment.cues`・共有の `…Timeline`）から演出の値を引く。
 止まり際の焦らし（SPEC §5.5「焦らし」）は `SpinPath.spin(from:to:count:style:releaseVelocity:using:)`（`Core/SpinTease.swift`）が作る。
 `showsCommonEffects` が偽なら今の `SpinMotion` と同じ区間 1 つ（乱数は引かない）で、真なら `SpinTease.random(using:)` で
@@ -149,7 +150,8 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 惰性の途中で盤面に触れたら、`WheelDragArea` の `onGrab` で `model.stopCoast()` が曲線から今の角度を逆算し、`disablesAnimations` の
 トランザクションで補間なしに書いて止める（止めた角度を `onGrab` が返し、`WheelDragArea` は描き直し前の最初の追従の境目をその角度から数える）。
 惰性の途中で `beginSpin` を呼ぶと惰性を打ち切り（止まる位置は行き先の `rotation` から）、`rotationPath` をスピンのものに差し替える。`reducedMotion` では付けない。
-惰性で回る間もスピンと同じ方式で回転音と触覚を鳴らす（下記「触覚の仕組み」「回転音の仕組み」）。
+惰性で回る間もスピンと同じ方式で回転音と触覚を鳴らす（下記「触覚の仕組み」「回転音の仕組み」）。速さに連動する演出（電飾の流れ・光の尾と残像・火花）も、
+惰性は `currentMotion` から、指で動かしている間は `WheelDragMotion` からスピンと同じ関数で引いて出る（下記「スピンの演出の仕組み」。惰性は強さ約 0.33 未満なので、光の尾・残像は閾値に届かず描かれない）。
 
 ### 触覚の仕組み
 
@@ -181,7 +183,9 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 「スピンの演出」（`@AppStorage(Config.spinEffectStyleKey)`）が `showsCommonEffects` で効果音が ON のときだけ鳴らす。判定は `StopChime.plays`（`Core/`。
 スタイル・効果音・止まった動き（`.spin` / `.coast`）だけを受け取り、指定や結果のラベルは受け取らない）。`RouletteScreen` が `onChange(of: model.outcome)` で
 結果が出た瞬間（`finishSpin`。保険のタイマーでも同じ）に `sound.playChime()` を呼ぶ。惰性では `outcome` が出ないので鳴らず、`reducedMotion` でも鳴らす。
-`SpinSoundPlayer` は回転音とは別の `AVAudioPlayerNode`（音量 `Config.chimeGain`）で流すので、クリックの再生を止めたり差し替えたりしない（`stop()` だけは両方止める）。
+`SpinSoundPlayer` は回転音とは別の `AVAudioPlayerNode`（音量 `Config.chimeGain`）で流すので、クリックの再生を止めたり差し替えたりしない。
+`stop()`（画面を離れた `onDisappear` と、惰性の途中で盤面に触れた `RouletteScreen.grab`）は回転音・決まり音・うなりの 3 つのノードをすべて止め、
+3 つの世代（`generation` / `chimeGeneration` / `humGeneration`）を進めて準備待ち・焼き込み中の再生も取り消し、エンジンも止める（触れたときに鳴り終わっていない決まり音も切れる）。
 「なし」のときは `prepare(effects:)` に false を渡して音源を読み込まない。
 
 スピン中のうなり（ドラムロール。音源は `Resources/Sounds/drumroll.wav` の 1 打ち。`scripts/make-drumroll-sound.swift` がノイズ・音程の下がる胴鳴り・低い芯を 0.12 秒で合成する）は、
@@ -202,7 +206,8 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 電飾（`SpinEffectStyle.showsLights`、SPEC §5.5）は 2D の `RouletteWheelView` と 3D の `Wheel3DView` の両方に出す（3D は下の「3D 表示の仕組み」）。
 `RouletteScreen` が `showsLights`・`model.currentMotion`・`model.now` を渡す。毎フレームの場面は 2D・3D で共有の `WheelLightsTimeline`（`WheelLightsView.swift`）が
 同じ時計・同じ規則で引いて `content` に渡し、2D は `WheelLightsView` が `Canvas` に描き、3D は `Wheel3DScene.light(_:)` がノードに写す。2D は `WheelLightsView` を `WheelDragArea` の中・`rotationEffect` の外（回らない層、針の後ろ）に重ねる。電球は `Config.wheelLightCount` 個を盤面の縁の上
-（寸法は `Theme.LightRing`。環の半径は `ringRadius(diameter:)` で、スライスの円の半径 `WheelGeometry.sliceRadius(diameter:)` の外 `ringOffset`。色は `Theme.wheelLight`）に `Canvas` で描き、盤面の枠と `WheelFaceView` は変えない（「なし」と共有画像は今のまま）。
+（寸法は `Theme.LightRing`。環の半径は `ringRadius(diameter:)` で、スライスの円の半径 `WheelGeometry.sliceRadius(diameter:)` の外 `ringOffset`。色は `Theme.wheelLight`）に `Canvas` で描き、盤面の枠と `WheelFaceView` は変えない（「なし」と共有画像は今のまま）。電球は縁の中（外端はスライスの円の外 10.2pt）に収め、
+にじみ（`haloWidth`）は縁の外にもはみ出すが盤面の枠（外 16pt）は越えないので、2D の `WheelLightsView` は盤面の枠と同じ大きさで描く。
 明るさは `WheelLights`（`Core/`）の純粋関数で、場面（`Scene`: 動きを減らす設定の `still` / 待機中・回転中・指で動かしている間の `running(angle:intensity:)` / 結果表示中の `stopped(elapsed:)`）から決める。
 並びの位置は流す角度 × `Config.wheelLightFlowFactor`（角度に比例させると角速度に比例して流れ、止まれば止まる）。流す角度は `WheelLights.Flow` が
 盤面に見えている角度（`WheelEffectMotion.displayedAngle`。`currentMotion` があれば `angle(now: now())`、無ければ `rotation`、どちらにも `dragRotation` を足す）の
@@ -248,7 +253,8 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 火花（`sparks`）は `currentMotion` の生まれうる時刻（`sparkSlotInterval` = `Config.wheelSparkLifetime` ÷ 上限）ごとにその時刻の強さの確率で生まれ、
 針の先（`ShareImageLayout.basePointerHeight - 6`）から回転の向きへ飛ぶ。生まれうる時刻は区間の列の長さ（焦らしを含めて 5.7 秒）まで。
 指で動かしている間は `sparks(drag:…)` がドラッグを始めた時刻から同じ間隔で区切り、最後に指が動いた時刻まで生まれる（その時刻までの点だけで決まるので、
-後から点が増えても前に生まれた粒は変わらない）。`WheelParticlesView` は両方を `sparks(motion:drag:…)` で集め（指の動きの粒が先、合わせて上限まで）、
+後から点が増えても前に生まれた粒は変わらない）。`WheelParticlesView` は両方を `sparks(motion:drag:…)` で集め（指の動きの粒が先、合わせて上限まで。上限は毎フレーム `prefix` で切るので、溢れて描かれなかったスピンの粒が、
+指の動きの粒が消えたあとに飛んでいる途中から現れることがある）、
 種はスピン・惰性の動きが変わるたび（`onChange(of: motion, initial: true)`）とドラッグを始めるたび（`onChange(of: drag?.start, initial: true)`）に引く。
 消え切った指の動きは `.task(id: drag)` で `@State` に書いて描き直しを止める。動きが無い・止まり切った・動きを減らす設定では出さない。
 紙吹雪（`confetti`）は結果が出た瞬間（`WheelStopCues.confettiStart` = `WheelStopMoment.start`。強調を指で解いても止めない。結果を出したまま盤面が出たときは nil）からの経過で、
@@ -274,7 +280,8 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 `WheelFaceView` を包む `TimelineView(.animation(minimumInterval: Config.effectPulseFrameInterval, paused:))` を結果表示中（`highlight` が nil でない）だけ動かす。
 位相は電飾の脈動と同じ（`afterglowWave`）。帯の登場演出は `RouletteScreen` の `ResultBandPopIn` が `revealOnAppear` に重ねて、`ResultBand.popInStartScale` から
 `Theme.resultBandPopAnimation` のばねで出す（行き過ぎの `ResultBand.popInPeakScale` でも帯がスライスの円に収まることを `ResultBandTests` で確かめる）。
-どれも動きを減らす設定では出さず、演出中（`model.spinning`）は停止で終わるので操作を止めない。
+どれも動きを減らす設定では出さない。演出中（`model.spinning`。`PageFrame` / `ItemListView` の `busy`）は `finishSpin` で終わり、停止のあとのフラッシュ・電飾の点滅と脈動・
+余韻・紙吹雪・帯の登場演出は含めないので、項目の編集・長押し・次のスピンを止めない（次のスピン・結果が消えたら `WheelStopMoment` が時刻を捨てて止まり、はじけた紙吹雪だけは `Burst` が最後まで落とす）。
 
 ### 3D 表示の仕組み
 
@@ -305,6 +312,8 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 `WheelDragArea` の記録から引く）、`Wheel3DSceneView.updateUIView` が `Wheel3DScene.light(_:)` に渡して `WheelLights.bulb` の明るさ・にじみをノードに写す。
 SceneKit は線形の色空間で重ねるので、電球は不透明度ではなく、2D の重ねた色（縁の `wheelRim` に `wheelLight` を明るさの割合で sRGB のまま混ぜた色、
 `Wheel3DScene.bulbColor(brightness:)`）を不透明に塗る。にじみは放射状のグラデーションを焼いた板を、にじみの強さで縮め・濃さを不透明度にして電球の後ろに重ねる。
+にじみは光の尾（`trailGlowBounds`）と違って外周の縁で切らず、2D と同じく縁の外の宙へ `LightRing.haloWidth` だけはみ出す（スライスの円の外 15.2pt で、盤面の枠の 16pt の内側）。
+場面は枠より片側 `Theme.Wheel3D.overscan`（直径の 15%）広く描くので、傾けても切れない。
 電球の色の成分（`wheelRim` / `wheelLight`）は static に一度だけ求め、明るさが前と同じ電球の素材は書き換えない。
 描き直しを止める条件（待機中・止まり切った・動きを減らす設定）と点滅の終わりで間隔を落とすのは 2D と同じ。「なし」では `WheelLightsTimeline` を止めたまま nil を渡し、
 電球のノードは作らない（初めて場面を渡されたときに作り、組み直したら作り直す。見た目は今のまま）。電飾を出していない間は `Flow` を進めないので、
@@ -340,7 +349,9 @@ SceneKit は線形の色空間で重ねるので、電球は不透明度では�
 `afterglow` が「なし」以外で、動きを減らす設定でない）だけで、「なし」は光彩ごと焼いた 1 枚のまま（消すフェードで半透明の塗りが 2 枚重なって濃く残らない）。
 結果を出したまま演出を切り替えたら、動かさずにその形で出し直す。結果の帯の登場演出は、`Wheel3DScene.show(result:reduceMotion:popIn:)` が
 帯の親ノードに今の現れ方（`revealOnAppear` 相当）を、子の板に `ResultBand.popInStartScale` からの `CASpringAnimation(perceptualDuration: popInDuration, bounce: popInBounce)` を掛けて重ねる
-（新しい結果でだけ。組み直し・見た目の変更での焼き直しでは動かさない）。動きを減らす設定ではどれも出さない。
+（新しい結果でだけ。組み直し・見た目の変更での焼き直しでは動かさない）。結果を出したまま 2D から 3D に切り替えたときは、新しい `Wheel3DScene` の `shownResult` が nil なので
+帯を新しい結果として出し、現れ方と登場演出がもう一度出る（2D の `ResultBandPopIn` も、3D から切り替えて帯が新しく出たときは同じ。フラッシュ・紙吹雪・電飾の点滅は `WheelStopMoment.appear` が飛ばす）。
+動きを減らす設定ではどれも出さない。
 
 盤は端末の姿勢で傾け、動かした勢いで支点まわりに揺らす。傾きの写像は `TiltMapping`（基準は `@AppStorage(Config.tiltReferenceKey)`
 の `TiltReference`。水平に置いた状態なら `DeviceGravity.flat`、持ち方なら取り直した重力。`Config.wheelMaxTilt` で抑える）、

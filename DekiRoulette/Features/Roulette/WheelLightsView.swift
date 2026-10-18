@@ -2,8 +2,9 @@ import SwiftUI
 
 /// 2D の盤面の外周の電飾（「スピンの演出」が電飾・全部入りのとき。`docs/SPEC.md` の §5.5）。
 /// 盤面の縁の上に `Config.wheelLightCount` 個の電球を回らない層で並べ、明るさは `WheelLights`（`Core/`）が決める。
-/// 毎フレームの明るさは 3D の盤面と共有の `WheelLightsTimeline` が引き、このビューは `Canvas` に描くだけ。
-/// 入力は角度・動き・結果を出しているかだけで、項目・指定（`targetId`）・印は受け取らない。読み上げず、触れられない。
+/// 毎フレームの明るさは 3D の盤面と共有の `WheelLightsTimeline` が引き、このビューは `Canvas` に描くだけ（盤面の枠と同じ大きさ。
+/// 電球は縁の中に、にじみは縁の外にもはみ出すが枠の中に収まる）。
+/// 入力は角度・動き（スピン・惰性と指の動き）・停止の時刻（`stoppedAt`）だけで、項目・指定（`targetId`）・印は受け取らない。読み上げず、触れられない。
 struct WheelLightsView: View {
     /// 盤面の一辺（pt）。電球の大きさと位置はこれに比例させる。
     let side: CGFloat

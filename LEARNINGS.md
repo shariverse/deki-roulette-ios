@@ -113,6 +113,9 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   `@main struct Runner { static func main() async { await Testing.__swiftPMEntryPoint() as Never } }` を `-framework Testing`（Simulator のプラットフォームの
   `Developer/Library/Frameworks`）・`-plugin-path`（ツールチェーンの `usr/lib/swift/host/plugins/testing`）で実行ファイルにして、`xcrun simctl spawn <端末> <実行ファイル> --filter <型>` で流せる。
   バンドルの資源（音源・画像・Info.plist）を読むテストと、メインの実行ループの時刻に依るテストはこの方法では落ちる（2026-10-19）
+- 上の `simctl spawn` の方法でも、`Wheel3DSceneTests`（`SCNRenderer` の画面外描画・`snapshot(atTime: CACurrentMediaTime() + 2)`）は流せる。
+  テストのファイルが別のテストのファイルの補助に依ることがあり、`SeededGenerator` は `SeededGenerator.swift`、`WheelDragMotion.testCircular` は
+  `WheelDragMotionTests.swift` にあるので、`WheelParticlesTests` を流すときは一緒にビルドする（`cannot find … in scope` の名前で探す）（2026-10-19）
 - 同じノードの `scale` に 2 つの動き（現れ方の 0.96 倍と登場演出の 0.6 倍からのばね）を重ねるときは、親と子のノードに分けて掛ける（2026-10-18）
 
 
