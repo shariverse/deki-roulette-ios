@@ -763,6 +763,52 @@ struct Wheel3DSceneTests {
         #expect(distance(pixels.color(at: ghost), plain.color(at: ghost)) > 0.02, "\(pixels.color(at: ghost)) \(plain.color(at: ghost))")
     }
 
+    // MARK: 光の尾の書き換え
+
+    @Test func 濃さの変わらない光の尾の切れ端は書き換えない() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        let trail = trailFrame()
+        scene.trail(trail)
+        let written = scene.trailOpacityWriteCount
+        #expect(written > 0)
+        // 残像だけが変わったフレーム・消して同じ尾を出し直したフレームでは、切れ端を書き換えない
+        scene.trail(trailFrame(ghosts: [WheelTrails.Ghost(angle: -30, opacity: 0.2)]))
+        scene.trail(.none)
+        scene.trail(trail)
+        #expect(scene.trailOpacityWriteCount == written)
+        // 出し直しても今の濃さのまま描く
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let pixels = try render(scene)
+        let tail = trailLocation(angle: -11.25, pixels: pixels)
+        #expect(brightness(pixels.color(at: tail)) > brightness(plain.color(at: tail)) + 0.2)
+        // 尾が短くなれば、濃さの変わった切れ端だけ書き換える
+        scene.trail(trailFrame(length: 40))
+        let changed = scene.trailOpacityWriteCount - written
+        #expect(changed > 0 && changed <= Int((40 / Theme.Wheel3D.trailPieceAngle).rounded(.up)))
+    }
+
+    @Test func 光の尾のにじみは外周の縁の外へはみ出さない() throws {
+        let bounds = Theme.Wheel3D.trailGlowBounds(diameter: size)
+        let scale = Double(size) / WheelLabel.referenceDiameter
+        let sliceRadius = WheelGeometry.sliceRadius(diameter: Double(size))
+        let ring = Double(Theme.TrailRing.ringRadius(diameter: size))
+        #expect(abs(Double(bounds.outer) - (sliceRadius + Double(Theme.Wheel3D.rimWidth) * scale)) < 1e-9)
+        #expect(abs(Double(bounds.inner) - (ring - Double(Theme.TrailRing.glowWidth) * scale / 2)) < 1e-9)
+
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.trail(trailFrame())
+        let pixels = try render(scene)
+        let distanceToCamera = WheelGeometry.cameraDistance(diameter: Double(canvas), fieldOfView: Theme.Wheel3D.fieldOfView)
+        let z = Double(Theme.Wheel3D.rimLift) * scale + Double(Theme.Wheel3D.trailLift)
+        for angle in [-11.25, -41.25] {
+            // 縁の外（スライスの円の外 13pt。2D のにじみの外側は 14pt まで届く）は地のまま
+            let outside = WheelGeometry.point(angle: angle, radius: (sliceRadius + 13 * scale) * distanceToCamera / (distanceToCamera - z))
+            let point = location(x: outside.x, y: outside.y, pixels: pixels)
+            #expect(distance(pixels.color(at: point), plain.color(at: point)) < 0.01, "\(angle): \(pixels.color(at: point))")
+        }
+    }
+
     // MARK: 火花・紙吹雪
 
     /// 粒の面（針と同じ奥行き）の、盤面の枠の左上を原点とする位置（pt、y が下向き）の画素の位置。紙吹雪は遠近の広がりを打ち消してあるので

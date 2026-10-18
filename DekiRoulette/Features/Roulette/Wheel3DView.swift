@@ -292,6 +292,10 @@ final class Wheel3DScene {
     private var shownTrails = WheelTrails.Frame.none
     /// 光の尾・残像のノードを作ったか（テストで、出さない間は作らないことを見る）。
     var hasTrailNodes: Bool { !trailCoreNodes.isEmpty }
+    /// 光の尾の切れ端ごとに最後に写した濃さ（隠しているときは nil）。濃さが変わらない切れ端は書き換えない。
+    private var trailPieceLevels: [Double?] = []
+    /// 光の尾の切れ端の不透明度を書き換えた回数（テストで、濃さの変わらない切れ端を書き換えていないかを見る）。
+    private(set) var trailOpacityWriteCount = 0
     /// 火花と紙吹雪（`tiltNode` に載せ、盤と一緒に傾くが回らない）。粒のノードは初めて描くときに上限の数だけ作り（「なし」では作らない）、
     /// 毎フレーム位置・大きさ・濃さだけを変えて使い回す。紙吹雪は盤面の枠に収まるよう、浮かせた分の遠近の広がりを `confettiNode` の縮みで打ち消す。
     private let particlesNode = SCNNode()
@@ -618,12 +622,17 @@ final class Wheel3DScene {
         let piece = Theme.Wheel3D.trailPieceAngle
         for index in trailCoreNodes.indices {
             let opacity = trail.opacity(atDistance: (Double(index) + 0.5) * piece, segments: Theme.TrailRing.segments)
+            let level: Double? = opacity > 0 ? opacity : nil
+            // 濃さが前と同じ切れ端（残像だけが変わったフレーム・尾の外のまま）は書き換えない
+            guard trailPieceLevels[index] != level else { continue }
+            trailPieceLevels[index] = level
             let core = trailCoreNodes[index], glow = trailGlowNodes[index]
-            core.isHidden = opacity <= 0
-            glow.isHidden = opacity <= 0
-            guard opacity > 0 else { continue }
-            core.opacity = CGFloat(opacity)
-            glow.opacity = CGFloat(opacity * Theme.TrailRing.glowOpacity)
+            core.isHidden = level == nil
+            glow.isHidden = level == nil
+            guard let level else { continue }
+            core.opacity = CGFloat(level)
+            glow.opacity = CGFloat(level * Theme.TrailRing.glowOpacity)
+            trailOpacityWriteCount += 1
         }
     }
 
@@ -682,8 +691,8 @@ final class Wheel3DScene {
         let ring = Double(Theme.TrailRing.ringRadius(diameter: CGFloat(diameter)))
         let piece = Theme.Wheel3D.trailPieceAngle
         let z = Float(Double(Theme.Wheel3D.rimLift) * scale + Double(Theme.Wheel3D.trailLift))
-        let shapeOf = { (width: Double) -> SCNGeometry in
-            let mesh = WheelGeometry.annulusMesh(start: 0, end: piece, inner: ring - width / 2, outer: ring + width / 2)
+        let shapeOf = { (inner: Double, outer: Double) -> SCNGeometry in
+            let mesh = WheelGeometry.annulusMesh(start: 0, end: piece, inner: inner, outer: outer)
             let geometry = SCNGeometry(
                 sources: [SCNGeometrySource(vertices: mesh.vertices.map(vector)), SCNGeometrySource(normals: mesh.normals.map(vector))],
                 elements: [SCNGeometryElement(indices: mesh.top, primitiveType: .triangles)]
@@ -691,8 +700,11 @@ final class Wheel3DScene {
             geometry.materials = [Self.overlayMaterial(Theme.wheelTrail)]
             return geometry
         }
-        let core = shapeOf(Double(Theme.TrailRing.coreWidth) * scale)
-        let glow = shapeOf(Double(Theme.TrailRing.glowWidth) * scale)
+        let coreHalf = Double(Theme.TrailRing.coreWidth) * scale / 2
+        let core = shapeOf(ring - coreHalf, ring + coreHalf)
+        // にじみは外周の縁の外へはみ出さない（縁の外は盤の無い宙なので、傾けると浮いて見える）
+        let glowBounds = Theme.Wheel3D.trailGlowBounds(diameter: CGFloat(diameter))
+        let glow = shapeOf(Double(glowBounds.inner), Double(glowBounds.outer))
         let pieces = Int((Config.wheelTrailMaxLength / piece).rounded(.up))
         for _ in 0..<pieces {
             let glowNode = SCNNode(geometry: glow)
@@ -708,6 +720,7 @@ final class Wheel3DScene {
             trailNode.addChildNode(coreNode)
             trailCoreNodes.append(coreNode)
         }
+        trailPieceLevels = Array(repeating: nil, count: pieces)
     }
 
     private func removeTrails() {
@@ -716,6 +729,7 @@ final class Wheel3DScene {
         ghostNodes = []
         trailCoreNodes = []
         trailGlowNodes = []
+        trailPieceLevels = []
         trailDirection = nil
     }
 
@@ -1374,7 +1388,7 @@ final class Wheel3DScene {
     /// 外周の縁。盤の表面より少し手前に出し、2D と同じ位置に細い線を入れる。
     private func addRim(radius: Double, thickness: Double, scale: Double) {
         let lift = Double(Theme.Wheel3D.rimLift) * scale
-        let rim = SCNTube(innerRadius: radius, outerRadius: radius + 11 * scale, height: thickness + lift)
+        let rim = SCNTube(innerRadius: radius, outerRadius: radius + Double(Theme.Wheel3D.rimWidth) * scale, height: thickness + lift)
         rim.radialSegmentCount = 96
         rim.materials = [Self.material(Theme.wheelRim, lit: true)]
         let node = SCNNode(geometry: rim)

@@ -156,6 +156,8 @@ enum Theme {
         static let thickness: CGFloat = 14
         /// 外周の縁が盤の表面より手前に出る高さ。
         static let rimLift: CGFloat = 3
+        /// 外周の縁の幅（スライスの円の外側。2D の盤面の縁と同じ）。
+        static let rimWidth: CGFloat = 11
         /// 中心のハブが盤の表面より手前に出る高さ。
         static let hubLift: CGFloat = 6
         /// 盤を裏から支える支柱の太さ（半径）と長さ。盤が傾くと縁の下から見える。
@@ -182,6 +184,17 @@ enum Theme {
         /// 光の尾を描く弧の切れ端 1 つの角度（度）。長さに依らない同じ形の切れ端を並べて回し、濃さだけを毎フレーム変える
         /// （メッシュを作り直さない）。2D の 1 区間（最長 120 度 ÷ 24 区間 = 5 度）の半分。
         static let trailPieceAngle: Double = 2.5
+
+        /// 直径 `diameter`（pt）の盤での、光の尾のにじみの内径と外径（pt）。2D と同じ芯の環（`TrailRing.ringRadius`）を中心に
+        /// `TrailRing.glowWidth` の幅だけ広げるが、外は外周の縁（スライスの円の外 `rimWidth`）で止める。2D では縁の外も盤面の枠の中の地に重なるが、
+        /// 3D の縁の外は盤の無い宙なので、はみ出すと傾けたときに浮いて見えるため。
+        static func trailGlowBounds(diameter: CGFloat) -> (inner: CGFloat, outer: CGFloat) {
+            let scale = max(diameter, 0) / CGFloat(WheelLabel.referenceDiameter)
+            let ring = TrailRing.ringRadius(diameter: diameter)
+            let half = TrailRing.glowWidth * scale / 2
+            let rim = CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + rimWidth * scale
+            return (ring - half, min(ring + half, rim))
+        }
     }
 
     // MARK: 停止の強調
