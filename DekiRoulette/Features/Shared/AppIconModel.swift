@@ -44,13 +44,31 @@ final class AppIconModel {
     }
 }
 
-/// `UIApplication` を窓口にする。
+/// `UIApplication` を窓口にする。visionOS には代替アイコンの API が無いので、非対応として振る舞う
+/// （`supportsAlternateIcons` が偽になり、設定の「アプリアイコン」の項目が出ない）。
 @MainActor
 final class UIApplicationIconSource: AppIconSource {
-    var supportsAlternateIcons: Bool { UIApplication.shared.supportsAlternateIcons }
-    var alternateIconName: String? { UIApplication.shared.alternateIconName }
+    var supportsAlternateIcons: Bool {
+        #if os(visionOS)
+        false
+        #else
+        UIApplication.shared.supportsAlternateIcons
+        #endif
+    }
+
+    var alternateIconName: String? {
+        #if os(visionOS)
+        nil
+        #else
+        UIApplication.shared.alternateIconName
+        #endif
+    }
 
     func setAlternateIconName(_ name: String?) async throws {
+        #if os(visionOS)
+        // `supportsAlternateIcons` が偽なので呼ばれない
+        #else
         try await UIApplication.shared.setAlternateIconName(name)
+        #endif
     }
 }

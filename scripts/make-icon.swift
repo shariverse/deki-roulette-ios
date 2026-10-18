@@ -2,10 +2,13 @@
 // 背景は icon.json の fill に置き、前景はレイヤーに分けて groups に入れる（iOS 26 以降は group ごとに Liquid Glass の
 // 奥行きが付き、それより前は Xcode が書き出す平面の画像になる）。既定のアイコン（AppIcon）の絵柄は Web 版 og.png と同じく、
 // 盤面だけの中立な絵。
+// 併せて、既定のアイコンは visionOS 用の AppIcon.solidimagestack（Assets.xcassets。<名前>.icon は visionOS に適用されない）
+// も同じ絵から書き出す。代替アイコンは visionOS に無い仕組み（UIApplication の代替アイコン）なので .icon だけ。
 // 使い方:
 //   swift scripts/make-icon.swift <出力先のディレクトリ>
 //     アプリに入れるアイコンを書き出す。例: swift scripts/make-icon.swift DekiRoulette/Resources → DekiRoulette/Resources の
-//     AppIcon.icon（既定）と AppIcon-<名前>.icon（代替アイコン）、設定画面の見本の画像（Assets.xcassets/<名前>-Preview.imageset）を作り直す
+//     AppIcon.icon（既定）と AppIcon-<名前>.icon（代替アイコン）、visionOS 用の Assets.xcassets/AppIcon.solidimagestack、
+//     設定画面の見本の画像（Assets.xcassets/<名前>-Preview.imageset）を作り直す
 //     出力先は既定のアイコンを置くディレクトリ（AppIcon.icon がある、または名前が Resources）だけを受け付ける
 //   swift scripts/make-icon.swift --candidates <出力先のディレクトリ>
 //     アイコンの案を <番号>-<名前>.icon で書き出す（00 は今アプリに入っているアイコンで見比べる用、01〜 が案）。
@@ -145,8 +148,68 @@ func writeIcon(_ design: IconDesign, into directory: URL, packageName: String? =
     print("wrote \(package.path)")
 }
 
-// MARK: - 既定のアイコン（AppIcon）
+// MARK: - visionOS 用の solidimagestack（Assets.xcassets）
+// visionOS のアプリアイコンは Icon Composer の .icon が適用されない（Xcode が警告して、アイコン無しのアプリになる）ため、
+// 同じ絵を「Front = 前景（盤面と針）、Back = 背景（icon.json の fill）」の層に分けて .solidimagestack で書き出す。
+// 層の画像は 1024x1024 の PNG で、前景は透明の地に描く。アイコン名（AppIcon）は .icon と揃えて project.yml の
+// ASSETCATALOG_COMPILER_APPICON_NAME をそのまま使う（iOS は .icon、visionOS はこのスタックが選ばれる）。
 
+/// icon.json の fill を 1 枚の不透明な画像にする（自動のグラデーションは色が分からないので、その色で塗る）
+func renderBackground(_ fill: IconFill) -> CGImage {
+    render(IconLayer(name: "back") { ctx in
+        let rect = CGRect(x: 0, y: 0, width: canvas, height: canvas)
+        switch fill {
+        case .gradient(let top, let bottom):
+            // CG は y が上向き。top を上（y の大きい側）に置く
+            let space = CGColorSpace(name: CGColorSpace.sRGB)!
+            let gradient = CGGradient(colorsSpace: space, colors: [cg(top), cg(bottom)] as CFArray, locations: [0, 1])!
+            ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: canvas), end: .zero, options: [])
+        case .solid(let color), .automatic(let color):
+            ctx.setFillColor(cg(color))
+            ctx.fill(rect)
+        }
+    })
+}
+
+/// 前景（盤面と針）を 1 枚の画像にする。レイヤーは手前から並んでいるので、奥から描く
+func renderForeground(_ design: IconDesign) -> CGImage {
+    render(IconLayer(name: "front") { ctx in
+        for group in design.groups.reversed() {
+            for layer in group.layers.reversed() {
+                layer.draw(ctx)
+            }
+        }
+    })
+}
+
+/// `<catalog>/<名前>.solidimagestack` を作り直す（前の層の画像が残らないよう、いったん消してから書く）
+func writeSolidImageStack(_ design: IconDesign, into catalog: URL) throws {
+    let fm = FileManager.default
+    let stack = catalog.appendingPathComponent("\(design.name).solidimagestack")
+    if fm.fileExists(atPath: stack.path) { try fm.removeItem(at: stack) }
+    try fm.createDirectory(at: stack, withIntermediateDirectories: false)
+
+    func writeJSON(_ json: [String: Any], to url: URL) throws {
+        let data = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+        try (data + Data("\n".utf8)).write(to: url)
+    }
+    let info: [String: Any] = ["author": "xcode", "version": 1]
+    try writeJSON(["info": info, "layers": [["filename": "Front.solidimagestacklayer"], ["filename": "Back.solidimagestacklayer"]]],
+                  to: stack.appendingPathComponent("Contents.json"))
+    for (layer, image) in [("Front", renderForeground(design)), ("Back", renderBackground(design.fill))] {
+        let layerDir = stack.appendingPathComponent("\(layer).solidimagestacklayer")
+        let imageset = layerDir.appendingPathComponent("Content.imageset")
+        try fm.createDirectory(at: imageset, withIntermediateDirectories: true)
+        try writeJSON(["info": info], to: layerDir.appendingPathComponent("Contents.json"))
+        let file = "\(design.name)\(layer).png"
+        writePNG(image, to: imageset.appendingPathComponent(file))
+        try writeJSON(["images": [["filename": file, "idiom": "vision", "scale": "2x"]], "info": info],
+                      to: imageset.appendingPathComponent("Contents.json"))
+    }
+    print("wrote \(stack.path)")
+}
+
+// MARK: - 既定のアイコン（AppIcon）
 // 色・形・比率は PNG 1 枚で描いていたときと同じ。CG は y 軸が上向きなので、針のある 12 時は y の大きい側
 let center = CGPoint(x: canvas / 2, y: canvas / 2)
 let wheelRadius = canvas * 0.38
@@ -532,6 +595,8 @@ case (1, let path?) where !path.hasPrefix("-"):
     }
     let ictool = ictoolPath()
     for design in appIcons { try writeIcon(design, into: output) }
+    // visionOS 用のスタックは既定のアイコンだけ（代替アイコンは visionOS に無い仕組み）
+    try writeSolidImageStack(appIcon, into: catalog)
     for design in appIcons {
         try writePreview(of: output.appendingPathComponent("\(design.name).icon"), name: design.name, into: catalog, ictool: ictool)
     }

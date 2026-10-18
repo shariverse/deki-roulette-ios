@@ -40,7 +40,7 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build and test
+      - name: Build and test (iOS)
         run: |
           # 最新の iOS ランタイムに存在する iPhone シミュレータを UDID で選ぶ
           # （名前だけの指定は OS:latest を暗黙に要求し、古いランタイムにしかないデバイスだと解決できない）
@@ -50,4 +50,16 @@ jobs:
             -project DekiRoulette.xcodeproj \
             -scheme DekiRoulette \
             -destination "platform=iOS Simulator,id=$device" \
+            CODE_SIGNING_ALLOWED=NO
+
+      # 同じテストを visionOS でも回す（Supported Destinations が iOS / visionOS のマルチプラットフォームターゲット）
+      - name: Build and test (visionOS)
+        run: |
+          # 最新の visionOS ランタイムに存在する Apple Vision Pro シミュレータを UDID で選ぶ（iOS と同じ理由）
+          device=$(xcrun simctl list devices available -j | jq -r '.devices | to_entries | map(select(.key | contains("SimRuntime.xrOS"))) | sort_by(.key | capture("xrOS-(?<maj>[0-9]+)-(?<min>[0-9]+)") | [(.maj|tonumber),(.min|tonumber)]) | reverse | map(.value[] | select(.name | startswith("Apple Vision Pro"))) | .[0].udid')
+          echo "Using simulator: $device"
+          xcodebuild test \
+            -project DekiRoulette.xcodeproj \
+            -scheme DekiRoulette \
+            -destination "platform=visionOS Simulator,id=$device" \
             CODE_SIGNING_ALLOWED=NO

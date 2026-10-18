@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 xcodegen generate   # project.yml から DekiRoulette.xcodeproj を生成（.xcodeproj は git 管理外）
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
-swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（DekiRoulette/Resources の AppIcon.icon・代替アイコンの AppIcon-<名前>.icon と、設定画面の見本の imageset を書き出す）
+xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=visionOS Simulator,name=Apple Vision Pro' test  # visionOS も同じスキーム・同じテスト
+swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（DekiRoulette/Resources の AppIcon.icon・代替アイコンの AppIcon-<名前>.icon・visionOS 用の Assets.xcassets/AppIcon.solidimagestack と、設定画面の見本の imageset を書き出す）
 dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"  # アイコンの案と一覧の画像（案はアプリに入れない）
 swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 回転音の再生成（--preview で 1 スピン分の試聴用）
 ```
@@ -17,9 +18,16 @@ swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 
 
 ## アーキテクチャ
 
-**デキレーレット** の iOS アプリ。結果をユーザが事前に指定できる抽選アプリ。`docs/SPEC.md` が機能仕様の正で、
+**デキレーレット** の iOS / visionOS アプリ（iOS 17.0 以上 / visionOS 26.0 以上のマルチプラットフォームターゲット）。結果をユーザが事前に指定できる抽選アプリ。`docs/SPEC.md` が機能仕様の正で、
 Web 版（React + Vite、b7b3936 以前の履歴にある）から README の対応表どおりにファイルを対応させて移植した。
-iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
+プラットフォーム固有の差分は SPEC.md の「iOS 版との対応」「visionOS 版との対応」に追記する。
+
+visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIScreen` が無い（画面キャプチャの検知は
+`UIWindowScene` の trait から読み、変化の通知も無いので trait の購読とアクティブ復帰時に読み直す）、
+ソフトウェアキーボードが無い（`scrollDismissesKeyboard` を付けない）、Vision Pro に触覚と姿勢センサが無い
+（`sensoryFeedback` と `CMMotionManager` の呼び出しは共通のまま。効果は無い）、代替アイコンの仕組みが無い
+（`UIApplicationIconSource` が非対応として振る舞い、設定の「アプリアイコン」を出さない。アプリアイコンは `.icon` では
+なく `Assets.xcassets/AppIcon.solidimagestack` を使う。`scripts/make-icon.swift` が `.icon` と同じ絵から書き出す）。
 
 - SwiftUI + `@Observable`（iOS 17+）。`ObservableObject` は使わない。
 - モデル (`RouletteModel` / `OrderModel`) は `@MainActor` で、View は薄く保つ。
@@ -61,6 +69,8 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
   そろえ（`AppIconChoiceTests` がビルドした Info.plist と突き合わせる）、リリースしたら変えない。設定シートの「アプリアイコン」で選び、
   `AppIconModel` が `AppIconSource`（実体は `UIApplication`）の `setAlternateIconName` を呼ぶ。選択はシステムが覚えるので `UserDefaults` には持たない。
   アイコンそのものを `UIImage(named:)` で読まない（iOS 26 で UIKit のアサーションで落ち、iOS 18 では nil）。
+  visionOS には `.icon` が適用されない（アイコン無しのアプリになる）ため、既定のアイコンは `.icon` と同じ絵から
+  `Assets.xcassets/AppIcon.solidimagestack`（`Front` = 盤面と針、`Back` = 背景）も書き出す。代替アイコンは visionOS に無い仕組み。
 
 ### スピンの仕組み
 

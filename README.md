@@ -1,10 +1,11 @@
 # deki-roulette
 
-[デキレーレット](https://roulette.basekeita.com/) の iOS アプリ。
+[デキレーレット](https://roulette.basekeita.com/) の iOS / visionOS アプリ。
 結果をユーザが事前に指定できる抽選アプリで、ルーレットと順番決めの 2 画面をタブで切り替える。
 
 機能仕様は [`docs/SPEC.md`](docs/SPEC.md) が正。Web 版（React + Vite）から移植したもので、
-プラットフォーム差分は同書の「iOS 版との対応」にまとめてある。Web 版のコードは b7b3936 以前の履歴にある。
+プラットフォーム差分は同書の「iOS 版との対応」「visionOS 版との対応」にまとめてある。
+Web 版のコードは b7b3936 以前の履歴にある。
 
 ## Status
 
@@ -19,7 +20,7 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 
 | ワークフロー | トリガー | 内容 |
 |---|---|---|
-| Build | 全ブランチへの push と Fork からの PR | シミュレータでビルドしてユニットテストを実行 |
+| Build | 全ブランチへの push と Fork からの PR | iOS と visionOS のシミュレータでビルドしてユニットテストを実行 |
 | Archive | `main` への push、手動実行 | Release 構成でアーカイブし、App Store Connect API キーで署名して IPA を書き出す |
 | Upload | `develop` と `release/**` への push、手動実行 | Archive に加えて TestFlight へアップロードし、IPA を Artifacts に残す |
 
@@ -43,7 +44,7 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 
 ## 環境
 
-- Xcode 27 / iOS 17.0 以上
+- Xcode 27 / iOS 17.0 以上 / visionOS 26.0 以上
 - Swift 6（strict concurrency: complete）
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)（`brew install xcodegen`）
 
@@ -68,11 +69,21 @@ xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
+visionOS（Apple Vision Pro シミュレータ）では `-destination` を差し替える:
+
+```bash
+xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette \
+  -destination 'platform=visionOS Simulator,name=Apple Vision Pro' test
+```
+
 アプリアイコンは `scripts/make-icon.swift` でレイヤーごとに描き、Icon Composer の `.icon`
 （`DekiRoulette/Resources/AppIcon.icon`。`icon.json` と `Assets/` のレイヤー画像）に組み立てている。
 背景は `icon.json` の `fill` で、前景（針・ハブ・スライスと区切り線・盤面の外周）はそれぞれ別の group にしてある。
 iOS 26 以降は Liquid Glass の質感が付き、iOS 18 以前は Xcode がビルド時に書き出す平面の画像が使われる。
 ダーク・色付き・クリアの外観は Icon Composer の自動に任せている。
+visionOS には `.icon` が適用されない（Xcode が警告して、アイコン無しのアプリになる）ため、既定のアイコンは同じ絵を層に
+分けた `DekiRoulette/Resources/Assets.xcassets/AppIcon.solidimagestack`（`Front` = 盤面と針、`Back` = 背景）も持ち、
+スクリプトが `.icon` と一緒に書き出す。代替アイコンは visionOS に無い仕組みなので `.icon` だけ。
 
 既定のアイコンのほかに、iOS 標準の代替アイコン（`UIApplication.setAlternateIconName(_:)` で切り替える）を 4 つ持つ。
 32 案から選定で採用した `AppIcon-Neon`・`AppIcon-Pastel`・`AppIcon-Spinner`・`AppIcon-Target` で、
@@ -80,7 +91,7 @@ iOS 26 以降は Liquid Glass の質感が付き、iOS 18 以前は Xcode がビ
 作り直すとき（既定と代替をまとめて書き出す）:
 
 ```bash
-swift scripts/make-icon.swift DekiRoulette/Resources   # AppIcon.icon・AppIcon-<名前>.icon と、設定画面の見本の imageset を作り直す
+swift scripts/make-icon.swift DekiRoulette/Resources   # AppIcon.icon・AppIcon-<名前>.icon・visionOS 用の AppIcon.solidimagestack と、設定画面の見本の imageset を作り直す
 ```
 
 `.icon` の中の画像と `icon.json` はスクリプトの出力なので、手で直さない（Icon Composer で開いて調整を試すのはよいが、

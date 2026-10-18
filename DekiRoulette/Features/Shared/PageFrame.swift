@@ -31,7 +31,10 @@ struct PageFrame<Content: View, Help: View>: View {
             .frame(maxWidth: Theme.Layout.pageMaxWidth)
             .frame(maxWidth: .infinity)
         }
+        // visionOS にはソフトウェアキーボードが無いので付けない
+        #if !os(visionOS)
         .scrollDismissesKeyboard(.interactively)
+        #endif
         .background(Theme.ink900.ignoresSafeArea())
         .sheet(isPresented: $settingsOpen) { SettingsView() }
         // 開始した瞬間に畳む。人前で回すときに開きっぱなしを踏まないための保険

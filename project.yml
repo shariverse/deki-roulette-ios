@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.basekeita
   deploymentTarget:
     iOS: "17.0"
+    visionOS: "26.0"
   developmentLanguage: ja
   createIntermediateGroups: true
   generateEmptyDirectories: true
@@ -22,7 +23,7 @@ settings:
 targets:
   DekiRoulette:
     type: application
-    platform: iOS
+    supportedDestinations: [iOS, visionOS]
     sources:
       - path: DekiRoulette
     info:
@@ -50,13 +51,15 @@ targets:
         # 代替アイコン（DekiRoulette/Resources/<名前>.icon。scripts/make-icon.swift の alternateIcons と同じ名前を空白区切りで並べる。
         # リリースしたら名前を変えない）
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIcon-Neon AppIcon-Pastel AppIcon-Spinner AppIcon-Target
+        # visionOS には代替アイコンの仕組みが無い。名前を渡すと「適用できる visionOS のアイコンが無い」と警告されるので空にする
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES[sdk=xr*]: ""
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        TARGETED_DEVICE_FAMILY: "1,2"
+        TARGETED_DEVICE_FAMILY: "1,2,7"
         GENERATE_INFOPLIST_FILE: NO
 
   DekiRouletteTests:
     type: bundle.unit-test
-    platform: iOS
+    supportedDestinations: [iOS, visionOS]
     sources:
       - path: DekiRouletteTests
     dependencies:

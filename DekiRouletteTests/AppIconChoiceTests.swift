@@ -32,6 +32,8 @@ struct AppIconChoiceTests {
 
     /// `project.yml`（`ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES`）とスクリプトの名前の食い違いを、ビルドした Info.plist で見つける。
     /// `Bundle.object(forInfoDictionaryKey:)` は端末に合わない `~ipad` のキーを返さないので、`.app` の Info.plist をそのまま読む。
+    /// visionOS には代替アイコンが無く、Info.plist の形も違う（`CFBundlePrimaryIcon` が名前の文字列）ので、別のテストで見る。
+    #if !os(visionOS)
     @Test(arguments: ["CFBundleIcons", "CFBundleIcons~ipad"])
     func 代替アイコンの名前はInfoPlistと同じ(key: String) throws {
         let data = try Data(contentsOf: Bundle.main.bundleURL.appendingPathComponent("Info.plist"))
@@ -42,6 +44,16 @@ struct AppIconChoiceTests {
         let primary = try #require(icons["CFBundlePrimaryIcon"] as? [String: Any])
         #expect(primary["CFBundleIconName"] as? String == AppIconChoice.standard.rawValue)
     }
+    #else
+    /// visionOS のアイコンは `Assets.xcassets/AppIcon.solidimagestack`（`.icon` は visionOS に適用されない）。
+    /// スタックが無いと `CFBundleIcons` ごと消えてアイコン無しのアプリになるので、名前が入っているかを見る。
+    @Test func アイコンの名前はInfoPlistにある() throws {
+        let data = try Data(contentsOf: Bundle.main.bundleURL.appendingPathComponent("Info.plist"))
+        let plist = try #require(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+        let icons = try #require(plist["CFBundleIcons"] as? [String: Any])
+        #expect(icons["CFBundlePrimaryIcon"] as? String == AppIconChoice.standard.rawValue)
+    }
+    #endif
 
     /// スクリプトが書き出した `.icon`（`DekiRoulette/Resources`）と候補の一覧の食い違いを見つける。
     /// スクリプトの `alternateIcons` にだけ足して `project.yml` や一覧に足し忘れた場合は、Info.plist のテストでは見つからない。
