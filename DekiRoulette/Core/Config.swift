@@ -235,6 +235,25 @@ enum Config {
     /// 結果の読み上げや周りの会話の邪魔にならないところに置く。クリックの最後の音と重なっても割れない。
     static let chimeGain: Float = 0.5
 
+    /// スピン中のうなり（`SpinHum`）の音量。回転音（`clickGain`）より小さくして、カチカチの粒立ちを埋めない。
+    /// 音源は最大振幅 0.8 で書き出してあり、速いときは打ちが重なるので、さらに下げておく。
+    static let humGain: Float = 0.35
+
+    /// うなりを打つ最小の演出の強さ（`SpinEffectIntensity`）。これ以下（既定では 36°/秒以下）では打たない。
+    /// 止まり際と焦らしの区間はこれを下回るので、うなりは止まる前に消える。
+    static let humMinIntensity = 0.05
+
+    /// うなりを打つ間隔（秒）。強さ 1 で `humFastInterval`（1 秒に約 18 打ちのロール）、強さ 0 に近づくほど `humSlowInterval` に広げる。
+    static let humFastInterval: TimeInterval = 0.055
+    static let humSlowInterval: TimeInterval = 0.16
+
+    /// うなりの 1 打ちの再生の速さ（ピッチ）。強さ 0 で `humMinRate`、強さ 1 で `humMaxRate`。速いほど高く、遅くなるにつれて低く沈む。
+    static let humMinRate = 0.85
+    static let humMaxRate = 1.15
+
+    /// ドラムロールの左右の手の強弱。1 打ちおきにこの割合で弱める。
+    static let humAccent = 0.8
+
     // MARK: 3D の盤の傾き
 
     /// 3D の盤を端末の姿勢に合わせて倒す最大角（度）。これより大きく傾けても盤はここで止める。

@@ -4,6 +4,7 @@ import AVFAudio
 /// 鳴らす時刻も先に分かる。`ClickTrack` で 1 本の波形にしてから一度に流し、リズムを揺らさない。
 /// 指で盤面を動かしている間は、境目を越えるたびに `playClick()` で 1 回ずつ鳴らす。
 /// 停止時の決まり音（`playChime()`）はクリックとは別のノードで鳴らすので、鳴っているクリックを止めたり差し替えたりしない。
+/// スピン中のうなり（`playHum(_:)`）も別のノードで、打ちの並び（`SpinHum`）を 1 本の波形に焼いてから一度に流す。
 /// 音が出せない環境（素材が読めない、オーディオが使えない等）では黙って何もしない。
 @MainActor
 final class SpinSoundPlayer {
@@ -13,6 +14,9 @@ final class SpinSoundPlayer {
     /// 決まり音を流すノードと音源。「スピンの演出」が「なし」のときは読み込まない（`prepare(chime:)` か最初の `playChime()` で読む）。
     private let chimePlayer = AVAudioPlayerNode()
     private var chime: AVAudioPCMBuffer?
+    /// うなりを流すノードと 1 打ちの音源。決まり音と同じく「なし」のときは読み込まない（`prepare(effects:)` か最初の `playHum(_:)` で読む）。
+    private let humPlayer = AVAudioPlayerNode()
+    private var humStroke: (samples: [Float], format: AVAudioFormat)?
     /// セッションを `.ambient` にして有効化する処理。成功したかを返す。
     /// 終わる前にエンジンを起動すると既定のカテゴリで有効化され、他のアプリの音を止めてしまう。
     private var sessionSetup: Task<Bool, Never>?
@@ -20,12 +24,17 @@ final class SpinSoundPlayer {
     private var generation = 0
     /// 決まり音用。回転音の `generation` とは別に数え、クリックの再生で決まり音を取り消さない。
     private var chimeGeneration = 0
+    /// うなり用。次のうなり・`stopHum()`・`stop()` のあとに、焼いている途中の古いうなりが流れ出さないようにする。
+    private var humGeneration = 0
 
     /// 素材の読み込みとオーディオの準備。画面が出たところで呼んでおく。
     /// セッションの有効化はメインスレッドで待つと UI が固まるので、別スレッドで行い `play(at:)` はその完了を待つ。
-    /// `chime` が true なら決まり音も読み込んでおく（最初の停止で読み込みを待たない）。
-    func prepare(chime: Bool = false) {
-        if chime { prepareChime() }
+    /// `effects` が true なら「スピンの演出」の効果音（決まり音・うなり）も読み込んでおく（最初のスピン・停止で読み込みを待たない）。
+    func prepare(effects: Bool = false) {
+        if effects {
+            prepareChime()
+            prepareHum()
+        }
         if click == nil {
             guard let loaded = loadSound(named: "click") else { return }
             click = loaded
@@ -106,14 +115,72 @@ final class SpinSoundPlayer {
         chimePlayer.play()
     }
 
-    /// 画面から離れるときなど、鳴らしている途中で止める。決まり音も止める。
-    /// 決まり音は回転音（click.wav）と同じエンジン・セッションで鳴らすので、click が読めていなければ決まり音も鳴っていない。
+    /// スピン中のうなりを流す。`strokes` は `RouletteModel.humStrokes`（打つ時刻はスピン開始からの秒で、呼んだ時点が 0 秒）。
+    /// 空なら鳴っているうなりを止めるだけ。焼き込み（`SpinHum.render`）はメインスレッドの外で行い、回転音・触覚の時刻を遅らせない。
+    /// 焼いたり準備を待ったりした分だけ遅れて流れ始めるので、その分の頭を切り落として盤面の動きと時刻をそろえる。
+    /// 回転音・決まり音のノードには触れない。続けて呼ぶと前のうなりを差し替える。
+    func playHum(_ strokes: [SpinHum.Stroke]) {
+        stopHum()
+        guard !strokes.isEmpty else { return }
+        prepare()
+        prepareHum()
+        guard let humStroke, let sessionSetup else { return }
+
+        let current = humGeneration
+        let requested = ContinuousClock.now
+        let samples = humStroke.samples
+        let sampleRate = humStroke.format.sampleRate
+        Task { [weak self] in
+            // 焼くあいだにセッションの準備も進める。焼き込みは純粋関数なので別スレッドで回す
+            let rendered = await Task.detached(priority: .userInitiated) {
+                SpinHum.render(stroke: samples, sampleRate: sampleRate, strokes: strokes)
+            }.value
+            let ready = await sessionSetup.value
+            guard let self else { return }
+            if !ready, self.sessionSetup == sessionSetup { self.sessionSetup = nil }
+            guard ready, self.humGeneration == current else { return }
+            let waited = requested.duration(to: .now) / .seconds(1)
+            let skip = Int(max(0, waited) * sampleRate)
+            guard skip < rendered.count else { return }
+            self.startHum(Array(rendered[skip...]), format: humStroke.format)
+        }
+    }
+
+    /// うなりだけを止める（スピンが止まって結果が出たとき）。止まる前に音量は 0 に落ちているので、切っても途切れは聞こえない。
+    func stopHum() {
+        humGeneration += 1
+        guard humStroke != nil else { return }
+        humPlayer.stop()
+    }
+
+    private func startHum(_ track: [Float], format: AVAudioFormat) {
+        guard let buffer = makeBuffer(track, format: format) else { return }
+        // 中断のあとはエンジンが止まっているので、鳴らすたびに確かめる
+        guard engine.isRunning || (try? engine.start()) != nil else { return }
+        humPlayer.stop()
+        humPlayer.scheduleBuffer(buffer, at: nil)
+        humPlayer.play()
+    }
+
+    /// うなりの 1 打ちを読み込んでノードをつなぐ。読めなければ何もしない（次の呼び出しでやり直す）。
+    private func prepareHum() {
+        guard humStroke == nil, let loaded = loadSound(named: "drumroll") else { return }
+        humStroke = loaded
+        engine.attach(humPlayer)
+        engine.connect(humPlayer, to: engine.mainMixerNode, format: loaded.format)
+        humPlayer.volume = Config.humGain
+    }
+
+    /// 画面から離れるときなど、鳴らしている途中で止める。決まり音・うなりも止める。
+    /// 決まり音・うなりは回転音（click.wav）と同じエンジン・セッションで鳴らすので、click が読めていなければどちらも鳴っていない。
     func stop() {
         guard click != nil else { return }
         generation += 1
         chimeGeneration += 1
+        humGeneration += 1
         player.stop()
         chimePlayer.stop()
+        if humStroke != nil { humPlayer.stop() }
         engine.stop()
     }
 

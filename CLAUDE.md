@@ -13,6 +13,7 @@ swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（
 dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"  # アイコンの案と一覧の画像（案はアプリに入れない）
 swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 回転音の再生成（--preview で 1 スピン分の試聴用）
 swift scripts/make-chime-sound.swift DekiRoulette/Resources/Sounds/chime.wav  # 停止時の決まり音の再生成（決定的。同じスクリプトなら差分は出ない）
+swift scripts/make-drumroll-sound.swift DekiRoulette/Resources/Sounds/drumroll.wav  # スピン中のうなり（ドラムロール）の 1 打ちの再生成（決定的。同じスクリプトなら差分は出ない）
 ```
 
 ファイルを追加・削除したら `xcodegen generate` を再実行する（`project.yml` はディレクトリ単位で sources を拾う）。
@@ -175,7 +176,20 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 スタイル・効果音・止まった動き（`.spin` / `.coast`）だけを受け取り、指定や結果のラベルは受け取らない）。`RouletteScreen` が `onChange(of: model.outcome)` で
 結果が出た瞬間（`finishSpin`。保険のタイマーでも同じ）に `sound.playChime()` を呼ぶ。惰性では `outcome` が出ないので鳴らず、`reducedMotion` でも鳴らす。
 `SpinSoundPlayer` は回転音とは別の `AVAudioPlayerNode`（音量 `Config.chimeGain`）で流すので、クリックの再生を止めたり差し替えたりしない（`stop()` だけは両方止める）。
-「なし」のときは `prepare(chime:)` に false を渡して音源を読み込まない。
+「なし」のときは `prepare(effects:)` に false を渡して音源を読み込まない。
+
+スピン中のうなり（ドラムロール。音源は `Resources/Sounds/drumroll.wav` の 1 打ち。`scripts/make-drumroll-sound.swift` がノイズ・音程の下がる胴鳴り・低い芯を 0.12 秒で合成する）は、
+「スピンの演出」が `showsCommonEffects` の抽選したスピン（ボタン・フリック）で、効果音が ON のときだけ流す。補間中の角度は observable でないので、
+`beginSpin` が `SpinHum.strokes(along: rotationPath)`（`Core/`）で打つ時刻・音量・ピッチを先に求めて `humStrokes` に持つ（各時刻の
+`SpinPath.intensity(at:)` から次の打ちまでの間隔 `humFastInterval`〜`humSlowInterval`・音量（`humMinIntensity` 以下は打たない）・再生の速さ
+`humMinRate`〜`humMaxRate` を決める）。止まり際と焦らしの区間は強さが下限を下回るので打たず、うなりは止まる前に消える。
+「なし」・`reducedMotion`（`SpinHum.plays`）と惰性（`beginCoast` が空にする）では空で、指で動かしている間も鳴らさない。指定は渡さない。
+`RouletteScreen` が回転音と同じところで `sound.playHum(model.humStrokes)` を呼び、`SpinSoundPlayer` が別の `AVAudioPlayerNode`（音量 `Config.humGain`。
+回転音より小さい）で流す。焼き込み（`SpinHum.render`。1 打ちを打ちごとに線形補間で伸び縮みさせて足す）は `Task.detached` でメインスレッドの外で行い、
+焼いて準備を待った分だけ頭を切り落として盤面と時刻をそろえる（回転音・触覚の時刻は遅らせない）。結果が出たら（`onChange(of: model.outcome)`）
+`stopHum()` で切ってから決まり音を鳴らし、次のスピンでは `playHum` が差し替え、画面を離れたら `stop()` が止める。
+音源（決まり音・うなり）は `onAppear` で `prepare(effects:)` に読み込み、画面を出したまま「スピンの演出」を変えた・効果音を OFF から ON にしたときも
+`onChange` で先読みする（最初のスピン・停止で読み込みを待たない）。どちらも `onScreen`（画面が出ている間）のときだけで、別のタブにいる間は戻ったときの `onAppear` に任せる。
 
 ### スピンの演出の仕組み
 
