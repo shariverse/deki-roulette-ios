@@ -32,19 +32,28 @@ final class RouletteModel {
     /// 始めたスピンの回数。同じラベルが続けて出ても結果表示を出し直すための識別子に使う（`rotation` は指で動かしても変わるため使わない）。
     private(set) var spinCount = 0
 
-    /// いまのスピンの曲線。ボタンでは `Config.spinEasing`、フリックでは離した瞬間の速さに合わせて始点の傾きを変える。
-    /// View の補間と、回転音・触覚の時刻の逆算はこの曲線を共有する。
+    /// いまの回転の曲線。ボタンでは `Config.spinEasing`、フリックでは離した瞬間の速さに合わせて始点の傾きを変える。
+    /// 勢いが足りずに惰性で回すときは `FlickCoast.easing`。View の補間と、回転音・触覚の時刻の逆算はこの曲線を共有する。
     private(set) var spinEasing = Config.spinEasing
+
+    /// いまの回転の補間の長さ（秒）。スピンは `Config.spinDuration`、惰性は `FlickCoast` が決めた時間。
+    /// View の補間（`Theme.spinAnimation(easing:duration:)`）は `spinEasing` と一緒にこれを使う。
+    private(set) var rotationDuration = Config.spinDuration
 
     /// 直前のフリックの向き。「スピン」ボタンはこの向きで回す。保存しないので起動ごとに時計回りから始まる。
     private(set) var lastDirection: SpinDirection = .clockwise
 
     private var pendingOutcome: SpinOutcome?
+    /// 惰性で回っている動き。補間中の角度は observable でないので、途中で盤面に触れたときはここから今の角度を逆算する。
+    private var coasting: Coasting?
     private var fallbackTask: Task<Void, Never>?
     private var tickTask: Task<Void, Never>?
 
     /// 項目の保存先。nil のときは保存しない（プレビューやテスト向け）。
     private let store: ItemStore?
+
+    /// 今の時刻（秒）。惰性の途中の角度の逆算に使う。テストで差し替える。
+    @ObservationIgnored var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
     init(items: [Item]) {
         self.items = items
@@ -154,6 +163,28 @@ final class RouletteModel {
         rotation += delta
     }
 
+    /// 勢いの足りないフリックで指を離したあと、盤面を少しだけ惰性で回す。止まるべき累積回転角を返す。惰性を付けないときは nil。
+    /// 抽選ではないので、結果・`spinCount`・`pendingOutcome`・「スピン」ボタンの向き（`lastDirection`）は変えない。
+    /// 呼び出し側はこの値を `rotation` に `Theme.spinAnimation(easing: spinEasing, duration: rotationDuration)` で反映する。
+    /// 演出中と動きを減らす設定では付けない（離した角度のまま止める）。
+    func beginCoast(angularVelocity: Double, reducedMotion: Bool) -> Double? {
+        guard !spinning, !reducedMotion, let coast = FlickCoast.coast(angularVelocity: angularVelocity) else { return nil }
+        spinEasing = coast.easing
+        rotationDuration = coast.duration
+        coasting = Coasting(from: rotation, start: now(), coast: coast)
+        return rotation + coast.distance
+    }
+
+    /// 惰性で回っている途中なら、今の角度を曲線から逆算して返し、惰性を打ち切る（盤面に再び触れたとき）。
+    /// 呼び出し側はこの値を補間なしで `rotation` に書く。惰性で回っていない・もう止まっているときは nil（何もしない）。
+    func stopCoast() -> Double? {
+        guard let coasting else { return nil }
+        self.coasting = nil
+        let elapsed = now() - coasting.start
+        guard elapsed < coasting.coast.duration else { return nil }
+        return coasting.from + coasting.coast.angle(after: max(elapsed, 0))
+    }
+
     /// 指で動かしている盤面の針が、時刻 `time`（秒）に境目を越えた。間引いたうえで触覚の刻み（`dragBoundaryTick`）を進め、
     /// 回転音を鳴らすかを返す。演出中は指で動かせないので何もしない。
     func crossDragBoundary(at time: TimeInterval) -> Bool {
@@ -176,6 +207,9 @@ final class RouletteModel {
     ) -> Double? {
         guard canSpin else { return nil }
         if let direction { lastDirection = direction }
+        // 惰性の途中で始めたら、惰性はそこで打ち切る（止まる位置は惰性の行き先の `rotation` から求める）
+        coasting = nil
+        rotationDuration = Config.spinDuration
 
         let targetIndex: Int
         if let targetId {
@@ -247,4 +281,11 @@ final class RouletteModel {
         outcome = pendingOutcome
         self.pendingOutcome = nil
     }
+}
+
+/// 惰性で回り始めた角度・時刻と、その動き。
+private struct Coasting {
+    let from: Double
+    let start: TimeInterval
+    let coast: FlickCoast.Coast
 }

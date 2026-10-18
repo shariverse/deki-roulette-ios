@@ -282,6 +282,84 @@ struct RouletteModelTests {
         #expect(!model.spinning)
     }
 
+    // MARK: 惰性
+
+    @Test func 惰性は抽選せず結果と向きを残す() throws {
+        let model = makeModel()
+        model.rotation = try #require(model.beginSpin(reducedMotion: false, fullSpins: 4, direction: .counterclockwise))
+        model.finishSpin()
+        let outcome = model.outcome
+        let count = model.spinCount
+        let before = model.rotation
+        let next = try #require(model.beginCoast(angularVelocity: 120, reducedMotion: false))
+        let coast = try #require(FlickCoast.coast(angularVelocity: 120))
+        #expect(abs(next - (before + coast.distance)) < 1e-9)
+        #expect(model.spinEasing == FlickCoast.easing)
+        #expect(abs(model.rotationDuration - coast.duration) < 1e-9)
+        #expect(model.outcome == outcome)
+        #expect(model.spinCount == count)
+        #expect(model.lastDirection == .counterclockwise)
+        #expect(!model.spinning)
+        #expect(model.rotation == before)
+    }
+
+    @Test func 動きを減らす設定と止めてから離したときは惰性を付けない() {
+        let model = makeModel()
+        #expect(model.beginCoast(angularVelocity: 120, reducedMotion: true) == nil)
+        #expect(model.beginCoast(angularVelocity: 0, reducedMotion: false) == nil)
+        #expect(model.rotationDuration == Config.spinDuration)
+        #expect(model.spinEasing == Config.spinEasing)
+    }
+
+    @Test func 演出中は惰性を付けない() {
+        let model = makeModel()
+        _ = model.beginSpin(reducedMotion: false)
+        #expect(model.beginCoast(angularVelocity: 120, reducedMotion: false) == nil)
+        #expect(model.rotationDuration == Config.spinDuration)
+    }
+
+    @Test func 惰性の途中で触れたら今の角度で止める() throws {
+        let model = makeModel()
+        var clock = 100.0
+        model.now = { clock }
+        model.rotation = 30
+        let next = try #require(model.beginCoast(angularVelocity: -200, reducedMotion: false))
+        let coast = try #require(FlickCoast.coast(angularVelocity: -200))
+        model.rotation = next
+        clock += coast.duration / 2
+        let angle = try #require(model.stopCoast())
+        #expect(abs(angle - (30 + coast.angle(after: coast.duration / 2))) < 1e-9)
+        #expect(angle < 30)
+        #expect(angle > next)
+        // 一度止めたら、もう止めるものは無い
+        #expect(model.stopCoast() == nil)
+    }
+
+    @Test func 惰性が止まったあとに触れても角度は変えない() throws {
+        let model = makeModel()
+        var clock = 0.0
+        model.now = { clock }
+        let next = try #require(model.beginCoast(angularVelocity: 100, reducedMotion: false))
+        model.rotation = next
+        clock += try #require(FlickCoast.coast(angularVelocity: 100)).duration
+        #expect(model.stopCoast() == nil)
+        #expect(model.rotation == next)
+    }
+
+    @Test func 惰性の途中でスピンを始めたら惰性を打ち切りスピンの曲線に戻す() throws {
+        let model = makeModel()
+        var clock = 0.0
+        model.now = { clock }
+        let next = try #require(model.beginCoast(angularVelocity: 100, reducedMotion: false))
+        model.rotation = next
+        clock += 0.01
+        let target = try #require(model.beginSpin(reducedMotion: false))
+        #expect(target > next)
+        #expect(model.rotationDuration == Config.spinDuration)
+        #expect(model.spinEasing == Config.spinEasing)
+        #expect(model.stopCoast() == nil)
+    }
+
     @Test func 反時計回りでもクリック音と触覚の時刻が出る() async throws {
         let model = makeModel()
         let from = model.rotation

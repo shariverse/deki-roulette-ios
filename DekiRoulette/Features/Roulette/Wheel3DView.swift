@@ -21,11 +21,14 @@ struct Wheel3DView: View {
     var highlightedIndex: Int? = nil
     var interactive = true
     var spinEasing = Config.spinEasing
+    /// 回転の補間の長さ。スピンは `Config.spinDuration`、勢いが足りずに惰性で回すときは親が `FlickCoast` から決める。
+    var rotationDuration = Config.spinDuration
     /// 止まったスライスの光彩の色（設定の「ルーレットの詳細設定」）。
     var glowStyle = GlowStyle.default
     /// 結果の帯。結果が出ている間だけ渡す。
     var result: Wheel3DResult? = nil
     var onBoundaryCross: ((_ time: TimeInterval) -> Void)? = nil
+    var onGrab: (() -> Void)? = nil
     var onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -48,7 +51,7 @@ struct Wheel3DView: View {
     var body: some View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
-            onBoundaryCross: onBoundaryCross, onRelease: onRelease
+            onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease
         ) { dragRotation, displacedByDrag in
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
@@ -68,7 +71,7 @@ struct Wheel3DView: View {
             }
             // 2D の盤面と同じく、回転の値の変化だけは外側のトランザクションに依らずスピンの曲線で補間させる
             // （キーボードが閉じる更新に重なっても盤面が最終角度へ飛ばない）。動きを減らす設定では親が値を直接書くので付けない
-            .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing), value: rotation)
+            .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)
             .aspectRatio(1, contentMode: .fit)
         }
         .onAppear {

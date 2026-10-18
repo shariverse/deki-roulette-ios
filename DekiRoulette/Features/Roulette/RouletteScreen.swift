@@ -133,10 +133,12 @@ struct RouletteScreen: View {
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
                 spinEasing: model.spinEasing,
+                rotationDuration: model.rotationDuration,
                 glowStyle: glowStyle,
                 result: wheel3DResult,
                 // 2D と同じく、指を離した角度からフリックのスピンを始める
                 onBoundaryCross: dragCrossedBoundary,
+                onGrab: grab,
                 onRelease: release
             )
         } else {
@@ -147,8 +149,10 @@ struct RouletteScreen: View {
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
                 spinEasing: model.spinEasing,
+                rotationDuration: model.rotationDuration,
                 glowStyle: glowStyle,
                 onBoundaryCross: dragCrossedBoundary,
+                onGrab: grab,
                 onRelease: release
             )
         }
@@ -216,11 +220,33 @@ struct RouletteScreen: View {
     }
 
     /// 盤面のフリック。強さは周回数にだけ反映し、フリックした向きに回す。盤面は離した瞬間の速さで回り出し、そこから減速する。
-    /// 閾値未満（ゆっくり動かして離した、止めてから離した）なら回さない。盤面は離した角度のまま止まり、
-    /// 結果の表示・`spinCount`・「スピン」ボタンの向き（`lastDirection`）は変わらない。
+    /// 閾値未満（ゆっくり動かして離した、止めてから離した）ならスピンを始めず、離した速さに応じて少しだけ惰性で回して止める。
     private func flick(angularVelocity: Double) {
-        guard let flick = FlickSpin.spin(angularVelocity: angularVelocity) else { return }
+        guard let flick = FlickSpin.spin(angularVelocity: angularVelocity) else {
+            coast(angularVelocity: angularVelocity)
+            return
+        }
         spin(fullSpins: flick.fullSpins, direction: flick.direction, releaseVelocity: angularVelocity)
+    }
+
+    /// 勢いの足りないフリックの惰性。抽選しないので、結果の表示・`spinCount`・「スピン」ボタンの向きは変わらない。
+    /// 盤面は離した瞬間の速さで回り出して止まる（`FlickCoast`）。動きを減らす設定では付けない（離した角度のまま）。
+    private func coast(angularVelocity: Double) {
+        guard let next = model.beginCoast(angularVelocity: angularVelocity, reducedMotion: reduceMotion) else { return }
+        withAnimation(Theme.spinAnimation(easing: model.spinEasing, duration: model.rotationDuration)) {
+            model.rotation = next
+        }
+    }
+
+    /// 盤面に再び触れた。惰性で回っている途中なら、今の角度で止めてから指に追従させる。
+    /// 補間中の角度は observable でないので、モデルが曲線から逆算した角度を補間なしで書く（盤面の `.animation` も掛けない）。
+    private func grab() {
+        guard let angle = model.stopCoast() else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            model.rotation = angle
+        }
     }
 
     private func spin(fullSpins: Int?, direction: SpinDirection?, releaseVelocity: Double?) {

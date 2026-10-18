@@ -4,6 +4,7 @@ import SwiftUI
 /// ドラッグ中は追従で回した角度（`dragRotation`）を `content` に渡して盤面を指に追従させ、指を離したら、追従で回した角度と、
 /// 離す直前の動きから出した角速度（度/秒、時計回りが正）を `onRelease` に伝える。指を離さずにジェスチャが取り消されたときは
 /// 角速度を nil で伝える。追従した角度は親が `rotation` に取り込むまでこのビューが持つ。
+/// 追従を始める直前に `onGrab` を呼ぶ（親は惰性で回っている盤面をその場で止める）。
 /// `interactive` が false の間（演出中）は追従もフリックもしない。
 /// 追従で針がスライスの境目を越えたら、その時刻（秒）を `onBoundaryCross` に伝える（親が回転音と触覚を鳴らす）。
 /// 結果が出たあと（`highlightedIndex` が nil でない）に指で動かしたら `displacedByDrag` を立てる（盤面は強調を解く）。
@@ -14,6 +15,7 @@ struct WheelDragArea<Content: View>: View {
     let highlightedIndex: Int?
     let interactive: Bool
     let onBoundaryCross: ((_ time: TimeInterval) -> Void)?
+    let onGrab: (() -> Void)?
     let onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)?
     @ViewBuilder let content: (_ dragRotation: Double, _ displacedByDrag: Bool) -> Content
 
@@ -55,6 +57,7 @@ struct WheelDragArea<Content: View>: View {
                 if !dragSession.started {
                     dragSession.started = true
                     dragSession.ignored = !interactive
+                    if !dragSession.ignored { onGrab?() }
                 }
                 guard !dragSession.ignored else { return }
                 follow(
