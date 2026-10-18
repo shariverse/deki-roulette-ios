@@ -82,6 +82,12 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 完了コールバックが来ない場合の保険として `Config.spinFallback` のタイマーを持つ。
 `accessibilityReduceMotion` のときは回さず、`reducedMotionSpinDuration` 後に完了扱いにする。
 
+補間中の角度は observable でないので、速さに連動する演出（SPEC §5.5）は `TimelineView` で毎フレーム `SpinMotion`（`Core/`。開始角・終了角・長さ・曲線）から
+経過時間で角度（`angle(at:)`。範囲外は端で止める）と符号つきの角速度（`angularVelocity(at:)`。曲線の傾き `CubicBezierCurve.slope(atTime:)` × 平均の速さ、範囲外は 0）を引く。
+`beginSpin` / `beginCoast` が `currentMotion`（`TimedSpinMotion` = 動き + `now()` の開始時刻）を記録し、完了・惰性を止めた・指で回した・`reducedMotion` のスピンでは nil。
+ドラッグ中は `FlickSpin.angularVelocity(samples:center:at:)`（窓の終わりを今の時刻に取る）で求める。強さは `SpinEffectIntensity.intensity(angularVelocity:)`
+（`|ω| / Config.effectFullIntensityVelocity` を 0〜1 に収める）で、揺れは `smoothed`（時定数 `Config.effectSmoothingTime` の指数平滑）でならす。演出の関数は指定・印を受け取らない。
+
 盤面の `rotationEffect` には `.animation(Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)` を付けてある（`reduceMotion` では `nil`。
 `spinEasing` / `rotationDuration` は `withAnimation` と同じ `model.spinEasing` / `model.rotationDuration` を渡す。長さはスピンでは `Config.spinDuration`、惰性では `FlickCoast` が決める）。
 キーボードが出た状態でスピンを始めると、演出開始で入力欄が無効になってキーボードが閉じ、その安全領域の変化が
