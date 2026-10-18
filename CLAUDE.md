@@ -93,12 +93,21 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
 `Config.flickSampleWindow` に中心のまわりを回った角度から `FlickSpin.angularVelocity` で角速度を出す（離した瞬間の
 `velocity` は揺れが大きく、同じフリックでも回らないことがあるので使わない）。それを
 `FlickSpin.spin` で周回数と向き（`SpinDirection`、角速度の符号）に写し、角速度そのものと一緒に
-`beginSpin(reducedMotion:fullSpins:direction:releaseVelocity:)` に渡す（閾値未満なら `FlickSpin.spin` が nil で `beginSpin` を呼ばず、追従した角度のまま止める。抽選しないので結果の表示・`spinCount`・`lastDirection` は変わらない。指を離さずにジェスチャが取り消されたときは
+`beginSpin(reducedMotion:fullSpins:direction:releaseVelocity:)` に渡す（閾値未満なら `FlickSpin.spin` が nil で `beginSpin` を呼ばず、`model.beginCoast` で少しだけ惰性で回す（下記）。指を離さずにジェスチャが取り消されたときは
 `onRelease` の角速度が nil で、追従した角度を残すだけで回さない）。
 強さは周回数と回り始めの速さ（`spinEasing`）にだけ効き、止まる位置の式は変えない。反時計回りでは `RouletteMath.nextRotation` が
 累積角を減らす向きに決め、`SpinTicks` / `HapticSchedule` は `to < from` を符号を反転して同じ式で数える。モデルは直前のフリックの
 向きを `lastDirection` に覚え、「スピン」ボタンはその向きで回す（初期値は時計回り、保存しない）。停止後は `outcome.index` を `highlightedIndex` として渡し、
 他のスライスを `Theme.sliceDim` で強く沈め、止まったスライスに白系の縁取り（`stopOutline`）と光彩（既定は `stopGlow`。色は `@AppStorage(Config.glowStyleKey)` の `GlowStyle` で、設定の「ルーレットの詳細設定」から選ぶ）を付ける（結果が出たあとに指で動かしたら強調だけ解く）。停止の瞬間に `stopPulseScale` で押し出して針を跳ねさせ、スライスはそのあと結果が出ている間 `stopHoldScale` で前に出したままにする（強調が解けたら戻す）。拡大と針の跳ねは `accessibilityReduceMotion` では省く。
+
+閾値未満で離したときの惰性（抽選しない）は、`FlickCoast.coast` が角速度から角度（`Config.flickCoastFactor` × 角速度、`flickCoastMaxAngle` で上限、
+`flickCoastMinAngle` 未満なら付けない）・時間（初速が離した角速度になる `2 × 角度 ÷ 角速度`）・曲線（2 次の ease-out の `FlickCoast.easing`）を決める。
+`RouletteModel.beginCoast` が `spinEasing` と `rotationDuration` をその曲線と長さにして行き先の角度を返し、View が
+`withAnimation(Theme.spinAnimation(easing:duration:))` で `rotation` を書く（2D・3D の盤面の `.animation(…, value: rotation)` も同じ曲線と長さなので、同じ時刻に同じ角度で止まる）。
+`outcome` / `spinCount` / `pendingOutcome` / `lastDirection` は変えず、`spinning` も立てない（結果の表示は残り、強調は解けたまま。押し出しや針の跳ねも出ない）。
+惰性の途中で盤面に触れたら、`WheelDragArea` の `onGrab` で `model.stopCoast()` が曲線から今の角度を逆算し、`disablesAnimations` の
+トランザクションで補間なしに書いて止める。惰性の途中で `beginSpin` を呼ぶと惰性を打ち切り（止まる位置は行き先の `rotation` から）、
+曲線と長さをスピンのものに戻す。`reducedMotion` では付けない。
 
 ### 触覚の仕組み
 
