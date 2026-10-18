@@ -123,7 +123,7 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 ためらい / 戻りかけ / 行き過ぎを等確率に選び、`teased(_:from:to:count:releaseVelocity:)` が主の区間（`Config.spinDuration`・`spinEasing`。
 フリックでは主の区間の距離で求めた `FlickSpin.easing`）と焦らしの区間（`Config.spinTeaseEasing`、合わせて `Config.spinTeaseDuration`）を
 つないだ `SpinPath`（`Core/SpinPath.swift`。`segments: [SpinMotion]`・`angle(at:)`・`angularVelocity(at:)`・`duration`）を返す。最終角 `to` は変えず、
-長さは入り方に依らず 5.7 秒、保険は `Config.spinTeaseFallback`。振れ幅は件数と最終角の幾何だけで決め（`Config.spinTease…`）、指定・止まるスライスの添字は受け取らない。
+長さは入り方に依らず 5.7 秒、保険は `SpinPath.fallback`（長さ + 0.6 秒。焦らしありは `Config.spinTeaseFallback`）。ためらい・戻りかけで止まりかける角度は、境目の手前 a と止まる角度の `Config.spinTeaseCreepMax` 手前の大きい方（広いスライスの奥で止まっても大きく回り直さない）。振れ幅は件数と最終角の幾何だけで決め（`Config.spinTease…`）、指定・止まるスライスの添字は受け取らない。
 境目を越える時刻は `boundaryCrossings(count:minInterval:)`（`SpinTicks` / `HapticSchedule` の `boundaryCrossings(along:count:minInterval:)` も同じ）が
 区間ごとに今の逆算で数えてつなぎ、戻る向きの境目も数え、間引きは全体で掛ける。惰性と `reducedMotion` には使わない（呼び出し側が判定）。
 モデル・2D・3D・音・触覚・保険への組み込みはタスク 10（今は関数だけで、`beginSpin` は従来の 1 本の曲線のまま）。
