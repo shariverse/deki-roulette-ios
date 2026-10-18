@@ -103,6 +103,16 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - `SCNRenderer.snapshot(atTime: 0)` の画面外描画は、直前に `SCNTransaction`（`animationDuration` > 0）で変えた値を動きの始まり（変える前の値）で描く。
   `highlight(_:reduceMotion: false)` の直後に描くと、暗くする層は不透明度 0 のまま写る（CI で、無いはずの差を比べて落ちた）。
   出し切った見た目を画素で確かめるときは、動きを付けない経路（動きを減らす設定）で作る（2026-10-18）
+- iOS の SceneKit で `node.setValue(NSValue(scnVector3: v), forKeyPath: "scale")` は成分を読み違える（(1.07, 1.07, 1) が (3.7e19, 1.88, 3.7e19) になる。
+  `position` の (1, 2, 3) は (0, 1.875, 0)）。macOS では起きない。値は `node.scale = v` のように型のあるプロパティに書き、`NSValue(scnVector3:)` は
+  `CABasicAnimation` / `CASpringAnimation` の `fromValue` / `toValue` にだけ使う（こちらは正しく動く）（2026-10-19）
+- `SCNRenderer.snapshot(atTime:)` の時刻はシステムの時計（`CACurrentMediaTime()`）。`CACurrentMediaTime() + 2` を渡すと、足したばかりの動き
+  （`SCNTransaction`・`addAnimation`）が終わったあとの見た目を描ける（2026-10-19）
+- テストを動かせる Mac が無いときも、手元の Xcode と起動中の Simulator があれば、アプリの Swift ファイル（`@main` の App を除く）を `swiftc -parse-as-library
+  -enable-testing -emit-library -static -emit-module` で Simulator 向けの静的ライブラリにし、テストのファイルと
+  `@main struct Runner { static func main() async { await Testing.__swiftPMEntryPoint() as Never } }` を `-framework Testing`（Simulator のプラットフォームの
+  `Developer/Library/Frameworks`）・`-plugin-path`（ツールチェーンの `usr/lib/swift/host/plugins/testing`）で実行ファイルにして、`xcrun simctl spawn <端末> <実行ファイル> --filter <型>` で流せる。
+  バンドルの資源（音源・画像・Info.plist）を読むテストと、メインの実行ループの時刻に依るテストはこの方法では落ちる（2026-10-19）
 - 同じノードの `scale` に 2 つの動き（現れ方の 0.96 倍と登場演出の 0.6 倍からのばね）を重ねるときは、親と子のノードに分けて掛ける（2026-10-18）
 
 
