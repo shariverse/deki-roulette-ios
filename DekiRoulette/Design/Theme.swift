@@ -168,6 +168,11 @@ enum Theme {
         /// 盤の側面・縁・支柱を照らす光の強さ。表面のスライスは照明に依らず塗りの色のまま出す。
         static let ambientLight: CGFloat = 500
         static let keyLight: CGFloat = 800
+        /// 電飾の電球を外周の縁の上面から浮かせる高さ（pt。直径に依らない）。持ち上げた止まったスライスの面（縁の上面 + 0.6pt）より手前、
+        /// 結果の帯・針（縁・ハブの上面 + 1pt 以上）より奥に置き、光彩の画像に隠れず、針の後ろになる（2D の重なり順と同じ）。
+        static let lightLift: CGFloat = 0.8
+        /// 電球の円の細かさ（周の分割数）。
+        static let lightSegments = 16
     }
 
     // MARK: 停止の強調
@@ -228,6 +233,26 @@ enum Theme {
         static let haloWidth: CGFloat = 5
         /// にじみの光の中心の不透明度（にじみの強さ × 明るさに掛ける）。
         static let haloOpacity = 0.6
+
+        /// 直径 `diameter`（pt）の盤面での電球の環の半径（pt）。スライスの円（`WheelGeometry.sliceRadius`）の外 `ringOffset`。
+        /// 2D の `WheelLightsView` と 3D の `Wheel3DScene` が同じ値を使う。
+        static func ringRadius(diameter: CGFloat) -> CGFloat {
+            CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + ringOffset * scale(diameter)
+        }
+
+        /// 直径 `diameter`（pt）の盤面での電球の半径（pt）。
+        static func bulbRadius(diameter: CGFloat) -> CGFloat {
+            bulbRadius * scale(diameter)
+        }
+
+        /// 直径 `diameter`（pt）の盤面での、にじみが最も強いときに電球の外へ広げる光の幅（pt）。
+        static func haloWidth(diameter: CGFloat) -> CGFloat {
+            haloWidth * scale(diameter)
+        }
+
+        private static func scale(_ diameter: CGFloat) -> CGFloat {
+            max(diameter, 0) / CGFloat(WheelLabel.referenceDiameter)
+        }
     }
 
     // MARK: 光の尾・残像

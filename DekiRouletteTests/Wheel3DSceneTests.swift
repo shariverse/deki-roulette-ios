@@ -400,4 +400,111 @@ struct Wheel3DSceneTests {
         scene.show(result: Wheel3DResult(id: "a2", label: "\u{3000}", accent: Theme.sliceColor(at: 1, count: 4)), reduceMotion: false)
         #expect(scene.bandRevealCount == 2)
     }
+
+    // MARK: 電飾
+
+    /// 電球 `index` の中心の画素の位置。電球は縁の上面から浮かせてあるので、カメラに近い分だけ外へ広がって見える。
+    private func lightLocation(index: Int, along offset: Double = 0, pixels: Pixels) -> CGPoint {
+        let ring = Double(Theme.LightRing.ringRadius(diameter: size))
+        let z = Double(Theme.Wheel3D.rimLift) * Double(size) / WheelLabel.referenceDiameter + Double(Theme.Wheel3D.lightLift)
+        let distance = WheelGeometry.cameraDistance(diameter: Double(canvas), fieldOfView: Theme.Wheel3D.fieldOfView)
+        let projection = distance / (distance - z)
+        // `offset` は環に沿って時計回りに進めた距離（pt）
+        let angle = WheelLights.angle(index: index) + offset / ring * 180 / .pi
+        let point = WheelGeometry.point(angle: angle, radius: ring * projection)
+        return location(x: point.x, y: point.y, pixels: pixels)
+    }
+
+    /// 2D の電球の色（縁の `wheelRim` に `wheelLight` を明るさの不透明度で重ねた色）。
+    private func bulbColor(_ brightness: Double) -> SIMD3<Double> {
+        let rim = srgb(Theme.wheelRim), light = srgb(Theme.wheelLight)
+        return rim + (light - rim) * brightness
+    }
+
+    @Test func 電飾を出さないときは縁のまま() throws {
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.light(.still)
+        scene.light(nil)
+        let cleared = try render(scene)
+        for index in [3, 6, 15] {
+            let before = plain.color(at: lightLocation(index: index, pixels: plain))
+            let after = cleared.color(at: lightLocation(index: index, pixels: cleared))
+            #expect(distance(before, after) < 0.01, "\(index): \(before) \(after)")
+            // 縁の色で、電球の色ではない
+            #expect(!isClose(before, bulbColor(WheelLights.stillLevel)), "\(index): \(before)")
+        }
+    }
+
+    @Test func 電球は縁の上に2Dと同じ明るさで点く() throws {
+        let cases: [(WheelLights.Scene, Int)] = [
+            (.still, 6),
+            // 止まっているとき、並び（3 個おき）は 0.6、間は 0.3
+            (.running(angle: 0, intensity: 0), 6),
+            (.running(angle: 0, intensity: 0), 7),
+            // 点滅の終わり（暗いところ）
+            (.stopped(elapsed: WheelLights.blinkDuration), 9),
+        ]
+        for (lights, index) in cases {
+            let scene = makeScene(count: 4, rotation: 0)
+            scene.light(lights)
+            let pixels = try render(scene)
+            let expected = bulbColor(WheelLights.bulb(index: index, scene: lights).brightness)
+            let color = pixels.color(at: lightLocation(index: index, pixels: pixels))
+            #expect(isClose(color, expected), "\(lights) \(index): \(color) expected \(expected)")
+        }
+    }
+
+    @Test func 電球は盤と一緒に回らない() throws {
+        let scene = makeScene(count: 4, rotation: 123)
+        scene.light(.still)
+        let pixels = try render(scene)
+        for index in [3, 6, 18] {
+            let color = pixels.color(at: lightLocation(index: index, pixels: pixels))
+            #expect(isClose(color, bulbColor(WheelLights.stillLevel)), "\(index): \(color)")
+        }
+    }
+
+    @Test func 強さに応じて電球のまわりににじむ() throws {
+        let weak = makeScene(count: 4, rotation: 0)
+        weak.light(.running(angle: 0, intensity: 0))
+        let strong = makeScene(count: 4, rotation: 0)
+        strong.light(.running(angle: 0, intensity: 1))
+        let weakPixels = try render(weak), strongPixels = try render(strong)
+        // 電球 6（並びの上）の縁に沿って 4pt 離れた位置（電球の外、にじみの中）
+        let near = strongPixels.color(at: lightLocation(index: 6, along: 4, pixels: strongPixels))
+        let plain = weakPixels.color(at: lightLocation(index: 6, along: 4, pixels: weakPixels))
+        #expect(near.x + near.y + near.z > plain.x + plain.y + plain.z + 0.1, "near: \(near) plain: \(plain)")
+        // 強さ 1 では並びの電球は最も明るい
+        let bulb = strongPixels.color(at: lightLocation(index: 6, pixels: strongPixels))
+        #expect(isClose(bulb, bulbColor(WheelLights.litPeakLevel)), "\(bulb)")
+    }
+
+    @Test func 盤を組み直しても電飾を出し直す() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.light(.still)
+        scene.update(labels: Array(repeating: "", count: 5), diameter: size)
+        let pixels = try render(scene)
+        let color = pixels.color(at: lightLocation(index: 6, pixels: pixels))
+        #expect(isClose(color, bulbColor(WheelLights.stillLevel)), "\(color)")
+    }
+
+    @Test func 電球は持ち上げた止まったスライスの光彩に隠れない() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.highlight(Wheel3DHighlight(index: 0, glowStyle: .white), reduceMotion: false)
+        scene.light(.stopped(elapsed: WheelLights.blinkDuration))
+        let pixels = try render(scene)
+        // 止まったスライス（0〜90 度）の外周の上の電球
+        let color = pixels.color(at: lightLocation(index: 3, pixels: pixels))
+        #expect(isClose(color, bulbColor(WheelLights.blinkLowLevel)), "\(color)")
+    }
+
+    @Test func 電球は針の後ろ() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.light(.running(angle: 0, intensity: 1))
+        let pixels = try render(scene)
+        // 12 時の電球（添字 0）は針に隠れる
+        let color = pixels.color(at: lightLocation(index: 0, pixels: pixels))
+        #expect(isClose(color, srgb(Theme.flare)), "\(color)")
+    }
 }

@@ -70,7 +70,7 @@ struct WheelTrailsView: View {
     private func draw(_ frame: WheelTrails.Frame, colors: [Color], in context: inout GraphicsContext, size: CGSize) {
         let scale = side / CGFloat(WheelLabel.referenceDiameter)
         // スライスの円の半径とハブの半径は `WheelFaceView` と同じ（枠から 16pt 内側、ハブは直径 38pt）
-        let radius = side / 2 - 16 * scale
+        let radius = CGFloat(WheelGeometry.sliceRadius(diameter: Double(side)))
         let hubRadius = 19 * scale
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
 

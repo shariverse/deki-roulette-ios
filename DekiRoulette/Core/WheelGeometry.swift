@@ -3,6 +3,16 @@ import Foundation
 /// 3D の盤面の形の計算。3D 空間は手前から見て x が右・y が上・z が手前で、盤は xy 平面に置いて手前（+z）へ向ける。
 /// 角度は 2D と同じく 12 時を 0 度として、手前から見て時計回りに数える。
 enum WheelGeometry {
+    /// 盤面の枠からスライスの円までの距離（基準直径 `WheelLabel.referenceDiameter` での pt）。外周の縁（スライスの円の外 5〜11pt）と
+    /// 枠までの余白はこの中に収まる。2D の `WheelFaceView`・3D の盤・電飾の環・光の尾・結果の帯（`ResultBand`）で同じ値を使う。
+    static let sliceInset: Double = 16
+
+    /// 直径 `diameter`（pt）の盤面のスライスの円の半径（pt）。
+    static func sliceRadius(diameter: Double) -> Double {
+        let diameter = max(diameter, 0)
+        return diameter / 2 - sliceInset * diameter / WheelLabel.referenceDiameter
+    }
+
     /// 盤面の角度 `angle`（度）・中心からの距離 `radius` の点を、盤の平面（xy）上の座標に写す。
     static func point(angle: Double, radius: Double) -> SIMD2<Double> {
         let rad = angle * .pi / 180

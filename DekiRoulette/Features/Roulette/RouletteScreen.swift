@@ -164,6 +164,10 @@ struct RouletteScreen: View {
                 rotationPath: model.rotationPath,
                 glowStyle: glowStyle,
                 result: wheel3DResult,
+                // 電飾は 2D と同じく指定・印を見ない。流れと明るさは盤面が自分で回る動きと時計から毎フレーム引く
+                showsLights: spinEffectStyle.showsLights,
+                motion: model.currentMotion,
+                now: model.now,
                 // 2D と同じく、指を離した角度からフリックのスピンを始める
                 onBoundaryCross: dragCrossedBoundary,
                 onGrab: grab,

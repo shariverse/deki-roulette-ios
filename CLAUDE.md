@@ -198,21 +198,25 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 
 ### スピンの演出の仕組み
 
-電飾（`SpinEffectStyle.showsLights`、SPEC §5.5）は 2D の `RouletteWheelView` だけに出す（3D は後続）。`RouletteScreen` が `showsLights`・`model.currentMotion`・`model.now` を渡し、
-`WheelLightsView` を `WheelDragArea` の中・`rotationEffect` の外（回らない層、針の後ろ）に重ねる。電球は `Config.wheelLightCount` 個を盤面の縁の上
-（寸法は `Theme.LightRing`、色は `Theme.wheelLight`）に `Canvas` で描き、盤面の枠と `WheelFaceView` は変えない（「なし」と共有画像は今のまま）。
+電飾（`SpinEffectStyle.showsLights`、SPEC §5.5）は 2D の `RouletteWheelView` と 3D の `Wheel3DView` の両方に出す（3D は下の「3D 表示の仕組み」）。
+`RouletteScreen` が `showsLights`・`model.currentMotion`・`model.now` を渡す。毎フレームの場面は 2D・3D で共有の `WheelLightsTimeline`（`WheelLightsView.swift`）が
+同じ時計・同じ規則で引いて `content` に渡し、2D は `WheelLightsView` が `Canvas` に描き、3D は `Wheel3DScene.light(_:)` がノードに写す。2D は `WheelLightsView` を `WheelDragArea` の中・`rotationEffect` の外（回らない層、針の後ろ）に重ねる。電球は `Config.wheelLightCount` 個を盤面の縁の上
+（寸法は `Theme.LightRing`。環の半径は `ringRadius(diameter:)` で、スライスの円の半径 `WheelGeometry.sliceRadius(diameter:)` の外 `ringOffset`。色は `Theme.wheelLight`）に `Canvas` で描き、盤面の枠と `WheelFaceView` は変えない（「なし」と共有画像は今のまま）。
 明るさは `WheelLights`（`Core/`）の純粋関数で、場面（`Scene`: 動きを減らす設定の `still` / 待機中・回転中・指で動かしている間の `running(angle:intensity:)` / 結果表示中の `stopped(elapsed:)`）から決める。
 並びの位置は流す角度 × `Config.wheelLightFlowFactor`（角度に比例させると角速度に比例して流れ、止まれば止まる）。流す角度は `WheelLights.Flow` が
 盤面に見えている角度（`WheelEffectMotion.displayedAngle`。`currentMotion` があれば `angle(now: now())`、無ければ `rotation`、どちらにも `dragRotation` を足す）の
 変化だけ進め、1 回に進める量を並びが 1 フレーム（`Config.effectReferenceFrameInterval` = 1/60 秒）に `Config.wheelLightMaxFlowPerFrame`（0.5）個までに抑える
-（経過時間に比例させ、1 回には 1 フレーム分まで。同じフレームに 2 回描き直されても上限に収まる）。上限を超える分は捨てるので、速いときは並びが盤面より遅れて流れる。
-`Flow` は描くたびに進めるので、`WheelLightsView` は書き換えても描き直さない参照型（`LightFlowBox`）に入れて `@State` で持つ。
+（経過時間に比例させ、1 回には 1 フレーム分まで。同じフレームに 2 回描き直されても上限に収まる）。流し切れなかった分（`lag`）は `Config.wheelLightMaxFlowLag`（電球 1 個）まで
+次の描き直しに持ち越して上限の範囲で追いつかせ、超える分は捨てる（速いときは並びが盤面より遅れて流れ、上限を下回ったら遅れを取り戻して盤面と同じだけ進む）。
+指で動かしている間は角度が変わる描き直し（指の動き）が `TimelineView` の描き直しの直後に来て経過時間が短いので、持ち越さないと上限より遅い動きでも流れを捨ててしまう。
+`Flow` は描くたびに進めるので、`WheelLightsTimeline` は書き換えても描き直さない参照型（`LightFlowBox`）に入れて `@State` で持つ（Optional にして `onAppear` で 1 回だけ作る。
+`@State` の初期値にすると View の値が作られるたびに作り直す）。
 強さは `WheelEffectMotion.current(spin: currentMotion, drag:, now:)` が選んだ動き（盤面が自分で回っている間はその動き、そうでなく指の動きが残っていれば
-`WheelDragMotion`）から引く。停止の点滅（`stopBlink`。停止の瞬間の明るいところから始め、
-1 回目をフラッシュと重ねて明滅を 1 秒 3 回未満に収める）と脈動（`afterglow`）は、`RouletteWheelView` が持つ結果が出た時刻（`stopStart`。`highlightedIndex` が
+`WheelDragMotion`。ただしスピン・惰性が指の動きの最後の点より後に始まっていれば、止まり切ったあともそちらを選び、短い惰性のあとに指の動きの残りへ戻らない）から引く。停止の点滅（`stopBlink`。停止の瞬間の明るいところから始め、
+1 回目をフラッシュと重ねて明滅を 1 秒 3 回未満に収める）と脈動（`afterglow`）は、`RouletteWheelView`（3D は `Wheel3DView` が同じ持ち方で）が持つ結果が出た時刻（`stopStart`。`highlightedIndex` が
 nil でなくなった `now()`。結果を出したまま 2D が出たときは点滅を飛ばした時刻）を `stoppedAt` で受け取り（指で強調を解いたら nil）、その経過で引く。
 `TimelineView(.animation(minimumInterval:paused:))` は `WheelLights.animates` が偽の間
-（待機中・止まり切った惰性 = `TimedSpinMotion.isMoving(now:)` が偽・指の動きが止まり切った = `WheelDragMotion.isMoving(now:)` が偽・動きを減らす設定）は止め、点滅が終わって脈動だけになったら `WheelLights.frameInterval` で
+（動いているかは `WheelEffectMotion.isMoving(_:settled:now:)`。待機中・止まり切った惰性 = `TimedSpinMotion.isMoving(now:)` が偽・指の動きが止まり切った = `WheelDragMotion.isMoving(now:)` が偽・動きを減らす設定）は止め、点滅が終わって脈動だけになったら `WheelLights.frameInterval` で
 `Config.effectPulseFrameInterval`（1/20 秒）ごとに落とす（点滅の終わりは `.task(id: stoppedAt)` が待って `@State` を書き、描き直させる）。止まり切った惰性・指の動きは親が描き直さないので、
 `WheelLightsView` が `.task(id: 選んだ動き)` で残り時間だけ待って `@State` を書き、描き直させて止める。演出は指定・印を受け取らず、`accessibilityHidden`・`allowsHitTesting(false)`。
 
@@ -244,7 +248,7 @@ nil でなくなった `now()`。結果を出したまま 2D が出たときは�
 
 指で動かしている間の速さに連動する演出（電飾の流れ・光の尾・残像・火花）は、`RouletteWheelView` が `WheelDragArea` に `tracksMotion`（電飾・光の尾・火花の
 どれかを出すとき。「なし」では記録しない）と `now` を渡し、`WheelDragArea` が `follow` のたびに `WheelDragMotion` へ記録して `content` の 3 つ目の引数で渡す
-（3D は受け取って捨てる）。演出中（`interactive == false`）に始まったドラッグは記録しない。記録は次のドラッグを始めるまで残し、指を離したあとの残り
+（3D は電飾を出すとき `tracksMotion` を立てて記録し、電飾にだけ渡す）。演出中（`interactive == false`）に始まったドラッグは記録しない。記録は次のドラッグを始めるまで残し、指を離したあとの残り
 （強さの落ち方・飛んでいる火花）は `Config.dragEffectSettleTime`（0.5 秒）まで描く。スピン・惰性に移ったら `WheelEffectMotion.current` がそちらを選ぶ。
 抽選しないので停止の演出・焦らし・うなり・決まり音は出さず（回転音・触覚は今のまま）、`RouletteModel` は変えない。惰性は `currentMotion` に入るので
 スピンと同じ経路で出る（強さ約 0.33 未満なので光の尾・残像は閾値に届かない）。
@@ -281,6 +285,15 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 縁取り・光彩（`StopGlow` を共有）を焼いた画像を側面付きの板に貼って縁の高さまで持ち上げ、`stopPulseScale` → `stopHoldScale` で
 押し出す（戻りは `CASpringAnimation(perceptualDuration:bounce:)` で 2D の `stopSettleAnimation` と同じばね）。針も同じ曲線で沈む。
 `accessibilityReduceMotion` では拡大・持ち上げ・針の跳ねを省く。
+
+電飾（「スピンの演出」が電飾・全部入り）は 2D と同じ数・位置・大きさ（`Config.wheelLightCount`・`Theme.LightRing`）の電球を `tiltNode` の `lightsNode` に並べ、
+外周の縁の上面から `Theme.Wheel3D.lightLift` だけ浮かせる（持ち上げた止まったスライスの光彩の画像より手前、針・結果の帯より奥。盤と一緒に傾き・揺れるが回らない）。
+場面は 2D と共有の `WheelLightsTimeline` が `Wheel3DSurface` を包んで毎フレーム引き（2D と同じ `now()`・`WheelEffectMotion`・`WheelLights.Flow`。指の動きも
+`WheelDragArea` の記録から引く）、`Wheel3DSceneView.updateUIView` が `Wheel3DScene.light(_:)` に渡して `WheelLights.bulb` の明るさ・にじみをノードに写す。
+SceneKit は線形の色空間で重ねるので、電球は不透明度ではなく、2D の重ねた色（縁の `wheelRim` に `wheelLight` を明るさの割合で sRGB のまま混ぜた色、
+`Wheel3DScene.bulbColor(brightness:)`）を不透明に塗る。にじみは放射状のグラデーションを焼いた板を、にじみの強さで縮め・濃さを不透明度にして電球の後ろに重ねる。
+描き直しを止める条件（待機中・止まり切った・動きを減らす設定）と点滅の終わりで間隔を落とすのは 2D と同じ。「なし」では `WheelLightsTimeline` を止めたまま nil を渡し、
+電球のノードは隠したまま（見た目は今のまま）。演出に指定・印は渡さない。
 
 盤は端末の姿勢で傾け、動かした勢いで支点まわりに揺らす。傾きの写像は `TiltMapping`（基準は `@AppStorage(Config.tiltReferenceKey)`
 の `TiltReference`。水平に置いた状態なら `DeviceGravity.flat`、持ち方なら取り直した重力。`Config.wheelMaxTilt` で抑える）、
