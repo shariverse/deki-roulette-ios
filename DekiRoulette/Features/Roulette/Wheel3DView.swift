@@ -501,10 +501,10 @@ final class Wheel3DScene {
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeOut)
         dim.opacity = 1
         SCNTransaction.commit()
-        Self.pulse(stopped, keyPath: "scale", from: Self.planeScale(1), peak: Self.planeScale(Theme.stopPulseScale),
+        Self.pulse(stopped, keyPath: .scale, from: Self.planeScale(1), peak: Self.planeScale(Theme.stopPulseScale),
                    rest: Self.planeScale(Theme.stopHoldScale))
         // 針は沈んでから戻る（y は上向きなので、2D で下へ沈むのは -）
-        Self.pulse(pointerNode, keyPath: "position", from: SCNVector3Zero,
+        Self.pulse(pointerNode, keyPath: .position, from: SCNVector3Zero,
                    peak: SCNVector3(0, -Float(Theme.pointerBounceOffset), 0), rest: SCNVector3Zero)
     }
 
@@ -1153,8 +1153,14 @@ final class Wheel3DScene {
 
     /// 2D の押し出し（`stopPulseAnimation` で `peak` へ、`stopSettleAnimation` の弾むばねで `rest` へ）を SceneKit で再現する。
     /// 値はすぐ `rest` にし、見た目だけをアニメーションで動かす。
-    private static func pulse(_ node: SCNNode, keyPath: String, from: SCNVector3, peak: SCNVector3, rest: SCNVector3) {
-        node.setValue(NSValue(scnVector3: rest), forKeyPath: keyPath)
+    private static func pulse(_ node: SCNNode, keyPath: PulseKeyPath, from: SCNVector3, peak: SCNVector3, rest: SCNVector3) {
+        // 値は型のあるプロパティに直接書く。`setValue(NSValue(scnVector3:), forKeyPath:)` は iOS では成分を読み違えて
+        // （`scale` が (3.7e19, 1.88, 3.7e19) のようになる）、動きが終わったあとの盤が壊れる
+        switch keyPath {
+        case .scale: node.scale = rest
+        case .position: node.position = rest
+        }
+        let keyPath = keyPath.rawValue
         let out = CABasicAnimation(keyPath: keyPath)
         out.fromValue = NSValue(scnVector3: from)
         out.toValue = NSValue(scnVector3: peak)
@@ -1172,6 +1178,12 @@ final class Wheel3DScene {
         group.duration = settle.beginTime + settle.duration
         group.isRemovedOnCompletion = true
         node.addAnimation(SCNAnimation(caAnimation: group), forKey: "stopPulse")
+    }
+
+    /// 押し出しで動かすノードの値。
+    private enum PulseKeyPath: String {
+        case scale
+        case position
     }
 
     private func removeHighlightNodes() {

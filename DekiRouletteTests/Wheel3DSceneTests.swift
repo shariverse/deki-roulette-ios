@@ -26,12 +26,14 @@ struct Wheel3DSceneTests {
         }
     }
 
-    private func render(_ scene: Wheel3DScene) throws -> Pixels {
+    /// 場面を描く。`time` は描く時刻（システムの時計の秒）。0 では、`SCNTransaction` で動かし始めた値は動きの始まり（変える前の値）で描かれる。
+    /// 動きが終わったあとを描くときは `CACurrentMediaTime()` より先の時刻を渡す。
+    private func render(_ scene: Wheel3DScene, atTime time: TimeInterval = 0) throws -> Pixels {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let renderer = SCNRenderer(device: device, options: nil)
         renderer.scene = scene.scene
         renderer.pointOfView = scene.cameraNode
-        let image = renderer.snapshot(atTime: 0, with: CGSize(width: canvas, height: canvas), antialiasingMode: .none)
+        let image = renderer.snapshot(atTime: time, with: CGSize(width: canvas, height: canvas), antialiasingMode: .none)
         let cgImage = try #require(image.cgImage)
         let width = cgImage.width, height = cgImage.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
@@ -211,6 +213,28 @@ struct Wheel3DSceneTests {
         let near = pixels.color(at: location(angle: 180 - 5 / radius * 180 / .pi, fraction: 0.6, pixels: pixels))
         let plain = pixels.color(at: location(angle: 135, fraction: 0.6, pixels: pixels))
         #expect(near.x + near.y + near.z > plain.x + plain.y + plain.z + 0.1, "near: \(near) plain: \(plain)")
+    }
+
+    @Test func 押し出しが終わったあとも止まったスライスは前に出した大きさで残る() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false)
+        // 押し出し（0.14 秒 + ばね約 0.5 秒）と暗くする動き（0.25 秒）が終わったあとを描く
+        let pixels = try render(scene, atTime: CACurrentMediaTime() + 2)
+        let slice2 = srgb(Theme.sliceColor(at: 2, count: 4))
+        // 止まったスライス（180〜270 度）は塗りの色、境目は縁取り、隣のスライス 1 は沈んだ色（止まったスライスの塗りが広がっていない）
+        let inside = pixels.color(at: location(angle: 225, fraction: 0.6, pixels: pixels))
+        #expect(isClose(inside, slice2), "\(inside)")
+        let edge = pixels.color(at: location(angle: 180, fraction: 0.6, pixels: pixels))
+        #expect(isClose(edge, srgb(Theme.stopOutline)), "\(edge)")
+        let neighbor = pixels.color(at: location(angle: 135, fraction: 0.6, pixels: pixels))
+        #expect(!isClose(neighbor, slice2), "\(neighbor)")
+        #expect(distance(neighbor, srgb(Theme.onSlice)) < distance(srgb(Theme.sliceColor(at: 1, count: 4)), srgb(Theme.onSlice)), "\(neighbor)")
+        // 1.07 倍に前に出したままなので、スライスの円の 4% 外（縁の上）にも止まったスライスの塗りが乗る
+        // （元の大きさなら半径 144pt の外は縁。前に出した塗りは 144 × 1.07 ≈ 154pt まで、縁取りはその内側 1.6pt から。
+        // 縁取りの光彩が少し混ざるので、縁の色ではなく塗りの色に寄っていることを見る）
+        let beyond = pixels.color(at: location(angle: 225, fraction: 1.04, pixels: pixels))
+        #expect(distance(beyond, slice2) < 0.1, "\(beyond)")
+        #expect(distance(beyond, srgb(Theme.wheelRim)) > 0.5, "\(beyond)")
     }
 
     @Test func 強調を解くと元の色に戻る() throws {
