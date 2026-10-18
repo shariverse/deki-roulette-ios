@@ -92,6 +92,29 @@ enum WheelParticles {
         )
     }
 
+    /// 時刻 `now` に出ている火花を、盤面が自分で回る動き（`motion`、種 `spinSeed`）と指で動かした動き（`drag`、種 `dragSeed`）の
+    /// 両方から集める。フリックで指を離してスピンに移ったときは、指の動きで生まれた粒が寿命まで残り、スピンの粒が加わる。
+    /// 合わせても上限まで（先に生まれた指の動きの粒を残し、溢れた分は新しい粒を出さない）。
+    static func sparks(
+        motion: TimedSpinMotion?,
+        drag: WheelDragMotion?,
+        now: TimeInterval,
+        spinSeed: UInt64,
+        dragSeed: UInt64,
+        origin: CGPoint,
+        scale: CGFloat,
+        lowPower: Bool,
+        reduceMotion: Bool
+    ) -> [Spark] {
+        let fromDrag = sparks(
+            drag: drag, now: now, seed: dragSeed, origin: origin, scale: scale, lowPower: lowPower, reduceMotion: reduceMotion
+        )
+        let fromSpin = sparks(
+            motion: motion, now: now, seed: spinSeed, origin: origin, scale: scale, lowPower: lowPower, reduceMotion: reduceMotion
+        )
+        return Array((fromDrag + fromSpin).prefix(sparkCapacity(lowPower: lowPower)))
+    }
+
     /// 開始時刻 `start` から区切った生まれうる時刻（番号 0...`lastSlot`）のうち、寿命の間に生まれた火花。
     /// `intensity` / `velocity` は開始からの秒でその時刻の強さ・角速度を返す。
     private static func sparks(

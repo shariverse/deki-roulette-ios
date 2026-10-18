@@ -4,35 +4,42 @@ import SwiftUI
 /// 盤面が速く回っている間だけ、回らない層に、遅れた時刻の角度で描いた簡略な盤面（スライスの塗りだけ。ラベル・縁・ハブ・停止の強調なし）を
 /// 薄く重ね、盤面の縁の上に針の下から回転の向きと逆へ伸びる光の弧を描く。角度・濃さは `WheelTrails`（`Core/`）が決める。
 /// 補間中の角度は observable でないので、盤面が自分で回っている間（`motion`）は `TimelineView` で毎フレーム、
-/// `now()`（`RouletteModel.now` と同じ時計）から引く。動いていない・指で動かしている間（`motion` が nil）・動きを減らす設定では
-/// `TimelineView` を止めて何も描かない。低電力モードでは残像を 1 枚に減らす。
+/// `now()`（`RouletteModel.now` と同じ時計）から引く。指で速く動かしている間（`drag`）も、指が回した角度の変化から求めた角速度で
+/// 同じように描く（残像は盤面に見えている `rotation + dragRotation` から、指の動きの遅れた角度の差だけずらす）。
+/// 動いていない・止まり切った・動きを減らす設定では `TimelineView` を止めて何も描かない。低電力モードでは残像を 1 枚に減らす。
 /// 入力は項目（スライスの塗りのため）・動き・時計だけで、指定（`targetId`）・印・止まったスライスは受け取らない。読み上げず、触れられない。
 struct WheelTrailsView: View {
     let items: [Item]
     /// 盤面の一辺（pt）。弧の太さと位置はこれに比例させる。
     let side: CGFloat
+    let rotation: Double
     let dragRotation: Double
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。
     let motion: TimedSpinMotion?
+    /// 指で動かしている動き（`WheelDragArea` の記録）。指を離したあとも次のドラッグまで残る。
+    let drag: WheelDragMotion?
     let now: () -> TimeInterval
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 最初に画面に出たときに 1 つだけ作る（`@State` の初期値の式は View の値が作られるたびに評価され、
     /// ドラッグの指の動きのたびに購読を作り直すことになるため）。作る前は今の値を直接読む。
     @State private var lowPower: LowPowerModeMonitor?
-    /// 止まり切った動き。惰性は止まり切っても `motion` に残り、親が描き直さないので、止まり切ったらここに入れて
+    /// 止まり切った動き。惰性・指の動きは止まり切っても残り、親が描き直さないので、止まり切ったらここに入れて
     /// 描き直させ、`TimelineView` を止める（電飾と同じ）。
-    @State private var settledMotion: TimedSpinMotion?
+    @State private var settledMotion: WheelEffectMotion?
 
     var body: some View {
-        let moving = motion.map { $0 != settledMotion && $0.isMoving(now: now()) } ?? false
+        let current = now()
+        let effect = WheelEffectMotion.current(spin: motion, drag: drag, now: current)
+        let moving = effect.map { $0 != settledMotion && $0.isMoving(now: current) } ?? false
         let animates = WheelTrails.animates(reduceMotion: reduceMotion, moving: moving)
         let colors = items.indices.map { Theme.sliceColor(in: items, at: $0) }
         TimelineView(.animation(paused: !animates)) { _ in
             // 時刻は `TimelineView` の日付ではなく、動きの開始時刻と同じ時計で取る
             let frame = WheelTrails.frame(
-                motion: animates ? motion : nil,
+                effect: animates ? effect : nil,
                 now: now(),
+                rotation: rotation,
                 dragRotation: dragRotation,
                 sliceCount: items.count,
                 lowPower: lowPower?.isEnabled ?? ProcessInfo.processInfo.isLowPowerModeEnabled,
@@ -45,13 +52,13 @@ struct WheelTrailsView: View {
             }
         }
         .frame(width: side, height: side)
-        .task(id: motion) {
-            guard let motion, !reduceMotion else { return }
-            let remaining = motion.remaining(now: now())
+        .task(id: effect) {
+            guard let effect, !reduceMotion else { return }
+            let remaining = effect.remaining(now: now())
             guard remaining > 0 else { return }
             try? await Task.sleep(for: .seconds(remaining))
             guard !Task.isCancelled else { return }
-            settledMotion = motion
+            settledMotion = effect
         }
         .onAppear {
             if lowPower == nil { lowPower = LowPowerModeMonitor() }

@@ -229,6 +229,25 @@ struct WheelParticlesTests {
         #expect(dragSparks(drag, now: last, reduceMotion: true).isEmpty)
     }
 
+    @Test func 指を離してスピンに移っても合わせて上限まで() {
+        // 指で速く動かして離した直後に、同じ時刻から速いスピンが始まった
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 1), start: 0, duration: 1)
+        let spin = TimedSpinMotion(
+            motion: SpinMotion(from: 0, to: velocity(intensity: 1) * 10, duration: 10, easing: Self.linear), start: drag.lastTime
+        )
+        for step in 0..<12 {
+            let now = drag.lastTime + Double(step) * 0.05
+            let both = WheelParticles.sparks(
+                motion: spin, drag: drag, now: now, spinSeed: 1, dragSeed: 2,
+                origin: Self.origin, scale: 1, lowPower: false, reduceMotion: false
+            )
+            let fromDrag = dragSparks(drag, now: now, seed: 2)
+            #expect(both.count <= WheelParticles.sparkCapacity(lowPower: false))
+            // 指の動きで生まれた粒は消えるまで残す
+            #expect(Array(both.prefix(fromDrag.count)) == fromDrag)
+        }
+    }
+
     @Test func 惰性でも動きに応じて火花が出る() throws {
         // 惰性は強さ約 0.33 以下なので、出ても少ない
         let coast = try #require(FlickCoast.coast(angularVelocity: 230))
