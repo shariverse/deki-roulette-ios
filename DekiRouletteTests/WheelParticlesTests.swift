@@ -389,6 +389,8 @@ struct WheelParticlesTests {
         )
         #expect(!frame.sparks.isEmpty)
         #expect(frame.sparks == sparks)
+        // 両方空でも等しくなるので、はじけてから 0.25 秒の紙吹雪が出ていることも確かめる
+        #expect(!frame.confetti.isEmpty)
         #expect(frame.confetti == confetti)
         #expect(frame.sparks.count <= WheelParticles.sparkCapacity(lowPower: lowPower))
         #expect(frame.confetti.count <= WheelParticles.confettiCapacity(lowPower: lowPower))
