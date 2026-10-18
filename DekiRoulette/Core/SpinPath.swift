@@ -32,6 +32,10 @@ struct SpinPath: Equatable, Sendable {
     /// 全体の長さ（秒）。区間の長さの和。
     var duration: TimeInterval { segments.reduce(0) { $0 + $1.duration } }
 
+    /// 完了の保険のタイマーの長さ（秒）。全体の長さの 0.6 秒後（`Config.spinFallback` と同じ余裕）。
+    /// 焦らしの有無（`tease`）ではなく長さから決めるので、焦らしを入れられずに 1 本の曲線になったスピンでも取り違えない。
+    var fallback: TimeInterval { duration + (Config.spinFallback - Config.spinDuration) }
+
     /// 各区間が始まる時刻（開始からの秒）。`segments` と同じ並び。
     var startTimes: [TimeInterval] {
         var times: [TimeInterval] = []
