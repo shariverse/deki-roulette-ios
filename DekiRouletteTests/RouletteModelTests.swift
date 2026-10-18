@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 @testable import DekiRoulette
 
@@ -562,6 +563,28 @@ struct RouletteModelTests {
         clock += coast.duration / 2
         _ = try #require(model.stopCoast())
         #expect(model.currentMotion == nil)
+    }
+
+    @Test func 惰性の間は演出が惰性の動きから強さを引き_触れたら指の動きに替わる() throws {
+        let model = makeModel()
+        var clock = 10.0
+        model.now = { clock }
+        let next = try #require(model.beginCoast(angularVelocity: 230, reducedMotion: false))
+        model.rotation = next
+        let coast = try #require(FlickCoast.coast(angularVelocity: 230))
+        let effect = try #require(WheelEffectMotion.current(spin: model.currentMotion, drag: nil, now: clock))
+        // 抽選しないが、盤面が自分で回っている間は速さに連動する演出が出る（強さは離した角速度から減速につれて下がる）
+        #expect(abs(effect.intensity(now: clock) - 230 / Config.effectFullIntensityVelocity) < 1e-6)
+        #expect(effect.intensity(now: clock + coast.duration / 2) < effect.intensity(now: clock))
+        #expect(effect.isMoving(now: clock + coast.duration / 2))
+        #expect(!effect.isMoving(now: clock + coast.duration))
+        #expect(model.outcome == nil)
+        #expect(!model.spinning)
+        // 途中で触れたら惰性を止め、演出は指で動かしている動きから引く
+        clock += coast.duration / 2
+        _ = try #require(model.stopCoast())
+        let drag = WheelDragMotion(center: CGPoint(x: 160, y: 160), time: clock, location: CGPoint(x: 160, y: 40), angle: 0)
+        #expect(WheelEffectMotion.current(spin: model.currentMotion, drag: drag, now: clock) == .drag(drag))
     }
 
     @Test func 惰性の途中でスピンを始めたら今の動きをスピンのものにする() throws {
