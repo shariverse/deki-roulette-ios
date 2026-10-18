@@ -140,11 +140,45 @@ struct SpinTeaseTests {
             #expect(path.segments.count == 2)
             let stop = spin.sign * spin.to
             let boundary = (stop / spin.slice).rounded(.down) * spin.slice
-            let approach = boundary - spin.sign * path.segments[0].to
-            #expect(approach > 0)
-            #expect(approach <= Config.spinTeaseApproachMax + 1e-9)
-            #expect(approach <= spin.slice * Config.spinTeaseApproachFraction + 1e-9)
+            let approach = min(spin.slice * Config.spinTeaseApproachFraction, Config.spinTeaseApproachMax)
+            let hesitation = spin.sign * path.segments[0].to
+            // 境目の手前 a か、止まる角度の `spinTeaseCreepMax` 手前の、止まる角度に近い方で止まりかける
+            #expect(abs(hesitation - max(boundary - approach, stop - Config.spinTeaseCreepMax)) < 1e-9)
+            #expect(hesitation < stop)
+            #expect(stop - hesitation <= Config.spinTeaseCreepMax + 1e-9)
         }
+    }
+
+    @Test func 止まる角度が境目の近くならためらいは境目の手前で止まりかける() {
+        // 8 件（45°）で境目の 2° 先に止まる。手前の距離は 5°
+        let path = SpinPath.teased(.hesitate, from: 0, to: 1440 + 92, count: 8)
+        #expect(abs(path.segments[0].to - (1440 + 90 - 5)) < 1e-9)
+    }
+
+    @Test(arguments: [SpinTease.hesitate, .rollBack], [2, 3])
+    func 広いスライスの奥で止まっても焦らしの区間で加速し直さない(tease: SpinTease, count: Int) {
+        // スライスの 99% の位置で止まる。焦らしの区間の角速度は、止まりかけた角度から c（＋戻り）だけ進む速さに収まる
+        let slice = 360 / Double(count)
+        let to = 1440 + slice * 0.99
+        let path = SpinPath.teased(tease, from: 0, to: to, count: count)
+        let peak = stride(from: Config.spinDuration, through: path.duration, by: 0.001)
+            .map { abs(path.angularVelocity(at: $0)) }.max() ?? 0
+        // ease-in-out の最大の傾きは 1.5 倍ほど。戻りかけは 0.8 秒で c + r を進む
+        let distance = Config.spinTeaseCreepMax + Config.spinTeaseRollBackMax
+        let shortest = Config.spinTeaseDuration * (1 - Config.spinTeaseRollBackShare)
+        #expect(peak < 2 * distance / shortest)
+        #expect(abs(path.to - to) < 1e-9)
+    }
+
+    @Test func 保険は長さの0_6秒後() {
+        let teased = SpinPath.teased(.hesitate, from: 0, to: 1532, count: 8)
+        #expect(abs(teased.fallback - Config.spinTeaseFallback) < 1e-9)
+        // 焦らしを入れられずに 1 本の曲線になったスピンも、同じ長さなので同じ保険
+        let short = SpinPath.teased(.hesitate, from: 0, to: 10, count: 8)
+        #expect(short.tease == nil)
+        #expect(abs(short.fallback - Config.spinTeaseFallback) < 1e-9)
+        let plain = SpinPath.spin(from: 0, to: 1532, count: 8, style: .none)
+        #expect(abs(plain.fallback - Config.spinFallback) < 1e-9)
     }
 
     @Test func 戻りかけは境目の手前で戻ってから越える() {
@@ -155,8 +189,9 @@ struct SpinTeaseTests {
             let boundary = (stop / spin.slice).rounded(.down) * spin.slice
             let turn = spin.sign * path.segments[0].to
             let bottom = spin.sign * path.segments[1].to
-            // 手前で止まり、1 つ前の境目は越えずに戻り、最後に境目を越えて止まる
-            #expect(turn < boundary)
+            // 止まる角度の手前で止まりかけ、1 つ前の境目は越えずに戻り、最後に止まる角度まで進んで止まる
+            #expect(turn < stop)
+            #expect(stop - turn <= Config.spinTeaseCreepMax + 1e-9)
             #expect(bottom < turn)
             #expect(bottom > boundary - spin.slice)
             #expect(turn - bottom <= Config.spinTeaseRollBackMax + 1e-9)
@@ -366,11 +401,11 @@ struct SpinTeaseTests {
     }
 
     @Test func 回る距離が短すぎれば焦らしを入れず同じ長さ() {
-        // スライス 1 つ分も回らない（境目の手前の距離が取れない）
-        let path = SpinPath.teased(.hesitate, from: 0, to: 20, count: 2)
+        // スライス 1 つ分も回らず、止まりかける角度（境目の手前・止まる角度の 12° 手前）が回り始めより手前になる
+        let path = SpinPath.teased(.hesitate, from: 0, to: 3, count: 2)
         #expect(path.tease == nil)
         #expect(path.segments.count == 1)
         #expect(abs(path.duration - Self.teaseDuration) < 1e-9)
-        #expect(abs(path.to - 20) < 1e-12)
+        #expect(abs(path.to - 3) < 1e-12)
     }
 }

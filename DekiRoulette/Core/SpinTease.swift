@@ -45,8 +45,11 @@ extension SpinPath {
     ///
     /// 回る向きを正にした角度 u（反時計回りは符号を反転）で、止まる角 u1 の直前の境目（スライス幅の倍数で u1 以下の最大）を B、
     /// 手前の距離を a（`spinTeaseApproach…`）とすると:
-    /// - ためらい: 主の区間で B − a まで → 焦らしの曲線で u1 まで（`spinTeaseDuration`）
-    /// - 戻りかけ: 主の区間で B − a まで → B − a − r まで戻る（`spinTeaseDuration` の `spinTeaseRollBackShare`）→ u1 まで（残り）
+    /// - ためらい: 主の区間で h まで → 焦らしの曲線で u1 まで（`spinTeaseDuration`）
+    /// - 戻りかけ: 主の区間で h まで → h − r まで戻る（`spinTeaseDuration` の `spinTeaseRollBackShare`）→ u1 まで（残り）
+    ///
+    /// h（止まりかける角度）は B − a と u1 − c（`spinTeaseCreepMax`）の大きい方。止まる角度が境目の近くなら境目の手前で
+    /// 止まりかけ、遠ければ止まる角度の c 手前で止まりかける（焦らしの区間で進む距離を c までに抑える）。
     /// - 行き過ぎ: 主の区間で u1 + o まで → u1 まで戻る（`spinTeaseDuration`）
     ///
     /// 主の区間は `Config.spinDuration` 秒で、曲線は `Config.spinEasing`（フリックでは主の区間の距離で求めた `FlickSpin.easing`。
@@ -66,15 +69,19 @@ extension SpinPath {
         let slice = 360.0 / Double(count)
         let boundary = (stop / slice).rounded(.down) * slice
         let approach = min(slice * Config.spinTeaseApproachFraction, Config.spinTeaseApproachMax)
+        // ためらい・戻りかけで止まりかける角度。止まる角度が境目から遠い（広いスライスの奥で止まる）ときに境目の手前で止めると、
+        // 焦らしの区間で半周近くを加速し直して回ってしまうので、焦らしの区間で進む距離を `spinTeaseCreepMax` までに抑える
+        // （そのときは境目を主の区間で越え、止まる角度の手前でためらう）
+        let hesitation = max(boundary - approach, stop - Config.spinTeaseCreepMax)
 
         let mainEnd: Double
         var tail: [(angle: Double, duration: TimeInterval)]
         switch tease {
         case .hesitate:
-            mainEnd = boundary - approach
+            mainEnd = hesitation
             tail = [(stop, Config.spinTeaseDuration)]
         case .rollBack:
-            mainEnd = boundary - approach
+            mainEnd = hesitation
             let back = min(slice * Config.spinTeaseRollBackFraction, Config.spinTeaseRollBackMax)
             let backDuration = Config.spinTeaseDuration * Config.spinTeaseRollBackShare
             tail = [(mainEnd - back, backDuration), (stop, Config.spinTeaseDuration - backDuration)]

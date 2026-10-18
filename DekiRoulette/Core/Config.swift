@@ -103,6 +103,10 @@ enum Config {
     static let spinTeaseApproachFraction: Double = 0.25
     static let spinTeaseApproachMax: Double = 5
 
+    /// ためらい・戻りかけの焦らしの区間で、止まりかけた角度から止まる角度まで進む距離の上限（度）。広いスライスの奥で止まるときも、
+    /// 止まりかけてから加速し直して大きく回らないようにする（`docs/SPEC.md` §5.5）。
+    static let spinTeaseCreepMax: Double = 12
+
     /// 戻りかけで戻る角度。スライス幅に対する割合と上限（度）の小さい方。手前の距離と足してもスライス幅の半分に収まり、
     /// 戻りで 1 つ前の境目を越えない。
     static let spinTeaseRollBackFraction: Double = 0.2
