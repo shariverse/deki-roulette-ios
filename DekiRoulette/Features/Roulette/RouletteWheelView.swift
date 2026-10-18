@@ -20,6 +20,12 @@ struct RouletteWheelView: View {
     var rotationDuration = Config.spinDuration
     /// 止まったスライスの光彩の色（設定の「ルーレットの詳細設定」）。
     var glowStyle = GlowStyle.default
+    /// 外周の電飾を出すか（「スピンの演出」が電飾・全部入り）。false なら今の盤面のまま何も足さない。
+    var showsLights = false
+    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れを毎フレームここから引く。
+    var motion: TimedSpinMotion? = nil
+    /// `motion` の開始時刻と同じ時計（`RouletteModel.now`）。
+    var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     var onBoundaryCross: ((_ time: TimeInterval) -> Void)? = nil
     var onGrab: (() -> Double?)? = nil
     var onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)? = nil
@@ -54,6 +60,21 @@ struct RouletteWheelView: View {
                 // 動きを減らす設定では親が値を直接書くので付けない
                 .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)
                 .shadow(color: Theme.wheelShadow, radius: 15, y: 10)
+
+                // 電飾は回らない層に置き、縁の上に並べる（盤面の枠と寸法は変えない）。針はその手前
+                if showsLights {
+                    GeometryReader { proxy in
+                        WheelLightsView(
+                            side: min(proxy.size.width, proxy.size.height),
+                            rotation: rotation,
+                            dragRotation: dragRotation,
+                            motion: motion,
+                            showingResult: highlight != nil,
+                            now: now
+                        )
+                        .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                    }
+                }
 
                 WheelPointerView()
                     .offset(y: -6 + (pulsing ? Theme.pointerBounceOffset : 0))
@@ -288,6 +309,14 @@ private struct Triangle: Shape {
     RouletteWheelView(items: ItemLabel.makeItems((1...12).map { "項目\($0)" }), rotation: 30)
         .padding(40)
         .background(Theme.ink900)
+}
+
+#Preview("Lights") {
+    RouletteWheelView(
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, showsLights: true
+    )
+    .padding(40)
+    .background(Theme.ink900)
 }
 
 #Preview("Stopped") {

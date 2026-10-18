@@ -173,6 +173,10 @@ struct RouletteScreen: View {
                 spinEasing: model.spinEasing,
                 rotationDuration: model.rotationDuration,
                 glowStyle: glowStyle,
+                // 電飾は指定・印を見ない。流れは盤面が自分で回る動きと時計から毎フレーム引く
+                showsLights: spinEffectStyle.showsLights,
+                motion: model.currentMotion,
+                now: model.now,
                 onBoundaryCross: dragCrossedBoundary,
                 onGrab: grab,
                 onRelease: release
