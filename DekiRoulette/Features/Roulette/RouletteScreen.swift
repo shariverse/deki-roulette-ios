@@ -173,9 +173,10 @@ struct RouletteScreen: View {
                 spinEasing: model.spinEasing,
                 rotationDuration: model.rotationDuration,
                 glowStyle: glowStyle,
-                // 電飾・光の尾・残像は指定・印を見ない。流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
+                // 電飾・光の尾・残像・火花・紙吹雪は指定・印を見ない。流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
                 showsLights: spinEffectStyle.showsLights,
                 showsTrails: spinEffectStyle.showsTrails,
+                showsParticles: spinEffectStyle.showsParticles,
                 motion: model.currentMotion,
                 now: model.now,
                 onBoundaryCross: dragCrossedBoundary,

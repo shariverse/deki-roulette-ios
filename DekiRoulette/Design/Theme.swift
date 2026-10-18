@@ -243,6 +243,28 @@ enum Theme {
         static let segments = 24
     }
 
+    // MARK: 火花・紙吹雪
+
+    // 「スピンの演出」の針の先の火花と停止の瞬間の紙吹雪（`WheelParticles`）。盤面と同じく外観に依らず固定し、
+    // `gold`（順番決めの 1 位・フォーカスリング）と `flare`（開始ボタン・針）は使わない。
+
+    /// 火花の芯（白熱した白）。縁（`wheelRim`）に対して 3:1 以上（`ThemeContrastTests`）。
+    static let wheelSpark = Color(hex: 0xFFF6E0)
+    /// 火花のにじみと尾（橙）。芯のまわりに薄く重ねる。針の `flare`（赤）・`gold`（黄）と色相を分ける。
+    static let wheelSparkGlow = Color(hex: 0xFF9A3C)
+
+    /// 紙吹雪の色。スライスの 10 色（`sliceColors`）を固定で使う。紙吹雪は特定のスライスを指さないので、
+    /// 項目の見た目（`sliceColor(in:at:)`）や止まったスライスでは変えない（指定・結果に依らず同じ見た目）。
+    static let confettiColors: [Color] = sliceColors
+
+    /// 火花の寸法（基準直径 `WheelLabel.referenceDiameter` での pt）。
+    enum SparkGlow {
+        /// にじみの半径の、芯の半径に対する倍率。
+        static let haloScale: CGFloat = 3
+        /// にじみの不透明度（火花の濃さに掛ける）。
+        static let haloOpacity = 0.45
+    }
+
     // MARK: 結果の帯
 
     // 結果が出ている間、盤面の中心より下に重ねて結果のラベルを全文で出す帯（寸法と位置は `ResultBand`）。

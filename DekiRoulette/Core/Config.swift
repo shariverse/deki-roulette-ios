@@ -138,6 +138,19 @@ enum Config {
     /// 光の尾の長さの最大（度、強さ 1 のとき）。
     static let wheelTrailMaxLength: Double = 120
 
+    /// 針の先の火花（`WheelParticles`）と停止の瞬間の紙吹雪の、同時に出す粒子の数の上限。
+    static let wheelSparkMaxCount = 60
+    static let wheelConfettiMaxCount = 80
+
+    /// 低電力モードで粒子の数の上限を割る数（上限の 1/3。火花 20・紙吹雪 26）。
+    static let wheelParticleLowPowerDivisor = 3
+
+    /// 火花 1 粒の寿命の最大（秒）。この間に生まれた分だけが同時に出ているので、生まれる間隔は これ ÷ 上限（`WheelParticles.sparkSlotInterval`）。
+    static let wheelSparkLifetime: TimeInterval = 0.5
+
+    /// 紙吹雪がはじけてから消え切るまでの長さ（秒）。粒ごとの寿命はこれ以下。
+    static let wheelConfettiDuration: TimeInterval = 1.6
+
     /// 削除した項目を「元に戻す」で戻せる時間。過ぎると削除が確定する。
     static let undoDuration: TimeInterval = 5
 
