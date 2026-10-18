@@ -118,6 +118,15 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 他のスライスを `Theme.sliceDim` で強く沈め、止まったスライスに白系の縁取り（`stopOutline`）と光彩（既定は `stopGlow`。色は `@AppStorage(Config.glowStyleKey)` の `GlowStyle` で、設定の「ルーレットの詳細設定」から選ぶ）を付ける（結果が出たあとに指で動かしたら強調だけ解く）。停止の瞬間に `stopPulseScale` で押し出して針を跳ねさせ、スライスはそのあと結果が出ている間 `stopHoldScale` で前に出したままにする（強調が解けたら戻す）。拡大と針の跳ねは `accessibilityReduceMotion` では省く。
 スピンの演出（`docs/SPEC.md` の §5.5）は `SpinEffectStyle`（`Core/`。なし / 電飾 / 光の尾 / 紙吹雪 / 全部入り、既定は「なし」）を `@AppStorage(Config.spinEffectStyleKey)` で持ち、同じ「ルーレットの詳細設定」で選ぶ。
 付ける演出は `showsLights` / `showsTrails` / `showsParticles` / `showsCommonEffects` で引き、指定は渡さない。
+止まり際の焦らし（SPEC §5.5「焦らし」）は `SpinPath.spin(from:to:count:style:releaseVelocity:using:)`（`Core/SpinTease.swift`）が作る。
+`showsCommonEffects` が偽なら今の `SpinMotion` と同じ区間 1 つ（乱数は引かない）で、真なら `SpinTease.random(using:)` で
+ためらい / 戻りかけ / 行き過ぎを等確率に選び、`teased(_:from:to:count:releaseVelocity:)` が主の区間（`Config.spinDuration`・`spinEasing`。
+フリックでは主の区間の距離で求めた `FlickSpin.easing`）と焦らしの区間（`Config.spinTeaseEasing`、合わせて `Config.spinTeaseDuration`）を
+つないだ `SpinPath`（`Core/SpinPath.swift`。`segments: [SpinMotion]`・`angle(at:)`・`angularVelocity(at:)`・`duration`）を返す。最終角 `to` は変えず、
+長さは入り方に依らず 5.7 秒、保険は `Config.spinTeaseFallback`。振れ幅は件数と最終角の幾何だけで決め（`Config.spinTease…`）、指定・止まるスライスの添字は受け取らない。
+境目を越える時刻は `boundaryCrossings(count:minInterval:)`（`SpinTicks` / `HapticSchedule` の `boundaryCrossings(along:count:minInterval:)` も同じ）が
+区間ごとに今の逆算で数えてつなぎ、戻る向きの境目も数え、間引きは全体で掛ける。惰性と `reducedMotion` には使わない（呼び出し側が判定）。
+モデル・2D・3D・音・触覚・保険への組み込みはタスク 10（今は関数だけで、`beginSpin` は従来の 1 本の曲線のまま）。
 
 閾値未満で離したときの惰性（抽選しない）は、`FlickCoast.coast` が角速度から角度（`Config.flickCoastFactor` × 角速度、`flickCoastMaxAngle` で上限、
 `flickCoastMinAngle` 未満なら付けない）・時間（初速が離した角速度になる `2 × 角度 ÷ 角速度`）・曲線（2 次の ease-out の `FlickCoast.easing`）を決める。
