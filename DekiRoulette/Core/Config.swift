@@ -120,6 +120,24 @@ enum Config {
     static let spinTeaseOvershootFraction: Double = 0.4
     static let spinTeaseOvershootMax: Double = 8
 
+    /// 光の尾・残像（`WheelTrails`）を出し始める演出の強さ（0...1）。これ未満では出さず、ここから 1 まで比例して濃くする。
+    static let wheelTrailThreshold = 0.35
+
+    /// 盤面の残像の枚数の上限と、低電力モードでの枚数。
+    static let wheelTrailMaxGhostCount = 3
+    static let wheelTrailLowPowerGhostCount = 1
+
+    /// いちばん後ろの残像が今から何秒前の盤面か。手前の残像はこれを枚数で等分した時刻（3 枚なら約 17・33・50 ミリ秒前）。
+    static let wheelTrailGhostWindow: TimeInterval = 0.05
+
+    /// いちばん後ろの残像をずらす角度の上限（度）と、スライス 1 枚の角度に対する上限の比。小さい方を使い、
+    /// 最高速（2000°/秒を超える）でも残像が隣のスライスを越えてずれないようにする。
+    static let wheelTrailMaxGhostOffset: Double = 18
+    static let wheelTrailMaxGhostSliceFraction = 0.6
+
+    /// 光の尾の長さの最大（度、強さ 1 のとき）。
+    static let wheelTrailMaxLength: Double = 120
+
     /// 削除した項目を「元に戻す」で戻せる時間。過ぎると削除が確定する。
     static let undoDuration: TimeInterval = 5
 
