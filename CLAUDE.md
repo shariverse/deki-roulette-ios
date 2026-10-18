@@ -75,25 +75,29 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 
 ### スピンの仕組み
 
-`RouletteModel.beginSpin` が `RouletteMath.nextRotation` で累積回転角を決めて返し、View が
-`withAnimation(Theme.spinAnimation(easing: model.spinEasing)) { model.rotation = next } completion: { model.finishSpin() }` で回す。
-曲線はボタンでは `Config.spinEasing`、フリックでは指を離した瞬間の角速度から `FlickSpin.easing` が始点の傾き（`y1`）だけを
-変えたもの（初速が離した速さにつながる）。長さ（`Config.spinDuration`）と終わりの形は同じなので、`spinFallback` も止まる位置も変わらない。
+`RouletteModel.beginSpin` が `RouletteMath.nextRotation` で累積回転角を決め、`SpinPath.spin` でその動き（`rotationPath`）を作って行き先を返し、View が
+`withAnimation(Theme.spinAnimation(path: model.rotationPath)) { model.rotation = next } completion: { model.finishSpin() }` で回す。
+動きは「スピンの演出」（`style`）が「なし」なら区間 1 つ（`Config.spinDuration`）で、曲線はボタンでは `Config.spinEasing`、フリックでは指を離した瞬間の角速度から
+`FlickSpin.easing` が始点の傾き（`y1`）だけを変えたもの（初速が離した速さにつながる）。長さと終わりの形は同じなので、`spinFallback` も止まる位置も変わらない。
+「なし」以外では止まり際の焦らし（下記）を足した区間の列になる。`Theme.spinAnimation(path:)` は区間 1 つなら今までどおり `timingCurve`、
+区間の列なら `SpinPathAnimation`（`Design/`。`CustomAnimation` で、経過時間ごとに `SpinPath.progress(at:)` の割合で値の差を縮める）を返す。
 結果は開始時に確定している（`SpinOutcome` でラベルと盤面上の添字を持ち、結果表示の色を止まったスライスに合わせる）。
-完了コールバックが来ない場合の保険として `Config.spinFallback` のタイマーを持つ。
-`accessibilityReduceMotion` のときは回さず、`reducedMotionSpinDuration` 後に完了扱いにする。
+完了コールバックが来ない場合の保険として `rotationPath.fallback`（長さ + 0.6 秒。「なし」は `Config.spinFallback`、焦らしありは `Config.spinTeaseFallback`）のタイマーを持つ。
+乱数は `RouletteModel.randomSource`（`AnyRandomNumberGenerator`。テストで `SeededGenerator` に差し替える）から、止まる項目 → 止まる位置と周回数 → 焦らしの入り方の順に引く。
+指定があっても止まる項目の乱数は引いて捨てるので、焦らしの入り方は指定の有無で変わらない（`RouletteModelTests` で確かめる）。
+`accessibilityReduceMotion` のときは回さず、焦らしも入れず（乱数も引かない）、`reducedMotionSpinDuration` 後に完了扱いにする。
 
-補間中の角度は observable でないので、速さに連動する演出（SPEC §5.5）は `TimelineView` で毎フレーム `SpinMotion`（`Core/`。開始角・終了角・長さ・曲線）から
-経過時間で角度（`angle(at:)`。範囲外は端で止める）と符号つきの角速度（`angularVelocity(at:)`。曲線の傾き `CubicBezierCurve.slope(atTime:)` × 平均の速さ、範囲外は 0）を引く。
-`beginSpin` / `beginCoast` が `currentMotion`（`TimedSpinMotion` = 動き + `now()` の開始時刻）を記録し、完了・惰性を止めた・指で回した・`reducedMotion` のスピンでは nil。
+補間中の角度は observable でないので、速さに連動する演出（SPEC §5.5）は `TimelineView` で毎フレーム `SpinPath`（`Core/`。`SpinMotion` = 開始角・終了角・長さ・曲線の区間の列）から
+経過時間で角度（`angle(at:)`。範囲外は端で止める）と符号つきの角速度（`angularVelocity(at:)`。曲線の傾き `CubicBezierCurve.slope(atTime:)` × 平均の速さ、範囲外は 0。焦らしで戻る区間は負）を引く。
+`beginSpin` / `beginCoast` が `currentMotion`（`TimedSpinMotion` = `rotationPath` + `now()` の開始時刻）を記録し、完了・惰性を止めた・指で回した・`reducedMotion` のスピンでは nil。
 ドラッグ中は `FlickSpin.angularVelocity(samples:center:at:)`（窓の終わりを今の時刻に取る）で求める。強さは `SpinEffectIntensity.intensity(angularVelocity:)`
 （`|ω| / Config.effectFullIntensityVelocity` を 0〜1 に収める）で、揺れは `smoothed`（時定数 `Config.effectSmoothingTime` の指数平滑）でならす。演出の関数は指定・印を受け取らない。
 
-盤面の `rotationEffect` には `.animation(Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)` を付けてある（`reduceMotion` では `nil`。
-`spinEasing` / `rotationDuration` は `withAnimation` と同じ `model.spinEasing` / `model.rotationDuration` を渡す。長さはスピンでは `Config.spinDuration`、惰性では `FlickCoast` が決める）。
+盤面の `rotationEffect` には `.animation(Theme.spinAnimation(path: rotationPath), value: rotation)` を付けてある（`reduceMotion` では `nil`。
+`rotationPath` は `withAnimation` と同じ `model.rotationPath` を渡す。長さはスピンでは `Config.spinDuration`（焦らしありは 5.7 秒）、惰性では `FlickCoast` が決める）。
 キーボードが出た状態でスピンを始めると、演出開始で入力欄が無効になってキーボードが閉じ、その安全領域の変化が
 `withAnimation` の更新に重なって補間が落ちる（盤面が最終角度へ飛び、音だけが鳴る）ため、回転の値の変化だけは
-外側のトランザクションに依らずスピンの曲線で補間させる。回り始めとキーボードの閉じ始めは同時で、音・触覚の時刻は変えない。
+外側のトランザクションに依らずスピンの動き（焦らしの区間の列も同じ `SpinPathAnimation`）で補間させる。回り始めとキーボードの閉じ始めは同時で、音・触覚の時刻は変えない。
 
 盤面は 12 時を 0 度、時計回り。`SliceShape` は `clockwise: false` で画面上は時計回りになる（y 軸が下向きのため）。
 
@@ -110,9 +114,9 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 `Config.flickSampleWindow` に中心のまわりを回った角度から `FlickSpin.angularVelocity` で角速度を出す（離した瞬間の
 `velocity` は揺れが大きく、同じフリックでも回らないことがあるので使わない）。それを
 `FlickSpin.spin` で周回数と向き（`SpinDirection`、角速度の符号）に写し、角速度そのものと一緒に
-`beginSpin(reducedMotion:fullSpins:direction:releaseVelocity:)` に渡す（閾値未満なら `FlickSpin.spin` が nil で `beginSpin` を呼ばず、`model.beginCoast` で少しだけ惰性で回す（下記）。指を離さずにジェスチャが取り消されたときは
+`beginSpin(reducedMotion:style:fullSpins:direction:releaseVelocity:)` に渡す（閾値未満なら `FlickSpin.spin` が nil で `beginSpin` を呼ばず、`model.beginCoast` で少しだけ惰性で回す（下記）。指を離さずにジェスチャが取り消されたときは
 `onRelease` の角速度が nil で、追従した角度を残すだけで回さない）。
-強さは周回数と回り始めの速さ（`spinEasing`）にだけ効き、止まる位置の式は変えない。反時計回りでは `RouletteMath.nextRotation` が
+強さは周回数と回り始めの速さ（`SpinPath.spin` に渡す `releaseVelocity`。モデルで別に `FlickSpin.easing` は求めない）にだけ効き、止まる位置の式は変えない。反時計回りでは `RouletteMath.nextRotation` が
 累積角を減らす向きに決め、`SpinTicks` / `HapticSchedule` は `to < from` を符号を反転して同じ式で数える。モデルは直前のフリックの
 向きを `lastDirection` に覚え、「スピン」ボタンはその向きで回す（初期値は時計回り、保存しない）。停止後は `outcome.index` を `highlightedIndex` として渡し、
 他のスライスを `Theme.sliceDim` で強く沈め、止まったスライスに白系の縁取り（`stopOutline`）と光彩（既定は `stopGlow`。色は `@AppStorage(Config.glowStyleKey)` の `GlowStyle` で、設定の「ルーレットの詳細設定」から選ぶ）を付ける（結果が出たあとに指で動かしたら強調だけ解く）。停止の瞬間に `stopPulseScale` で押し出して針を跳ねさせ、スライスはそのあと結果が出ている間 `stopHoldScale` で前に出したままにする（強調が解けたら戻す）。拡大と針の跳ねは `accessibilityReduceMotion` では省く。
@@ -120,46 +124,48 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 付ける演出は `showsLights` / `showsTrails` / `showsParticles` / `showsCommonEffects` で引き、指定は渡さない。
 止まり際の焦らし（SPEC §5.5「焦らし」）は `SpinPath.spin(from:to:count:style:releaseVelocity:using:)`（`Core/SpinTease.swift`）が作る。
 `showsCommonEffects` が偽なら今の `SpinMotion` と同じ区間 1 つ（乱数は引かない）で、真なら `SpinTease.random(using:)` で
-ためらい / 戻りかけ / 行き過ぎを等確率に選び、`teased(_:from:to:count:releaseVelocity:)` が主の区間（`Config.spinDuration`・`spinEasing`。
+ためらい / 戻りかけ / 行き過ぎを等確率に選び、`teased(_:from:to:count:releaseVelocity:)` が主の区間（`Config.spinDuration`・`Config.spinEasing`。
 フリックでは主の区間の距離で求めた `FlickSpin.easing`）と焦らしの区間（`Config.spinTeaseEasing`、合わせて `Config.spinTeaseDuration`）を
 つないだ `SpinPath`（`Core/SpinPath.swift`。`segments: [SpinMotion]`・`angle(at:)`・`angularVelocity(at:)`・`duration`）を返す。最終角 `to` は変えず、
 長さは入り方に依らず 5.7 秒、保険は `SpinPath.fallback`（長さ + 0.6 秒。焦らしありは `Config.spinTeaseFallback`）。ためらい・戻りかけで止まりかける角度は、境目の手前 a と止まる角度の `Config.spinTeaseCreepMax` 手前の大きい方（広いスライスの奥で止まっても大きく回り直さない）。振れ幅は件数と最終角の幾何だけで決め（`Config.spinTease…`）、指定・止まるスライスの添字は受け取らない。
 境目を越える時刻は `boundaryCrossings(count:minInterval:)`（`SpinTicks` / `HapticSchedule` の `boundaryCrossings(along:count:minInterval:)` も同じ）が
-区間ごとに今の逆算で数えてつなぎ、戻る向きの境目も数え、間引きは全体で掛ける。惰性と `reducedMotion` には使わない（呼び出し側が判定）。
-モデル・2D・3D・音・触覚・保険への組み込みはタスク 10（今は関数だけで、`beginSpin` は従来の 1 本の曲線のまま）。
+区間ごとに今の逆算で数えてつなぎ、戻る向きの境目も数え、間引きは全体で掛ける。焦らしは惰性と `reducedMotion` には入れない（`beginSpin` が `reducedMotion` では「なし」として呼ぶ。惰性は `SpinPath.spin` を通らない）。
+`RouletteModel.beginSpin(reducedMotion:style:…)` は `RouletteScreen` の `@AppStorage(Config.spinEffectStyleKey)` を受け取り、作った動きを `rotationPath`・`currentMotion`・回転音（`clickTimes`）・
+触覚の刻み・保険（`fallback`）のすべてに使う。2D の `rotationEffect` と 3D の `Wheel3DSurface` は同じ `Theme.spinAnimation(path:)` で補間するので同じ時刻に同じ角度になり、
+電飾は `currentMotion` から焦らしの角度・角速度を引く。
 
 閾値未満で離したときの惰性（抽選しない）は、`FlickCoast.coast` が角速度から角度（`Config.flickCoastFactor` × 角速度、`flickCoastMaxAngle` で上限、
 `flickCoastMinAngle` 未満なら付けない）・時間（初速が離した角速度になる `2 × 角度 ÷ 角速度`）・曲線（2 次の ease-out の `FlickCoast.easing`）を決める。
-`RouletteModel.beginCoast` が `spinEasing` と `rotationDuration` をその曲線と長さにして行き先の角度を返し、View が
-`withAnimation(Theme.spinAnimation(easing:duration:))` で `rotation` を書く（2D・3D の盤面の `.animation(…, value: rotation)` も同じ曲線と長さなので、同じ時刻に同じ角度で止まる）。
+`RouletteModel.beginCoast` が `rotationPath` をその曲線と長さの区間 1 つにして行き先の角度を返し、View が
+`withAnimation(Theme.spinAnimation(path:))` で `rotation` を書く（2D・3D の盤面の `.animation(…, value: rotation)` も同じ動きなので、同じ時刻に同じ角度で止まる）。焦らしは入れない。
 `outcome` / `spinCount` / `pendingOutcome` / `lastDirection` は変えず、`spinning` も立てない（結果の表示は残り、強調は解けたまま。押し出しや針の跳ねも出ない）。
 惰性の途中で盤面に触れたら、`WheelDragArea` の `onGrab` で `model.stopCoast()` が曲線から今の角度を逆算し、`disablesAnimations` の
 トランザクションで補間なしに書いて止める（止めた角度を `onGrab` が返し、`WheelDragArea` は描き直し前の最初の追従の境目をその角度から数える）。
-惰性の途中で `beginSpin` を呼ぶと惰性を打ち切り（止まる位置は行き先の `rotation` から）、曲線と長さをスピンのものに戻す。`reducedMotion` では付けない。
+惰性の途中で `beginSpin` を呼ぶと惰性を打ち切り（止まる位置は行き先の `rotation` から）、`rotationPath` をスピンのものに差し替える。`reducedMotion` では付けない。
 惰性で回る間もスピンと同じ方式で回転音と触覚を鳴らす（下記「触覚の仕組み」「回転音の仕組み」）。
 
 ### 触覚の仕組み
 
 `sensoryFeedback(_:trigger:)` でモデルの値の変化に反応させる（`spinning` / `outcome` / `revealing` と、
 刻み用のカウンタ `boundaryTick` / `revealTick`）。補間中の角度は observable でないので、`beginSpin` が
-`HapticSchedule.boundaryCrossings`（そのスピンの曲線 `spinEasing` を `CubicBezierCurve` で逆算）で境目を越える時刻を
+`HapticSchedule.boundaryCrossings(along: rotationPath, …)`（そのスピンの動きの区間ごとに曲線を `CubicBezierCurve` で逆算。焦らしで戻る向きに越えた境目も数える）で境目を越える時刻を
 先に求め、`TickScheduler` の `Task` でカウンタを刻む。完了・中断でキャンセルし、`reducedMotion` では刻まない。
 指で盤面を動かしている間の境目は別のカウンタ `dragBoundaryTick` で、スピン中の `.selection` より強い
 `.impact(weight: Config.hapticDragBoundaryWeight)` を返す（利用者の操作なので `reducedMotion` でも鳴らす）。
 閾値未満で離したあとの惰性の間は、盤面が自分で回っているのでスピン中と同じ `boundaryTick`（`.selection`）を刻む。`beginCoast` が
-惰性の曲線（`FlickCoast.easing`・その長さ）で `HapticSchedule.boundaryCrossings` を求めて `TickScheduler` に渡し、
+惰性の動き（`FlickCoast.easing`・その長さの区間 1 つ）で `HapticSchedule.boundaryCrossings(along:…)` を求めて `TickScheduler` に渡し、
 `stopCoast`（惰性の途中で盤面に触れた・画面を離れた）と `beginSpin`（刻みをスピンのものに差し替える）でキャンセルする。
 ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚フィードバック」だけで、長押しには触れない。
 
 ### 回転音の仕組み
 
 スピン中は針がスライスの境目を越えるたびにクリック音を鳴らす。補間中の角度は observable でないので、
-`beginSpin` が `SpinTicks.boundaryCrossings`（そのスピンの曲線 `spinEasing` を `CubicBezierCurve` で逆算）で鳴らす時刻を
+`beginSpin` が `SpinTicks.boundaryCrossings(along: rotationPath, …)`（そのスピンの動きの区間ごとに曲線を `CubicBezierCurve` で逆算。焦らしで戻る向きに越えた境目も数える）で鳴らす時刻を
 先に求め、`SpinSoundPlayer` が `ClickTrack` で 1 本の波形に焼いてから一度に流す（1 発ずつタイマーで鳴らすと
 リズムが揺れるため）。`Config.clickMinInterval` より詰まった時刻は間引く。音源は `Resources/Sounds/click.wav`
 （`scripts/make-click-sound.swift` で再生成）。`AVAudioSession` は `.ambient` で、消音スイッチに従い他アプリの
 音も止めない。`reducedMotion` では鳴らさない。指で盤面を動かしている間は、境目を越えたその場で `playClick()` で 1 回ずつ
-鳴らす（`reducedMotion` でも鳴らす）。閾値未満で離したあとの惰性の間も、`beginCoast` が惰性の曲線で `SpinTicks.boundaryCrossings` を
+鳴らす（`reducedMotion` でも鳴らす）。閾値未満で離したあとの惰性の間も、`beginCoast` が惰性の動きで `SpinTicks.boundaryCrossings(along:…)` を
 求めた `clickTimes` を `play(at:)` で一度に流す（1 発ずつタイマーでは鳴らさない）。惰性の途中で盤面に触れたら `RouletteScreen.grab` が
 `sound.stop()` で残りを止め、スピンを始めたら次の `play(at:)` が差し替える。惰性は `reducedMotion` では付かないので鳴らない。
 ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
@@ -211,9 +217,9 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 支柱だけ陰影を付ける。ラベルは `WheelLabel` の省略・文字サイズで 1 枚の画像に焼いて表面に貼る。
 場面は盤面の枠より `Theme.Wheel3D.overscan` だけ広く描き（触れた操作は受けない）、傾いた盤や針が切れないようにする。
 
-回転は 2D と同じ `rotation` / `dragRotation` / `spinEasing` から決める。補間は SwiftUI に任せ（`Wheel3DSurface` の
-`animatableData` と `.animation(Theme.spinAnimation(easing:duration:), value: rotation)`。惰性も同じ曲線と長さ）、毎フレームの角度を盤のノードに写すだけなので、
-2D と同じ時刻に同じ角度で止まる。スピンの完了は今どおり `withAnimation … completion:` と `Config.spinFallback` で判定し、
+回転は 2D と同じ `rotation` / `dragRotation` / `rotationPath` から決める。補間は SwiftUI に任せ（`Wheel3DSurface` の
+`animatableData` と `.animation(Theme.spinAnimation(path:), value: rotation)`。焦らしの区間の列も惰性も 2D と同じアニメーション）、毎フレームの角度を盤のノードに写すだけなので、
+2D と同じ時刻に同じ角度で止まる。スピンの完了は今どおり `withAnimation … completion:` と保険（`rotationPath.fallback`）で判定し、
 3D 側の描画の完了には依らない。ドラッグ追従とフリックは 2D と同じ `WheelDragArea` が盤面の枠（overscan を含まない正方形）で受け、
 角速度は画面平面上の指の動きのまま。
 

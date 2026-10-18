@@ -4,8 +4,9 @@ import Foundation
 /// 1 本の曲線では表せず、区間ごとに単調な曲線をつなぐ。区間は時刻順で、前の区間の `to` が次の区間の `from` になる。
 /// 焦らしの無いスピンは区間 1 つ（今の `SpinMotion` と同じ角度）。
 ///
-/// 2D・3D の盤面・回転音・触覚が同じ時刻に同じ角度になるよう、描画（`TimelineView` で `angle(at:)` を引く・区間ごとの補間）と
-/// 境目を越える時刻（`boundaryCrossings(count:minInterval:)`）はどちらもこの区間の列から求める。項目・指定・印は持たない。
+/// 2D・3D の盤面・回転音・触覚が同じ時刻に同じ角度になるよう、盤面の補間（`SpinPathAnimation` が `progress(at:)` を引く）・
+/// 演出の角度（`TimedSpinMotion` を `TimelineView` で引く）・境目を越える時刻（`boundaryCrossings(count:minInterval:)`）はどれもこの区間の列から求める。
+/// 項目・指定・印は持たない。
 struct SpinPath: Hashable, Sendable {
     /// 時刻順の区間。空にはしない。
     let segments: [SpinMotion]
