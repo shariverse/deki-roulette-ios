@@ -89,6 +89,14 @@ enum Config {
     /// 盤面が 1 周したとき並びが元に戻るよう、`wheelLightCount` × これは `WheelLights.litStride` の倍数にする（24 × 0.25 = 6）。
     static let wheelLightFlowFactor = 0.25
 
+    /// 電飾の光の並びが 1 フレームに進む上限（電球の個数）。速く回すと並びが 1 フレームに大きく飛び、流れではなく明滅に見えるので抑える
+    /// （並びは 3 個おきなので、1.5 個で向きが分からなくなる）。上限を超える速さでは並びが盤面より遅れて流れる（`WheelLights.Flow`）。
+    static let wheelLightMaxFlowPerFrame = 0.5
+
+    /// 演出の上限を時間あたりに直すときの 1 フレームの長さ（秒）。iPhone のアプリは 60Hz で描くので 1/60 秒
+    /// （120Hz・90Hz の画面では 1 フレームあたりはもっと小さくなる）。
+    static let effectReferenceFrameInterval: TimeInterval = 1.0 / 60
+
     /// 停止の瞬間の電飾の全灯の点滅の周期（秒）と回数。0.6 秒周期の 2 回（停止の瞬間と 0.6 秒後が明るい）で、
     /// 停止の瞬間のフラッシュと 1 回目を重ねるので、合わせても 1 秒に 3 回未満の明滅に収まる。
     static let wheelLightBlinkPeriod: TimeInterval = 0.6

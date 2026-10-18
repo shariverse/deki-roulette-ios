@@ -4,6 +4,7 @@ import SwiftUI
 /// 盤面の縁の上に `Config.wheelLightCount` 個の電球を回らない層で並べ、明るさは `WheelLights`（`Core/`）が決める。
 /// 補間中の角度は observable でないので、盤面が自分で回っている間（`motion`）は `TimelineView` で毎フレーム、
 /// `now()`（`RouletteModel.now` と同じ時計）から角度と強さを引く。動いていないときは `rotation + dragRotation`。
+/// 光の並びは盤面の角度の変化だけ流し、1 フレームに `Config.wheelLightMaxFlowPerFrame` 個を超える分は抑える（`WheelLights.Flow`）。
 /// 待機中・止まり切った惰性・指で動かしている間は `TimelineView` を止め（角度が変われば親の描き直しで足りる）、
 /// 結果表示中は点滅と脈動のために動かす（点滅の間は毎フレーム、脈動だけになったら `Config.effectPulseFrameInterval` ごと）。
 /// 動きを減らす設定では止めたまま一定の明るさで点ける。
@@ -26,6 +27,8 @@ struct WheelLightsView: View {
     /// 止まり切った動き。惰性は止まり切っても `motion` に残り、親が描き直さないので、止まり切ったらここに入れて
     /// 描き直させ、`TimelineView` を止める。
     @State private var settledMotion: TimedSpinMotion?
+    /// 光の並びを流す角度（`WheelLights.Flow`）。描くたびに進めるので、書き換えても描き直さないよう参照型に入れて持つ。
+    @State private var flow = LightFlowBox()
 
     var body: some View {
         let moving = motion.map { $0 != settledMotion && $0.isMoving(now: now()) } ?? false
@@ -38,9 +41,13 @@ struct WheelLightsView: View {
         TimelineView(.animation(minimumInterval: interval, paused: !animates)) { _ in
             // 時刻は `TimelineView` の日付ではなく、動きの開始時刻と同じ時計で取る
             let time = now()
+            // 並びは盤面の角度の変化だけ流す。速すぎる分は 1 フレームに `Config.wheelLightMaxFlowPerFrame` 個までに抑える
+            let flowAngle = reduceMotion ? 0 : flow.value.advance(
+                to: (motion?.angle(now: time) ?? rotation) + dragRotation, at: time
+            )
             let scene = WheelLights.scene(
                 reduceMotion: reduceMotion,
-                angle: (motion?.angle(now: time) ?? rotation) + dragRotation,
+                angle: flowAngle,
                 intensity: motion?.intensity(now: time) ?? 0,
                 stoppedElapsed: stoppedAt.map { time - $0 }
             )
@@ -102,4 +109,10 @@ struct WheelLightsView: View {
             context.fill(Path(ellipseIn: rect), with: .color(Theme.wheelLight.opacity(bulb.brightness)))
         }
     }
+}
+
+/// 電飾の光の並びを流す角度の入れ物。描くたびに進めても View を描き直さないよう参照型にする。
+@MainActor
+final class LightFlowBox {
+    var value = WheelLights.Flow()
 }
