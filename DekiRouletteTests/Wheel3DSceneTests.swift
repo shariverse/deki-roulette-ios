@@ -740,4 +740,25 @@ struct Wheel3DSceneTests {
         let margin = location(x: 15, y: bandCenterY + ResultBand.height(diameter: Double(size)) / 2 + 4, pixels: after)
         #expect(distance(after.color(at: margin), before.color(at: margin)) > 0.02, "\(after.color(at: margin)) \(before.color(at: margin))")
     }
+
+    /// 止まったスライス 1（90〜180 度）を強調した（`clearing` なら続けて消し始めた）盤に、光の尾と残像を重ねる。
+    private func highlightedScene(clearing: Bool, trails: WheelTrails.Frame) -> Wheel3DScene {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.highlight(Wheel3DHighlight(index: 1, glowStyle: .white), reduceMotion: false)
+        if clearing { scene.highlight(nil, reduceMotion: false) }
+        scene.trail(trails)
+        return scene
+    }
+
+    @Test(arguments: [false, true])
+    func 強調を出したままでも消している途中でも光の尾と残像は板に隠れない(clearing: Bool) throws {
+        // 光の尾（−11.25 度）と残像を見る位置（300 度）は、沈めたスライス 3 の上。残像ではスライス 0 になる
+        let frame = trailFrame(ghosts: [WheelTrails.Ghost(angle: -120, opacity: 0.3)])
+        let plain = try render(highlightedScene(clearing: clearing, trails: .none))
+        let pixels = try render(highlightedScene(clearing: clearing, trails: frame))
+        let tail = trailLocation(angle: -11.25, pixels: pixels)
+        #expect(brightness(pixels.color(at: tail)) > brightness(plain.color(at: tail)) + 0.2, "\(pixels.color(at: tail)) \(plain.color(at: tail))")
+        let ghost = location(angle: 300, fraction: 0.6, pixels: pixels)
+        #expect(distance(pixels.color(at: ghost), plain.color(at: ghost)) > 0.02, "\(pixels.color(at: ghost)) \(plain.color(at: ghost))")
+    }
 }

@@ -479,6 +479,9 @@ final class Wheel3DScene {
 
     // MARK: 光の尾・残像
 
+    /// 止まっていないスライスを暗くする層と、止まったスライスの画像。どちらも深度を書かないので、盤・ラベル（0）より後、残像より前に描く。
+    private static let dimRenderingOrder = 1
+    private static let stoppedFaceRenderingOrder = 2
     /// 残像を重ねる順（大きいほど後に描く）。盤・縁・ハブ（0）より後で、光の尾・電飾・結果の帯より前。手前の残像ほど後に描く。
     private static let ghostRenderingOrder = 5
     /// 光の尾のにじみと芯。残像より後、電飾のにじみ（10）と電球（11）より前に描き、電球の奥にする。
@@ -822,6 +825,9 @@ final class Wheel3DScene {
         }
         dimNode = nil
         stoppedNode = nil
+        // 消している間は深度を書かない。回し直す・指で動かすと同時に描き始める残像・光の尾（奥にある）が、薄れていく板の下で深度で隠れないように
+        Self.stopWritingDepth(dim)
+        Self.stopWritingDepth(stopped)
         SCNTransaction.begin()
         SCNTransaction.animationDuration = Self.dimDuration
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -835,12 +841,21 @@ final class Wheel3DScene {
         SCNTransaction.commit()
     }
 
+    /// `node` から下の素材をすべて深度を書かないようにする（深度は読むので、手前のものには隠れる）。
+    private static func stopWritingDepth(_ node: SCNNode) {
+        node.enumerateHierarchy { child, _ in
+            child.geometry?.materials.forEach { $0.writesToDepthBuffer = false }
+        }
+    }
+
     /// 止まっていないスライスに `Theme.sliceDim` を重ねた 1 枚の板。ラベルと境目の線より手前に置き、2D と同じく一緒に沈める。
     private func makeDim(except index: Int, shape: Shape) -> SCNNode {
         let diameter = Double(shape.diameter)
         let content = DimmedSlices(count: shape.count, except: index, diameter: diameter)
         let node = Self.imagePlane(content, side: diameter, displayScale: shape.displayScale)
         node.position.z = 0.4
+        // 深度を書かないので、奥のラベル（0.3）より後に描いてラベルごと沈める
+        node.renderingOrder = Self.dimRenderingOrder
         return node
     }
 
@@ -882,6 +897,8 @@ final class Wheel3DScene {
         .padding(margin)
         let face = Self.imagePlane(content, side: diameter + margin * 2, displayScale: shape.displayScale)
         face.position.z = 0.1
+        // 深度を書かないので、暗くする層より後に描く（板の側面と表は深度を書き、奥のものを隠す）
+        face.renderingOrder = Self.stoppedFaceRenderingOrder
         group.addChildNode(face)
         return group
     }
@@ -893,6 +910,9 @@ final class Wheel3DScene {
         let plane = SCNPlane(width: side, height: side)
         let face = material(.white, lit: false)
         face.diffuse.contents = renderer.uiImage
+        // 画像の透明な画素も深度を書くと、奥に重ねる残像・光の尾（深度を書かず後に描く）が板の形に抜ける。
+        // 板は深度を読むので手前のもの（ハブ・針・電球）には隠れ、奥の盤・ラベルより後に描かれる
+        face.writesToDepthBuffer = false
         plane.materials = [face]
         return SCNNode(geometry: plane)
     }
