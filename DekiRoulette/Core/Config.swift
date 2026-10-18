@@ -74,6 +74,14 @@ enum Config {
     /// 演出用にドラッグ中の角速度を滑らかにする時定数（秒）。フレームごとに新しい値へこの時間で約 63% 寄せる。
     static let effectSmoothingTime: TimeInterval = 0.08
 
+    /// 指で盤面を動かしている間の演出（`WheelDragMotion`）で、最後に指が動いてからこの時間（秒）がたったら止まり切ったとみなす。
+    /// 角速度は窓（`flickSampleWindow`）の 0.15 秒で 0 に落ち、平滑の残り（時定数 0.08 秒）も 0.35 秒で約 1% になる。
+    /// 火花の寿命の最大（`wheelSparkLifetime`）と同じなので、最後に生まれた火花も消え切る。
+    static let dragEffectSettleTime: TimeInterval = 0.5
+
+    /// 指で盤面を動かしている間の演出で、指の位置の記録を残す長さ（秒）。演出が引く過去の時刻（火花の寿命 + 窓）より長くする。
+    static let dragEffectHistory: TimeInterval = 1.0
+
     /// 2D の盤面の外周に並べる電飾の数（`WheelLights`）。12 時から時計回りに等間隔に置く。
     static let wheelLightCount = 24
 
