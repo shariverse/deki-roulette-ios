@@ -129,6 +129,34 @@ struct ThemeContrastTests {
         #expect(blueMinusRed(Theme.wheelLight) < -0.1)
     }
 
+    // MARK: 火花・紙吹雪
+
+    @Test(arguments: styles)
+    func 火花の芯とにじみは盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.wheelSpark, on: Theme.wheelRim, style) >= 3)
+        #expect(ratio(Theme.wheelSparkGlow, on: Theme.wheelRim, style) >= 3)
+    }
+
+    /// 火花の橙は針の `flare`（赤）や `gold` と同じ色にしない（専用色を流用しない）。
+    @Test func 火花はgoldとflareを使わない() {
+        for style in styles {
+            for spark in [Theme.wheelSpark, Theme.wheelSparkGlow] {
+                #expect(resolve(spark, style) != resolve(Theme.gold, style))
+                #expect(resolve(spark, style) != resolve(Theme.flare, style))
+            }
+        }
+    }
+
+    /// 紙吹雪はスライスの 10 色で、盤面の縁の上でも見分けられること。
+    @Test(arguments: styles)
+    func 紙吹雪はスライスの10色で盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(Theme.confettiColors.count == 10)
+        for (confetto, slice) in zip(Theme.confettiColors, Theme.sliceColors) {
+            #expect(resolve(confetto, style) == resolve(slice, style))
+            #expect(ratio(confetto, on: Theme.wheelRim, style) >= 3)
+        }
+    }
+
     // MARK: 共有画像
 
     @Test(arguments: styles)
@@ -149,8 +177,8 @@ struct ThemeContrastTests {
             Theme.onSlice, Theme.wheelRim, Theme.wheelEdge, Theme.wheelHub, Theme.wheelHubMark,
             Theme.flare, Theme.onFlare, Theme.destructive, Theme.onDestructive, Theme.stopOutline,
             Theme.resultBandFill, Theme.resultBandInk, Theme.shareBackground, Theme.shareInk, Theme.wheelLight,
-            Theme.wheelTrail,
-        ] + Theme.sliceColors
+            Theme.wheelTrail, Theme.wheelSpark, Theme.wheelSparkGlow,
+        ] + Theme.sliceColors + Theme.confettiColors
         for color in fixed {
             #expect(resolve(color, .light) == resolve(color, .dark))
         }
