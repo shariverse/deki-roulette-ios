@@ -753,37 +753,52 @@ struct Wheel3DSceneTests {
         #expect(distance(after.color(at: margin), before.color(at: margin)) > 0.02, "\(after.color(at: margin)) \(before.color(at: margin))")
     }
 
-    /// 止まったスライス 1（90〜180 度）を強調した（`clearing` なら続けて消し始めた）盤に、光の尾と残像を重ねる。
-    private func highlightedScene(clearing: Bool, trails: WheelTrails.Frame) -> Wheel3DScene {
+    /// 強調の状態。
+    enum HighlightPhase: String, CaseIterable {
+        /// 強調を出した直後（暗くする層は 0 から濃くなり始めたところ。画面外描画は動きの始まりを描く）。止まったスライスは持ち上げてある。
+        case appearing
+        /// 強調を出し切った（動きを減らす設定と同じく即座に出すので、暗くする層は最初から濃い）。
+        case settled
+        /// 強調を消し始めた。
+        case clearing
+    }
+
+    /// 止まったスライス 1（90〜180 度）を `phase` の状態で強調した盤に、光の尾と残像を重ねる。
+    private func highlightedScene(_ phase: HighlightPhase, trails: WheelTrails.Frame) -> Wheel3DScene {
         let scene = makeScene(count: 4, rotation: 0)
-        scene.highlight(Wheel3DHighlight(index: 1, glowStyle: .white), reduceMotion: false)
-        if clearing { scene.highlight(nil, reduceMotion: false) }
+        scene.highlight(Wheel3DHighlight(index: 1, glowStyle: .white), reduceMotion: phase == .settled)
+        if phase == .clearing { scene.highlight(nil, reduceMotion: false) }
         scene.trail(trails)
         return scene
     }
 
-    @Test(arguments: [false, true])
-    func 強調を出したままでも消している途中でも光の尾と残像は板に隠れない(clearing: Bool) throws {
+    @Test(arguments: HighlightPhase.allCases)
+    func 強調を出したままでも消している途中でも光の尾と残像は板に隠れない(phase: HighlightPhase) throws {
         // 光の尾（−11.25 度）と残像を見る位置（300 度）は、沈めたスライス 3 の上。残像ではスライス 0 になる
         let frame = trailFrame(ghosts: [WheelTrails.Ghost(angle: -120, opacity: 0.3)])
-        let plain = try render(highlightedScene(clearing: clearing, trails: .none))
-        let pixels = try render(highlightedScene(clearing: clearing, trails: frame))
+        let plain = try render(highlightedScene(phase, trails: .none))
+        let pixels = try render(highlightedScene(phase, trails: frame))
         let tail = trailLocation(angle: -11.25, pixels: pixels)
         #expect(brightness(pixels.color(at: tail)) > brightness(plain.color(at: tail)) + 0.2, "\(pixels.color(at: tail)) \(plain.color(at: tail))")
         let ghost = location(angle: 300, fraction: 0.6, pixels: pixels)
         #expect(distance(pixels.color(at: ghost), plain.color(at: ghost)) > 0.02, "\(pixels.color(at: ghost)) \(plain.color(at: ghost))")
-        if clearing {
+        switch phase {
+        case .clearing:
             // 消している途中は、止まったスライス（90〜180 度、持ち上げた板）の上でも残像（スライス 2）が見える
             let stopped = location(angle: 135, fraction: 0.6, pixels: pixels)
             #expect(distance(pixels.color(at: stopped), plain.color(at: stopped)) > 0.02, "\(pixels.color(at: stopped)) \(plain.color(at: stopped))")
-        } else {
-            // 強調を出したままなら、残像の下でも沈めたスライスは暗くする層で沈んだまま（残像が暗くする層を消さない）
+        case .settled:
+            // 暗くする層が濃く出ていても、残像はその上に見え（上の確かめ）、沈めたスライスは残像の下で沈んだまま（残像が暗くする層を消さない）。
+            // 暗くする層が無い盤に同じ残像を重ねた色（緑は 0.7·lin(0.859) + 0.3·lin(0.502) → sRGB 0.773、`onSlice` から 0.706）より、
+            // 暗くした上に重ねた色（緑は 0.7·0.357 + 0.3·0.216 → sRGB 0.59、`onSlice` から約 0.52）の方が `onSlice` に近い
             let bare = makeScene(count: 4, rotation: 0)
             bare.trail(frame)
             let unlit = try render(bare)
             let ink = srgb(Theme.onSlice)
             #expect(distance(pixels.color(at: ghost), ink) < distance(unlit.color(at: ghost), ink) - 0.03,
                     "\(pixels.color(at: ghost)) \(unlit.color(at: ghost))")
+        case .appearing:
+            break
         }
     }
 
