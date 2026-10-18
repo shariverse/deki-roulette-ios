@@ -66,6 +66,25 @@ enum WheelGeometry {
         return mesh
     }
 
+    /// `start` 度から `end` 度までの、内径 `inner`・外径 `outer` の平らな扇形の帯（z = 0、手前向き）。側面は無い（`side` は空）。
+    /// 3D の盤面の残像（ハブの内側を抜いたスライスの塗り）と光の尾の弧に使う。三角形は表から見て反時計回りに頂点を並べる。
+    static func annulusMesh(start: Double, end: Double, inner: Double, outer: Double, segmentsPerTurn: Int = 96) -> SliceMesh {
+        let outerArc = arc(start: start, end: end, radius: outer, segmentsPerTurn: segmentsPerTurn)
+        let innerArc = arc(start: start, end: end, radius: max(inner, 0), segmentsPerTurn: segmentsPerTurn)
+        var mesh = SliceMesh(vertices: [], normals: [], top: [], side: [])
+        for (offset, (o, i)) in zip(outerArc, innerArc).enumerated() {
+            mesh.vertices += [SIMD3(o.x, o.y, 0), SIMD3(i.x, i.y, 0)]
+            mesh.normals += [SIMD3(0, 0, 1), SIMD3(0, 0, 1)]
+            if offset > 0 {
+                let outerNow = Int32(offset * 2), innerNow = outerNow + 1
+                let outerBefore = outerNow - 2, innerBefore = outerNow - 1
+                // 外周の点は手前から見て時計回りに進むので、前の内・今の外・前の外、前の内・今の内・今の外の順で反時計回りになる
+                mesh.top += [innerBefore, outerNow, outerBefore, innerBefore, innerNow, outerNow]
+            }
+        }
+        return mesh
+    }
+
     /// 盤の累積の回転角（度、時計回りが正。`RouletteModel.rotation`）を、z 軸まわりの回転（ラジアン）に写す。
     /// z 軸まわりは手前から見て反時計回りが正なので、符号を返す。
     static func spinAngle(rotation: Double) -> Double {
