@@ -174,6 +174,72 @@ struct WheelParticlesTests {
         }
     }
 
+    // MARK: 指で動かしている間・惰性
+
+    private func dragSparks(
+        _ drag: WheelDragMotion?, now: TimeInterval, seed: UInt64 = 42, reduceMotion: Bool = false
+    ) -> [WheelParticles.Spark] {
+        WheelParticles.sparks(
+            drag: drag, now: now, seed: seed, origin: Self.origin, scale: 1, lowPower: false, reduceMotion: reduceMotion
+        )
+    }
+
+    @Test func 指で速く動かしている間も火花が出る() {
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 1), duration: 1)
+        let now = drag.lastTime
+        let all = dragSparks(drag, now: now)
+        #expect(all.count >= WheelParticles.sparkCapacity(lowPower: false) / 2)
+        #expect(all.count <= WheelParticles.sparkCapacity(lowPower: false))
+        #expect(all.allSatisfy { $0.position.x >= Self.origin.x })
+        // 反時計回りに動かすと左へ
+        let counter = WheelDragMotion.testCircular(velocity: -velocity(intensity: 1), duration: 1)
+        let left = dragSparks(counter, now: counter.lastTime)
+        #expect(!left.isEmpty)
+        #expect(left.allSatisfy { $0.position.x <= Self.origin.x })
+    }
+
+    @Test func 指の動きの火花の数は動かす速さに比例する() {
+        func average(_ intensity: Double) -> Double {
+            let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: intensity), duration: 1)
+            let counts = (UInt64(0)..<40).map { dragSparks(drag, now: drag.lastTime, seed: $0).count }
+            return Double(counts.reduce(0, +)) / Double(counts.count)
+        }
+        let full = average(1)
+        #expect(full > 0)
+        #expect(abs(average(0.5) / full - 0.5) < 0.12)
+        #expect(average(0) == 0)
+    }
+
+    @Test func 後から指が動いても前に生まれた火花は変わらない() {
+        let shorter = WheelDragMotion.testCircular(velocity: velocity(intensity: 0.8), duration: 0.5)
+        let longer = WheelDragMotion.testCircular(velocity: velocity(intensity: 0.8), duration: 0.8)
+        for seed in UInt64(0)..<10 {
+            #expect(dragSparks(shorter, now: shorter.lastTime, seed: seed) == dragSparks(longer, now: shorter.lastTime, seed: seed))
+        }
+    }
+
+    @Test func 指を止めたら新しく生まれず寿命で消える() {
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 1), duration: 1)
+        let last = drag.lastTime
+        #expect(!dragSparks(drag, now: last + 0.1).isEmpty)
+        // 最後に指が動いた時刻より後には生まれないので、寿命が過ぎたら消える
+        #expect(dragSparks(drag, now: last + Config.wheelSparkLifetime).isEmpty)
+        #expect(Config.wheelSparkLifetime <= Config.dragEffectSettleTime)
+        #expect(dragSparks(nil, now: last).isEmpty)
+        #expect(dragSparks(drag, now: last, reduceMotion: true).isEmpty)
+    }
+
+    @Test func 惰性でも動きに応じて火花が出る() throws {
+        // 惰性は強さ約 0.33 以下なので、出ても少ない
+        let coast = try #require(FlickCoast.coast(angularVelocity: 230))
+        let motion = TimedSpinMotion(motion: coast.motion(from: 0), start: 0)
+        let counts = (UInt64(0)..<40).map { sparks(motion, now: 0.2, seed: $0).count }
+        let average = Double(counts.reduce(0, +)) / Double(counts.count)
+        #expect(average > 0)
+        #expect(average < Double(WheelParticles.sparkCapacity(lowPower: false)) / 3)
+        #expect(sparks(motion, now: coast.duration + Config.wheelSparkLifetime).isEmpty)
+    }
+
     // MARK: 紙吹雪
 
     @Test func 紙吹雪の上限は80で低電力モードでは3分の1() {

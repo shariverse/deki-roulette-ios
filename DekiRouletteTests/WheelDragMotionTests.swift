@@ -3,28 +3,45 @@ import Foundation
 import Testing
 @testable import DekiRoulette
 
-struct WheelDragMotionTests {
-    private static let center = CGPoint(x: 160, y: 160)
-    private static let radius = 120.0
+extension WheelDragMotion {
+    /// テスト用の盤面の中心と、指を動かす円の半径。
+    static let testCenter = CGPoint(x: 160, y: 160)
+    static let testRadius = 120.0
 
-    /// 中心から `radius` の円周上で、向き `degrees`（画面上の時計回りが正）の指の位置。
-    private func location(_ degrees: Double) -> CGPoint {
+    /// 中心から `testRadius` の円周上で、向き `degrees`（画面上の時計回りが正）の指の位置。
+    static func testLocation(_ degrees: Double) -> CGPoint {
         let radians = degrees * .pi / 180
-        return CGPoint(x: Double(Self.center.x) + Self.radius * cos(radians), y: Double(Self.center.y) + Self.radius * sin(radians))
+        return CGPoint(
+            x: Double(testCenter.x) + testRadius * cos(radians), y: Double(testCenter.y) + testRadius * sin(radians)
+        )
     }
 
     /// 時刻 `start` から `duration` 秒、角速度 `velocity`（度/秒）で指を円周に沿って動かした記録。`rate` 回/秒で点を取る。
-    private func drag(
+    static func testCircular(
         velocity: Double, start: TimeInterval = 10, duration: TimeInterval = 1, rate: Double = 120
     ) -> WheelDragMotion {
-        var motion = WheelDragMotion(center: Self.center, time: start, location: location(0), angle: 0)
+        var motion = WheelDragMotion(center: testCenter, time: start, location: testLocation(0), angle: 0)
         let steps = Int((duration * rate).rounded())
         for step in 1...steps {
             let elapsed = Double(step) / rate
             let angle = velocity * elapsed
-            motion.append(time: start + elapsed, location: location(angle), angle: angle)
+            motion.append(time: start + elapsed, location: testLocation(angle), angle: angle)
         }
         return motion
+    }
+}
+
+struct WheelDragMotionTests {
+    private static let center = WheelDragMotion.testCenter
+
+    private func location(_ degrees: Double) -> CGPoint {
+        WheelDragMotion.testLocation(degrees)
+    }
+
+    private func drag(
+        velocity: Double, start: TimeInterval = 10, duration: TimeInterval = 1, rate: Double = 120
+    ) -> WheelDragMotion {
+        WheelDragMotion.testCircular(velocity: velocity, start: start, duration: duration, rate: rate)
     }
 
     // MARK: 時計
