@@ -21,7 +21,7 @@ struct RouletteWheelView: View {
     /// 止まったスライスの光彩の色（設定の「ルーレットの詳細設定」）。
     var glowStyle = GlowStyle.default
     var onBoundaryCross: ((_ time: TimeInterval) -> Void)? = nil
-    var onGrab: (() -> Void)? = nil
+    var onGrab: (() -> Double?)? = nil
     var onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

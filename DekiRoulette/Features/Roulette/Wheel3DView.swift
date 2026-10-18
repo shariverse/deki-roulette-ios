@@ -28,7 +28,7 @@ struct Wheel3DView: View {
     /// 結果の帯。結果が出ている間だけ渡す。
     var result: Wheel3DResult? = nil
     var onBoundaryCross: ((_ time: TimeInterval) -> Void)? = nil
-    var onGrab: (() -> Void)? = nil
+    var onGrab: (() -> Double?)? = nil
     var onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
