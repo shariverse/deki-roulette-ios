@@ -15,6 +15,8 @@ import SwiftUI
 /// 盤は端末の姿勢で傾け、動かした勢いで支点まわりに揺らす（`WheelMotionModel`）。揺れるのは待機中と回転中だけで、
 /// 結果表示中は正面へ戻して止め、姿勢の購読も止める。視差効果を減らす設定では揺らさず正面に置く。
 /// 姿勢を読むのは、この盤面が画面に出ていてアプリが前面にある間だけ。揺れは見た目だけで、回転・結果・音・触覚には影響しない。
+/// `showsLights` のときは 2D と同じ外周の電飾を盤と同じ面の縁の上に出す（回らない）。明るさは 2D と共有の `WheelLightsTimeline` が
+/// 同じ時計（`now`）・同じ規則（`WheelLights`）で毎フレーム引き、盤の角度と同じく SceneKit のノードに写す。
 struct Wheel3DView: View {
     let items: [Item]
     let rotation: Double
@@ -26,6 +28,13 @@ struct Wheel3DView: View {
     var glowStyle = GlowStyle.default
     /// 結果の帯。結果が出ている間だけ渡す。
     var result: Wheel3DResult? = nil
+    /// 外周の電飾を出すか（「スピンの演出」が電飾・全部入り）。false なら今の盤面のまま何も足さない。
+    var showsLights = false
+    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れと明るさを毎フレームここから引く。
+    /// 指で動かしている間は、`WheelDragArea` が記録した指の動き（`WheelDragMotion`）から引く。
+    var motion: TimedSpinMotion? = nil
+    /// `motion` の開始時刻と同じ時計（`RouletteModel.now`）。
+    var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     var onBoundaryCross: ((_ time: TimeInterval) -> Void)? = nil
     var onGrab: (() -> Double?)? = nil
     var onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)? = nil
@@ -35,12 +44,14 @@ struct Wheel3DView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Config.tiltReferenceKey) private var tiltReference = TiltReference.default
     /// 姿勢の購読。`CMMotionManager` は使い回したいので、ビューを作り直すたびには作らず、最初に画面に出たときに作る。
-    @State private var motion: WheelMotionModel?
+    @State private var deviceMotion: WheelMotionModel?
     @State private var visible = false
+    /// 結果が出た時刻（`now()` の秒）。電飾の点滅と脈動の経過時間の基準（2D の `RouletteWheelView` と同じ持ち方）。結果が無いときは nil。
+    @State private var stopStart: TimeInterval?
 
     /// 盤の傾き。視差効果を減らす設定では正面。
     private var tilt: WheelTilt {
-        reduceMotion ? .zero : motion?.tilt ?? .zero
+        reduceMotion ? .zero : deviceMotion?.tilt ?? .zero
     }
 
     private var swayMode: SwayMode {
@@ -50,20 +61,31 @@ struct Wheel3DView: View {
     var body: some View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
-            onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease
-        ) { dragRotation, displacedByDrag, _ in
+            onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease,
+            // 電飾を出すときだけ、指で動かしている動きを記録する（「なし」では今のまま記録しない）
+            tracksMotion: showsLights, now: now
+        ) { dragRotation, displacedByDrag, dragMotion in
+            // 結果が出たあとに指で動かしたら強調を解く（結果の帯は残る）
+            let highlight = displacedByDrag ? nil : highlightedIndex
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
                 let canvas = side * (1 + 2 * Theme.Wheel3D.overscan)
-                // 追従の角度は足すだけにする。ドラッグ中は `rotation` が変わらないので下の `.animation` は掛からず、指にそのまま付いてくる。
-                // 指を離した更新では、親が追従の角度を `rotation` に取り込むのと `dragRotation` を 0 に戻すのが同じ更新に入るので、
-                // 盤は離した角度から続く
-                Wheel3DSurface(
-                    items: items, rotation: rotation + dragRotation, tilt: tilt, diameter: side, displayScale: displayScale,
-                    // 結果が出たあとに指で動かしたら強調を解く（結果の帯は残る）
-                    highlight: displacedByDrag ? nil : highlightedIndex.map { Wheel3DHighlight(index: $0, glowStyle: glowStyle) },
-                    result: result, reduceMotion: reduceMotion
-                )
+                // 電飾の明るさは 2D と同じ時計で毎フレーム引く。電飾を出さないときは止めたまま nil を渡す
+                WheelLightsTimeline(
+                    enabled: showsLights, rotation: rotation, dragRotation: dragRotation, motion: motion, drag: dragMotion,
+                    // 指で動かして強調を解いたら点滅・脈動も止める
+                    stoppedAt: highlight != nil ? stopStart : nil,
+                    now: now
+                ) { lights in
+                    // 追従の角度は足すだけにする。ドラッグ中は `rotation` が変わらないので下の `.animation` は掛からず、指にそのまま付いてくる。
+                    // 指を離した更新では、親が追従の角度を `rotation` に取り込むのと `dragRotation` を 0 に戻すのが同じ更新に入るので、
+                    // 盤は離した角度から続く
+                    Wheel3DSurface(
+                        items: items, rotation: rotation + dragRotation, tilt: tilt, diameter: side, displayScale: displayScale,
+                        highlight: highlight.map { Wheel3DHighlight(index: $0, glowStyle: glowStyle) },
+                        result: result, lights: lights, reduceMotion: reduceMotion
+                    )
+                }
                 .frame(width: canvas, height: canvas)
                 .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
                 .allowsHitTesting(false)
@@ -74,10 +96,12 @@ struct Wheel3DView: View {
             .aspectRatio(1, contentMode: .fit)
         }
         .onAppear {
-            if motion == nil { motion = WheelMotionModel(source: DeviceMotionSource()) }
+            if deviceMotion == nil { deviceMotion = WheelMotionModel(source: DeviceMotionSource()) }
+            // 結果を出したまま画面に戻った（3D に切り替えた）ときは、2D と同じく停止の瞬間の点滅を飛ばして脈動から始める
+            if highlightedIndex != nil, stopStart == nil { stopStart = now() - WheelLights.blinkDuration }
             visible = true
             // 「画面を開いたときの持ち方」基準は、画面を開いたときの姿勢を正面にする
-            motion?.recaptureBaseline()
+            deviceMotion?.recaptureBaseline()
             updateMotion()
         }
         .onDisappear {
@@ -86,8 +110,11 @@ struct Wheel3DView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             // アプリに戻ったときも持ち直していることが多いので、基準を取り直す
-            if phase == .active { motion?.recaptureBaseline() }
+            if phase == .active { deviceMotion?.recaptureBaseline() }
             updateMotion()
+        }
+        .onChange(of: highlightedIndex) { _, index in
+            stopStart = index != nil ? now() : nil
         }
         .onChange(of: swayMode) { updateMotion() }
         .onChange(of: tiltReference) { updateMotion() }
@@ -95,7 +122,7 @@ struct Wheel3DView: View {
     }
 
     private func updateMotion() {
-        motion?.update(active: visible && scenePhase == .active, mode: swayMode, reference: tiltReference)
+        deviceMotion?.update(active: visible && scenePhase == .active, mode: swayMode, reference: tiltReference)
     }
 }
 
@@ -122,6 +149,8 @@ private struct Wheel3DSurface: View, Animatable {
     let displayScale: CGFloat
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
+    /// 外周の電飾の場面。電飾を出さないときは nil。
+    let lights: WheelLights.Scene?
     let reduceMotion: Bool
 
     nonisolated var animatableData: Double {
@@ -132,7 +161,7 @@ private struct Wheel3DSurface: View, Animatable {
     var body: some View {
         Wheel3DSceneView(
             items: items, rotation: rotation, tilt: tilt, diameter: diameter, displayScale: displayScale,
-            highlight: highlight, result: result, reduceMotion: reduceMotion
+            highlight: highlight, result: result, lights: lights, reduceMotion: reduceMotion
         )
     }
 }
@@ -145,6 +174,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
     let displayScale: CGFloat
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
+    let lights: WheelLights.Scene?
     let reduceMotion: Bool
 
     func makeCoordinator() -> Wheel3DScene {
@@ -169,6 +199,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
         context.coordinator.tilt(to: tilt)
         context.coordinator.highlight(highlight, reduceMotion: reduceMotion)
         context.coordinator.show(result: result, reduceMotion: reduceMotion)
+        context.coordinator.light(lights)
     }
 }
 
@@ -192,6 +223,11 @@ final class Wheel3DScene {
     private var stoppedNode: SCNNode?
     private var shownHighlight: Wheel3DHighlight?
     private let postNode = SCNNode()
+    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は組み直すたびに作り、出さない間は隠す。
+    private let lightsNode = SCNNode()
+    private var bulbNodes: [SCNNode] = []
+    private var haloNodes: [SCNNode] = []
+    private var shownLights: WheelLights.Scene?
 
     private struct Shape: Equatable {
         /// 項目。比べるのはラベルと見た目だけ（`id` が変わっても見た目が同じなら組み直さない）。
@@ -234,6 +270,8 @@ final class Wheel3DScene {
 
         tiltNode.addChildNode(spinNode)
         tiltNode.addChildNode(pointerNode)
+        tiltNode.addChildNode(lightsNode)
+        lightsNode.isHidden = true
         scene.rootNode.addChildNode(tiltNode)
         scene.rootNode.addChildNode(postNode)
     }
@@ -392,6 +430,123 @@ final class Wheel3DScene {
         addHub(scale: scale)
         addPost(thickness: thickness, scale: scale)
         addPointer(diameter: diameter, scale: scale)
+        addLights(diameter: diameter, scale: scale, displayScale: shape.displayScale)
+    }
+
+    // MARK: 電飾
+
+    /// 外周の電飾を出す・消す。`scene` は 2D と同じ `WheelLights.Scene`（nil なら出さない）で、電球ごとの明るさとにじみを
+    /// `WheelLights.bulb` から引いてノードに写す。盤の角度と同じく毎フレーム呼ばれる。
+    func light(_ scene: WheelLights.Scene?) {
+        guard scene != shownLights else { return }
+        shownLights = scene
+        applyLights()
+    }
+
+    /// 電球の色。2D は縁（`wheelRim`）の上に `wheelLight` を明るさの不透明度で重ねるので、その重ねた色（sRGB で混ぜる）を不透明に塗る
+    /// （SceneKit は線形の色空間で重ねるので、不透明度で重ねると 2D より明るく見える）。
+    static func bulbColor(brightness: Double) -> UIColor {
+        let amount = CGFloat(min(max(brightness, 0), 1))
+        let rim = components(Theme.wheelRim), light = components(Theme.wheelLight)
+        return UIColor(
+            red: rim.r + (light.r - rim.r) * amount,
+            green: rim.g + (light.g - rim.g) * amount,
+            blue: rim.b + (light.b - rim.b) * amount,
+            alpha: 1
+        )
+    }
+
+    private static func components(_ color: Color) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (r, g, b)
+    }
+
+    private func applyLights() {
+        guard let scene = shownLights, !bulbNodes.isEmpty else {
+            lightsNode.isHidden = true
+            return
+        }
+        lightsNode.isHidden = false
+        let count = bulbNodes.count
+        let haloFull = Theme.LightRing.bulbRadius + Theme.LightRing.haloWidth
+        for index in 0..<count {
+            let bulb = WheelLights.bulb(index: index, count: count, scene: scene)
+            bulbNodes[index].geometry?.firstMaterial?.diffuse.contents = Self.bulbColor(brightness: bulb.brightness)
+            let halo = haloNodes[index]
+            guard bulb.glow > 0 else {
+                halo.isHidden = true
+                continue
+            }
+            // 2D と同じく、にじみの広がり（電球の半径 + 幅 × にじみ）と濃さ（`haloOpacity` × にじみ × 明るさ）を変える
+            let spread = Float((Theme.LightRing.bulbRadius + Theme.LightRing.haloWidth * CGFloat(bulb.glow)) / haloFull)
+            halo.isHidden = false
+            halo.opacity = CGFloat(Theme.LightRing.haloOpacity * bulb.glow * bulb.brightness)
+            halo.scale = SCNVector3(spread, spread, 1)
+        }
+    }
+
+    /// 電球を縁の上に並べる（2D と同じ数・位置・大きさ。12 時から時計回り）。縁の上面から `Theme.Wheel3D.lightLift` だけ浮かせ、
+    /// 持ち上げた止まったスライスの光彩より手前、針・結果の帯より奥に置く。にじみは電球の後ろの板（放射状のグラデーションを焼いた画像）。
+    private func addLights(diameter: Double, scale: Double, displayScale: CGFloat) {
+        lightsNode.childNodes.forEach { $0.removeFromParentNode() }
+        bulbNodes = []
+        haloNodes = []
+        let side = CGFloat(diameter)
+        let ringRadius = Double(Theme.LightRing.ringRadius(diameter: side))
+        let bulbRadius = Double(Theme.LightRing.bulbRadius(diameter: side))
+        let haloRadius = bulbRadius + Double(Theme.LightRing.haloWidth(diameter: side))
+        let z = Float(Double(Theme.Wheel3D.rimLift) * scale + Double(Theme.Wheel3D.lightLift))
+        let haloImage = Self.haloImage(bulbRadius: bulbRadius, haloRadius: haloRadius, displayScale: displayScale)
+        let count = Config.wheelLightCount
+        for index in 0..<count {
+            let point = WheelGeometry.point(angle: WheelLights.angle(index: index, count: count), radius: ringRadius)
+
+            let plane = SCNPlane(width: haloRadius * 2, height: haloRadius * 2)
+            let glow = Self.material(.white, lit: false)
+            glow.diffuse.contents = haloImage
+            // にじみは隣の電球や盤の手前のものを隠さない
+            glow.writesToDepthBuffer = false
+            plane.materials = [glow]
+            let halo = SCNNode(geometry: plane)
+            halo.position = SCNVector3(Float(point.x), Float(point.y), z - 0.1)
+            halo.isHidden = true
+            // 重ねる順を盤より後にして、縁の上に混ぜる
+            halo.renderingOrder = 10
+            lightsNode.addChildNode(halo)
+            haloNodes.append(halo)
+
+            let disc = SCNCylinder(radius: bulbRadius, height: 0.1)
+            disc.radialSegmentCount = Theme.Wheel3D.lightSegments
+            disc.materials = [Self.material(Theme.wheelLight, lit: false)]
+            let bulb = SCNNode(geometry: disc)
+            bulb.eulerAngles.x = .pi / 2
+            bulb.position = SCNVector3(Float(point.x), Float(point.y), z)
+            bulb.renderingOrder = 11
+            lightsNode.addChildNode(bulb)
+            bulbNodes.append(bulb)
+        }
+        applyLights()
+    }
+
+    /// にじみの画像。2D の `WheelLightsView` と同じく、電球の半径の半分から外へ `wheelLight` を透明まで薄める放射状のグラデーション
+    /// （にじみが最も強いときの大きさ。弱いときは板を縮める）。
+    private static func haloImage(bulbRadius: Double, haloRadius: Double, displayScale: CGFloat) -> UIImage {
+        let side = CGFloat(haloRadius * 2)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = max(displayScale, 1)
+        format.opaque = false
+        let light = UIColor(Theme.wheelLight)
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { renderer in
+            let colors = [light.cgColor, light.withAlphaComponent(0).cgColor] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: [0, 1])
+            else { return }
+            let center = CGPoint(x: side / 2, y: side / 2)
+            renderer.cgContext.drawRadialGradient(
+                gradient, startCenter: center, startRadius: CGFloat(bulbRadius * 0.5), endCenter: center,
+                endRadius: CGFloat(haloRadius), options: .drawsBeforeStartLocation
+            )
+        }
     }
 
     // MARK: 停止の強調

@@ -168,6 +168,11 @@ enum Theme {
         /// 盤の側面・縁・支柱を照らす光の強さ。表面のスライスは照明に依らず塗りの色のまま出す。
         static let ambientLight: CGFloat = 500
         static let keyLight: CGFloat = 800
+        /// 電飾の電球を外周の縁の上面から浮かせる高さ（pt。直径に依らない）。持ち上げた止まったスライスの面（縁の上面 + 0.6pt）より手前、
+        /// 結果の帯・針（縁・ハブの上面 + 1pt 以上）より奥に置き、光彩の画像に隠れず、針の後ろになる（2D の重なり順と同じ）。
+        static let lightLift: CGFloat = 0.8
+        /// 電球の円の細かさ（周の分割数）。
+        static let lightSegments = 16
     }
 
     // MARK: 停止の強調
