@@ -181,7 +181,9 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 「スピンの演出」（`@AppStorage(Config.spinEffectStyleKey)`）が `showsCommonEffects` で効果音が ON のときだけ鳴らす。判定は `StopChime.plays`（`Core/`。
 スタイル・効果音・止まった動き（`.spin` / `.coast`）だけを受け取り、指定や結果のラベルは受け取らない）。`RouletteScreen` が `onChange(of: model.outcome)` で
 結果が出た瞬間（`finishSpin`。保険のタイマーでも同じ）に `sound.playChime()` を呼ぶ。惰性では `outcome` が出ないので鳴らず、`reducedMotion` でも鳴らす。
-`SpinSoundPlayer` は回転音とは別の `AVAudioPlayerNode`（音量 `Config.chimeGain`）で流すので、クリックの再生を止めたり差し替えたりしない（`stop()` だけは両方止める）。
+`SpinSoundPlayer` は回転音とは別の `AVAudioPlayerNode`（音量 `Config.chimeGain`）で流すので、クリックの再生を止めたり差し替えたりしない。
+`stop()`（画面を離れた `onDisappear` と、惰性の途中で盤面に触れた `RouletteScreen.grab`）は回転音・決まり音・うなりの 3 つのノードをすべて止め、
+3 つの世代（`generation` / `chimeGeneration` / `humGeneration`）を進めて準備待ち・焼き込み中の再生も取り消し、エンジンも止める（触れたときに鳴り終わっていない決まり音も切れる）。
 「なし」のときは `prepare(effects:)` に false を渡して音源を読み込まない。
 
 スピン中のうなり（ドラムロール。音源は `Resources/Sounds/drumroll.wav` の 1 打ち。`scripts/make-drumroll-sound.swift` がノイズ・音程の下がる胴鳴り・低い芯を 0.12 秒で合成する）は、
