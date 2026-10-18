@@ -110,6 +110,25 @@ struct ThemeContrastTests {
         #expect((luminance(bulb) + 0.05) / (rim + 0.05) >= 1.5)
     }
 
+    // MARK: 光の尾
+
+    @Test(arguments: styles)
+    func 光の尾は盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.wheelTrail, on: Theme.wheelRim, style) >= 3)
+    }
+
+    /// 光の尾は電飾の電球と同じ縁の上に重なるので、電飾の暖かい白とは色味で見分ける（青みが強い）。
+    @Test(arguments: styles)
+    func 光の尾は電飾と色味が違う(style: UIUserInterfaceStyle) {
+        func blueMinusRed(_ color: Color) -> Double {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            resolve(color, style).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            return Double(blue - red)
+        }
+        #expect(blueMinusRed(Theme.wheelTrail) > 0.1)
+        #expect(blueMinusRed(Theme.wheelLight) < -0.1)
+    }
+
     // MARK: 共有画像
 
     @Test(arguments: styles)
@@ -130,6 +149,7 @@ struct ThemeContrastTests {
             Theme.onSlice, Theme.wheelRim, Theme.wheelEdge, Theme.wheelHub, Theme.wheelHubMark,
             Theme.flare, Theme.onFlare, Theme.destructive, Theme.onDestructive, Theme.stopOutline,
             Theme.resultBandFill, Theme.resultBandInk, Theme.shareBackground, Theme.shareInk, Theme.wheelLight,
+            Theme.wheelTrail,
         ] + Theme.sliceColors
         for color in fixed {
             #expect(resolve(color, .light) == resolve(color, .dark))
