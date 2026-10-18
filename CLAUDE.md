@@ -12,6 +12,7 @@ xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'pl
 swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（DekiRoulette/Resources の AppIcon.icon・代替アイコンの AppIcon-<名前>.icon・visionOS 用の Assets.xcassets/AppIcon.solidimagestack と、設定画面の見本の imageset を書き出す）
 dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"  # アイコンの案と一覧の画像（案はアプリに入れない）
 swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 回転音の再生成（--preview で 1 スピン分の試聴用）
+swift scripts/make-chime-sound.swift DekiRoulette/Resources/Sounds/chime.wav  # 停止時の決まり音の再生成（決定的。同じスクリプトなら差分は出ない）
 ```
 
 ファイルを追加・削除したら `xcodegen generate` を再実行する（`project.yml` はディレクトリ単位で sources を拾う）。
