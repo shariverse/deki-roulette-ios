@@ -24,7 +24,9 @@ struct RouletteWheelView: View {
     var showsLights = false
     /// 光の尾と残像を出すか（「スピンの演出」が光の尾・全部入り）。false なら今の盤面のまま何も足さない。
     var showsTrails = false
-    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れ・光の尾・残像を毎フレームここから引く。
+    /// 針の先の火花と停止の瞬間の紙吹雪を出すか（「スピンの演出」が紙吹雪・全部入り）。false なら今の盤面のまま何も足さない。
+    var showsParticles = false
+    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れ・光の尾・残像・火花を毎フレームここから引く。
     var motion: TimedSpinMotion? = nil
     /// `motion` の開始時刻と同じ時計（`RouletteModel.now`）。
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
@@ -95,6 +97,20 @@ struct RouletteWheelView: View {
 
                 WheelPointerView()
                     .offset(y: -6 + (pulsing ? Theme.pointerBounceOffset : 0))
+
+                // 火花と紙吹雪は回らない層に置き、針より手前に重ねる。紙吹雪は結果が出た瞬間（強調を指で解いても止めない）に
+                // はじけさせるので、`highlight` ではなく `highlightedIndex` を見る。止まったスライスがどれかは渡さない
+                if showsParticles {
+                    GeometryReader { proxy in
+                        WheelParticlesView(
+                            side: min(proxy.size.width, proxy.size.height),
+                            motion: motion,
+                            stopped: highlightedIndex != nil,
+                            now: now
+                        )
+                        .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                    }
+                }
             }
             .aspectRatio(1, contentMode: .fit)
         }
@@ -339,6 +355,18 @@ private struct Triangle: Shape {
 #Preview("Trails") {
     RouletteWheelView(
         items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, showsTrails: true,
+        motion: TimedSpinMotion(
+            motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
+            start: ProcessInfo.processInfo.systemUptime
+        )
+    )
+    .padding(40)
+    .background(Theme.ink900)
+}
+
+#Preview("Particles") {
+    RouletteWheelView(
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, showsParticles: true,
         motion: TimedSpinMotion(
             motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
             start: ProcessInfo.processInfo.systemUptime
