@@ -72,8 +72,8 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
 完了コールバックが来ない場合の保険として `Config.spinFallback` のタイマーを持つ。
 `accessibilityReduceMotion` のときは回さず、`reducedMotionSpinDuration` 後に完了扱いにする。
 
-盤面の `rotationEffect` には `.animation(Theme.spinAnimation(easing: spinEasing), value: rotation)` を付けてある（`reduceMotion` では `nil`。
-`spinEasing` は `withAnimation` と同じ `model.spinEasing` を渡す）。
+盤面の `rotationEffect` には `.animation(Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)` を付けてある（`reduceMotion` では `nil`。
+`spinEasing` / `rotationDuration` は `withAnimation` と同じ `model.spinEasing` / `model.rotationDuration` を渡す。長さはスピンでは `Config.spinDuration`、惰性では `FlickCoast` が決める）。
 キーボードが出た状態でスピンを始めると、演出開始で入力欄が無効になってキーボードが閉じ、その安全領域の変化が
 `withAnimation` の更新に重なって補間が落ちる（盤面が最終角度へ飛び、音だけが鳴る）ため、回転の値の変化だけは
 外側のトランザクションに依らずスピンの曲線で補間させる。回り始めとキーボードの閉じ始めは同時で、音・触覚の時刻は変えない。
@@ -106,8 +106,9 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
 `withAnimation(Theme.spinAnimation(easing:duration:))` で `rotation` を書く（2D・3D の盤面の `.animation(…, value: rotation)` も同じ曲線と長さなので、同じ時刻に同じ角度で止まる）。
 `outcome` / `spinCount` / `pendingOutcome` / `lastDirection` は変えず、`spinning` も立てない（結果の表示は残り、強調は解けたまま。押し出しや針の跳ねも出ない）。
 惰性の途中で盤面に触れたら、`WheelDragArea` の `onGrab` で `model.stopCoast()` が曲線から今の角度を逆算し、`disablesAnimations` の
-トランザクションで補間なしに書いて止める。惰性の途中で `beginSpin` を呼ぶと惰性を打ち切り（止まる位置は行き先の `rotation` から）、
-曲線と長さをスピンのものに戻す。`reducedMotion` では付けない。
+トランザクションで補間なしに書いて止める（止めた角度を `onGrab` が返し、`WheelDragArea` は描き直し前の最初の追従の境目をその角度から数える）。
+惰性の途中で `beginSpin` を呼ぶと惰性を打ち切り（止まる位置は行き先の `rotation` から）、曲線と長さをスピンのものに戻す。`reducedMotion` では付けない。
+惰性で回る間もスピンと同じ方式で回転音と触覚を鳴らす（下記「触覚の仕組み」「回転音の仕組み」）。
 
 ### 触覚の仕組み
 
@@ -117,6 +118,9 @@ iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
 先に求め、`TickScheduler` の `Task` でカウンタを刻む。完了・中断でキャンセルし、`reducedMotion` では刻まない。
 指で盤面を動かしている間の境目は別のカウンタ `dragBoundaryTick` で、スピン中の `.selection` より強い
 `.impact(weight: Config.hapticDragBoundaryWeight)` を返す（利用者の操作なので `reducedMotion` でも鳴らす）。
+閾値未満で離したあとの惰性の間は、盤面が自分で回っているのでスピン中と同じ `boundaryTick`（`.selection`）を刻む。`beginCoast` が
+惰性の曲線（`FlickCoast.easing`・その長さ）で `HapticSchedule.boundaryCrossings` を求めて `TickScheduler` に渡し、
+`stopCoast`（惰性の途中で盤面に触れた・画面を離れた）と `beginSpin`（刻みをスピンのものに差し替える）でキャンセルする。
 ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚フィードバック」だけで、長押しには触れない。
 
 ### 回転音の仕組み
@@ -127,7 +131,10 @@ ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚
 リズムが揺れるため）。`Config.clickMinInterval` より詰まった時刻は間引く。音源は `Resources/Sounds/click.wav`
 （`scripts/make-click-sound.swift` で再生成）。`AVAudioSession` は `.ambient` で、消音スイッチに従い他アプリの
 音も止めない。`reducedMotion` では鳴らさない。指で盤面を動かしている間は、境目を越えたその場で `playClick()` で 1 回ずつ
-鳴らす（`reducedMotion` でも鳴らす）。ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
+鳴らす（`reducedMotion` でも鳴らす）。閾値未満で離したあとの惰性の間も、`beginCoast` が惰性の曲線で `SpinTicks.boundaryCrossings` を
+求めた `clickTimes` を `play(at:)` で一度に流す（1 発ずつタイマーでは鳴らさない）。惰性の途中で盤面に触れたら `RouletteScreen.grab` が
+`sound.stop()` で残りを止め、スピンを始めたら次の `play(at:)` が差し替える。惰性は `reducedMotion` では付かないので鳴らない。
+ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 
 ### 3D 表示の仕組み
 
@@ -139,7 +146,7 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 場面は盤面の枠より `Theme.Wheel3D.overscan` だけ広く描き（触れた操作は受けない）、傾いた盤や針が切れないようにする。
 
 回転は 2D と同じ `rotation` / `dragRotation` / `spinEasing` から決める。補間は SwiftUI に任せ（`Wheel3DSurface` の
-`animatableData` と `.animation(Theme.spinAnimation(easing:), value: rotation)`）、毎フレームの角度を盤のノードに写すだけなので、
+`animatableData` と `.animation(Theme.spinAnimation(easing:duration:), value: rotation)`。惰性も同じ曲線と長さ）、毎フレームの角度を盤のノードに写すだけなので、
 2D と同じ時刻に同じ角度で止まる。スピンの完了は今どおり `withAnimation … completion:` と `Config.spinFallback` で判定し、
 3D 側の描画の完了には依らない。ドラッグ追従とフリックは 2D と同じ `WheelDragArea` が盤面の枠（overscan を含まない正方形）で受け、
 角速度は画面平面上の指の動きのまま。
