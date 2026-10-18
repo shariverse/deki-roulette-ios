@@ -72,6 +72,7 @@ struct WheelLightsView: View {
 /// 待機中・止まり切った惰性・指の動きが止まり切ったあとは `TimelineView` を止め（角度が変われば親の描き直しで足りる）、
 /// 結果表示中は点滅と脈動のために動かす（点滅の間は毎フレーム、脈動だけになったら `Config.effectPulseFrameInterval` ごと）。
 /// 動きを減らす設定では止めたまま一定の明るさで点ける。`enabled` が false なら止めたまま場面を nil で渡す（電飾を出さない）。
+/// false の間は流れを進めないので、true に戻したら流れはそのときの盤面の角度から始め直す（出していない間に回った分を流さない）。
 /// 入力は角度・動き・結果を出しているかだけで、項目・指定（`targetId`）・印は受け取らない。
 struct WheelLightsTimeline<Content: View>: View {
     var enabled = true
@@ -127,6 +128,10 @@ struct WheelLightsTimeline<Content: View>: View {
         }
         .onAppear {
             if flow == nil { flow = LightFlowBox() }
+        }
+        .onChange(of: enabled) { _, enabled in
+            // 出していない間は流さないので、次に出したときに溜まった角度の差を流さないよう、そのときの角度から始め直す
+            if !enabled { flow?.value = WheelLights.Flow() }
         }
     }
 
