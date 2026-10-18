@@ -438,11 +438,12 @@ struct SpinTeaseTests {
     @Test func 開始時刻つきの動きは焦らしの区間の角度と角速度を引く() {
         let path = SpinPath.teased(.rollBack, from: 10, to: 1532, count: 8)
         let timed = TimedSpinMotion(path: path, start: 100)
+        // 100 + elapsed - 100 は elapsed に丸めの誤差が乗るので、角度（千度単位）・角速度の差は 1e-11 ほど出る
         for step in 0...60 {
             let elapsed = Double(step) / 10
-            #expect(abs(timed.angle(now: 100 + elapsed) - path.angle(at: elapsed)) < 1e-12)
-            #expect(abs(timed.angularVelocity(now: 100 + elapsed) - path.angularVelocity(at: elapsed)) < 1e-12)
-            #expect(abs(timed.intensity(now: 100 + elapsed) - path.intensity(at: elapsed)) < 1e-12)
+            #expect(abs(timed.angle(now: 100 + elapsed) - path.angle(at: elapsed)) < 1e-9)
+            #expect(abs(timed.angularVelocity(now: 100 + elapsed) - path.angularVelocity(at: elapsed)) < 1e-9)
+            #expect(abs(timed.intensity(now: 100 + elapsed) - path.intensity(at: elapsed)) < 1e-9)
         }
         // 戻る区間では角速度が負になる（電飾の流れも逆向きに引ける）
         #expect(timed.angularVelocity(now: 100 + Config.spinDuration + 0.2) < 0)
