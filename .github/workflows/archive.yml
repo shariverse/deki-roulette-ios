@@ -1,6 +1,6 @@
 name: Archive
 
-# main は TestFlight へ上げないので、署名と IPA の書き出しが通ることだけをここで確かめる。
+# main は TestFlight へ上げないので、署名と IPA の書き出しが通ることだけをここで確かめる（iOS と visionOS の両方）。
 # それ以外のブランチは Build（ビルド + テスト）と、develop / release なら Upload が受け持つ。
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
 
       # 署名はエクスポート時に App Store Connect API キーで行うので、アーカイブでは署名しない。
       # ビルド番号は run_number で一意にし、同じ番号のアップロードで弾かれないようにする。
-      - name: Archive
+      - name: Archive (iOS)
         run: |
           xcodebuild archive \
             -project DekiRoulette.xcodeproj \
@@ -52,12 +52,36 @@ jobs:
           mkdir private_keys
           echo -n '${{ secrets.APPLE_API_KEY_BASE64 }}' | base64 --decode > ./private_keys/AuthKey_${{ secrets.APPLE_API_ISSUER_ID }}.p8
 
-      - name: Export IPA
+      - name: Export IPA (iOS)
         run: |
           xcodebuild -exportArchive \
             -archivePath build.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
             -exportPath app.ipa \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$(pwd)/private_keys/AuthKey_${{ secrets.APPLE_API_ISSUER_ID }}.p8" \
+            -authenticationKeyID ${{ secrets.APPLE_API_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APPLE_API_ISSUER_ID }}
+
+      # visionOS も同じ手順（アーカイブ → 書き出し）が通ることを確かめる。
+      # デバイス向けの SDK は iOS の iphoneos に対して xros
+      - name: Archive (visionOS)
+        run: |
+          xcodebuild archive \
+            -project DekiRoulette.xcodeproj \
+            -scheme DekiRoulette \
+            -sdk xros \
+            -configuration Release \
+            -archivePath build-visionos.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }}
+
+      - name: Export IPA (visionOS)
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build-visionos.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath app-visionos.ipa \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$(pwd)/private_keys/AuthKey_${{ secrets.APPLE_API_ISSUER_ID }}.p8" \
             -authenticationKeyID ${{ secrets.APPLE_API_KEY_ID }} \

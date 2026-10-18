@@ -21,14 +21,15 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 | ワークフロー | トリガー | 内容 |
 |---|---|---|
 | Build | 全ブランチへの push と Fork からの PR | iOS と visionOS のシミュレータでビルドしてユニットテストを実行 |
-| Archive | `main` への push、手動実行 | Release 構成でアーカイブし、App Store Connect API キーで署名して IPA を書き出す |
-| Upload | `develop` と `release/**` への push、手動実行 | Archive に加えて TestFlight へアップロードし、IPA を Artifacts に残す |
+| Archive | `main` への push、手動実行 | iOS と visionOS を Release 構成でアーカイブし、App Store Connect API キーで署名して IPA を書き出す |
+| Upload | `develop` と `release/**` への push、手動実行 | Archive に加えて iOS と visionOS を TestFlight へアップロードし、IPA を Artifacts に残す |
 
 ドキュメントだけの変更（`**/*.md`、`docs/**`）では Build を実行しない（Upload / Archive は実行する）。
 
 作業ブランチで走るのは Build だけ。TestFlight へのアップロードには App Store Connect 側の 24 時間あたりの
 上限（`Upload limit reached (90382)`）があり、作業ブランチまで上げていると枠を使い切るため。
-作業ブランチのビルドを実機で確認したいときは、Upload を手動実行してそのブランチを選ぶ。
+作業ブランチのビルドを実機で確認したいときは、Upload を手動実行してそのブランチを選ぶ（1 回で iOS と
+visionOS の 2 つを上げるので、その分だけ枠を使う）。
 
 ビルド番号 (`CFBundleVersion`) はワークフローの `run_number` で上書きする。Archive / Upload には次の Secrets が必要:
 
@@ -40,7 +41,11 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 | `APPLE_API_ISSUER_ID` | 同キーの Issuer ID |
 
 署名もアップロードもこの API キーで行う。Upload が通るには、App Store Connect に Bundle ID
-`com.basekeita.roulette` のアプリがあらかじめ登録されている必要がある。
+`com.basekeita.roulette` のアプリがあらかじめ登録されている必要がある。iOS と visionOS は同じアプリ
+（同じ Bundle ID）に上がり、TestFlight ではプラットフォームごとに並ぶ。visionOS はアプリのページの
+サイドバーの「Add Platform」でプラットフォームを追加しておく（追加前は altool が
+`Cannot determine the Apple ID from Bundle ID ... and platform 'VISION_OS'` で止まる。ロールは
+Account Holder / Admin / App Manager が必要）。
 
 ## 環境
 
