@@ -124,6 +124,63 @@ struct WheelLightsTests {
         #expect(abs(second - 30) < 1e-9)
     }
 
+    @Test func 遅れてよい上限は電球1個分() {
+        // 電球 1 個は盤面で 15 度 ÷ 0.25 = 60 度
+        #expect(abs(WheelLights.maxFlowLag(count: count) - 60) < 1e-9)
+        #expect(WheelLights.maxFlowLag(count: 0) == 0)
+    }
+
+    /// 指で動かしている間は、角度が変わる描き直し（指の動き）が `TimelineView` の描き直しの直後に来て経過時間が短く、
+    /// 角度の変わらない `TimelineView` の描き直しの経過時間が長い。持ち越した遅れで追いつき、上限より遅い動きは捨てない。
+    @Test func 指の動きと描き直しの時刻がずれても上限より遅ければ盤面と同じだけ流す() {
+        var flow = WheelLights.Flow()
+        _ = flow.advance(to: 0, at: 0, count: count)
+        var board = 0.0
+        for frame in 1...60 {
+            let tick = Double(frame) / 60
+            // 指の動き（1 フレームに 20 度 = 1,200°/秒。上限の 1,800°/秒より遅い）は描き直しの 0.5ms 後
+            board += 20
+            let touched = flow.advance(to: board, at: tick - 1.0 / 60 + 0.0005, count: count)
+            #expect(touched <= board + 1e-9)
+            // 次の `TimelineView` の描き直しで追いつく
+            #expect(abs(flow.advance(to: board, at: tick, count: count) - board) < 1e-9)
+        }
+    }
+
+    @Test func 遅れは上限まで持ち越し超える分は捨てる() {
+        for direction in [1.0, -1.0] {
+            var flow = WheelLights.Flow()
+            _ = flow.advance(to: 0, at: 0, count: count)
+            // 1 フレームに盤面が 1,000 度進んで止まる。1 フレーム目は上限の 30 度、残りは遅れの上限 60 度まで持ち越して追いつく
+            #expect(abs(flow.advance(to: direction * 1000, at: 1.0 / 60, count: count) - direction * 30) < 1e-9)
+            var angles: [Double] = []
+            for frame in 2...10 {
+                angles.append(flow.advance(to: direction * 1000, at: Double(frame) / 60, count: count))
+            }
+            #expect(abs(angles[0] - direction * 60) < 1e-9)
+            #expect(abs(angles[1] - direction * 90) < 1e-9)
+            // 追いついたら止まる（捨てた分は取り戻さない）
+            #expect(angles.dropFirst(2).allSatisfy { abs($0 - direction * 90) < 1e-9 })
+            // そのあと盤面が上限より遅く動けば、同じだけ進む
+            let next = flow.advance(to: direction * 1010, at: 11.0 / 60, count: count)
+            #expect(abs(next - direction * 100) < 1e-9)
+        }
+    }
+
+    @Test func 速いスピンのあとは減速して遅れを取り戻し盤面と同じだけ進む() {
+        let motion = SpinMotion(from: 0, to: 360 * 8 + 100, duration: Config.spinDuration, easing: Config.spinEasing)
+        var flow = WheelLights.Flow()
+        var differences: [Double] = []
+        let frames = Int(Config.spinDuration * 60)
+        for frame in 0...frames {
+            let board = motion.angle(at: Double(frame) / 60)
+            differences.append(board - flow.advance(to: board, at: Double(frame) / 60, count: count))
+        }
+        // 止まる前に遅れ（捨てた分）は一定になり、盤面と同じだけ進む
+        let tail = differences.suffix(30)
+        #expect(tail.allSatisfy { abs($0 - tail.first!) < 1e-9 })
+    }
+
     @Test func 並びは滑らかに隣へ移る() {
         // 電球の半分ぶん進んだところでは、隣り合う 2 個が半分ずつ点く
         let half = 360 / Double(count) / Config.wheelLightFlowFactor / 2

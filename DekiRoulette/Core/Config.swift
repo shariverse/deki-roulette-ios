@@ -93,6 +93,12 @@ enum Config {
     /// （並びは 3 個おきなので、1.5 個で向きが分からなくなる）。上限を超える速さでは並びが盤面より遅れて流れる（`WheelLights.Flow`）。
     static let wheelLightMaxFlowPerFrame = 0.5
 
+    /// 電飾の光の並びが盤面より遅れてよい上限（電球の個数）。1 フレームの上限で流し切れなかった分はここまで次の描き直しに持ち越して追いつかせ、
+    /// 超える分は捨てる。指で動かしている間は指の動き（親の描き直し）と `TimelineView` の描き直しの時刻がずれ、角度が変わった描き直しの
+    /// 経過時間が短くなるので、持ち越さないと上限より遅い動きでも流れを捨ててしまう。1 個（盤面で 60 度）は上限の速さの 2 フレーム分で、
+    /// 速く回したあとも 2 フレームで追いつく（`WheelLights.Flow`）。
+    static let wheelLightMaxFlowLag = 1.0
+
     /// 演出の上限を時間あたりに直すときの 1 フレームの長さ（秒）。iPhone のアプリは 60Hz で描くので 1/60 秒
     /// （120Hz・90Hz の画面では 1 フレームあたりはもっと小さくなる）。
     static let effectReferenceFrameInterval: TimeInterval = 1.0 / 60
