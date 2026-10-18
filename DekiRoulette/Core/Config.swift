@@ -66,6 +66,14 @@ enum Config {
     /// フリックの角速度を、指を離す直前のこの時間（秒）に回った角度から求める。
     static let flickSampleWindow: TimeInterval = 0.15
 
+    // MARK: スピンの演出
+
+    /// 速さに連動する演出の強さが 1（最大）になる角速度（度/秒）。これ未満は角速度に比例して弱める（`SpinEffectIntensity`）。
+    static let effectFullIntensityVelocity: Double = 720
+
+    /// 演出用にドラッグ中の角速度を滑らかにする時定数（秒）。フレームごとに新しい値へこの時間で約 63% 寄せる。
+    static let effectSmoothingTime: TimeInterval = 0.08
+
     /// 削除した項目を「元に戻す」で戻せる時間。過ぎると削除が確定する。
     static let undoDuration: TimeInterval = 5
 
