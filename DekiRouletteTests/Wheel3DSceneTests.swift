@@ -1094,6 +1094,24 @@ struct Wheel3DSceneTests {
         #expect(distance(cleared.color(at: inner), plain.color(at: inner)) < 0.01)
     }
 
+    @Test func フラッシュは針に隠れる() throws {
+        // 針の先の近く（中心から 148pt）でも光がはっきり見えるよう、不透明度 1 で光らせる
+        // （0.25 だと針の先のあたりの不透明度は 0.25 × 1.4 × 12 ÷ 160 ≈ 0.03 で、針の色の許容 0.04 に収まってしまう）
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.stopEffects(WheelStopEffects.Frame(flashOpacity: 1, glowLevel: 1))
+        let pixels = try render(scene)
+        let y = 148 * Double(size) / WheelLabel.referenceDiameter
+        // 針のすぐ横（縁の上）は光る（不透明度 ≈ 1.4 × 12 ÷ 160 ≈ 0.1）
+        let beside = location(x: 8 * Double(size) / WheelLabel.referenceDiameter, y: y, pixels: pixels)
+        #expect(brightness(pixels.color(at: beside)) > brightness(plain.color(at: beside)) + 0.05,
+                "\(pixels.color(at: beside)) \(plain.color(at: beside))")
+        // 針（先から約 6pt 上で幅 5pt）は光の手前で、針の色のまま（光が上に重なると緑・青が約 0.07 明るくなり許容を超える）
+        let pointer = pixels.color(at: location(x: 0, y: y, pixels: pixels))
+        #expect(isClose(pointer, srgb(Theme.flare)), "\(pointer)")
+        #expect(isClose(plain.color(at: location(x: 0, y: y, pixels: plain)), srgb(Theme.flare)))
+    }
+
     /// 止まったスライス 2 を強調した盤。`afterglow` は「スピンの演出」が「なし」以外（余韻を出せる形）か。
     /// 動きを減らす設定では余韻を出さないので、どちらも押し出す側（`reduceMotion: false`）で比べる。
     private func glowingScene(afterglow: Bool, level: Double? = nil) -> Wheel3DScene {
