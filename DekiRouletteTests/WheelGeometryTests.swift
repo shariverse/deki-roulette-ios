@@ -7,6 +7,14 @@ struct WheelGeometryTests {
         abs(a.x - b.x) < 1e-9 && abs(a.y - b.y) < 1e-9
     }
 
+    @Test func スライスの円は盤面の枠から基準直径で16pt内側で直径に比例する() {
+        #expect(abs(WheelGeometry.sliceRadius(diameter: 320) - 144) < 1e-9)
+        #expect(abs(WheelGeometry.sliceRadius(diameter: 480) - 216) < 1e-9)
+        #expect(WheelGeometry.sliceRadius(diameter: -10) == 0)
+        // 結果の帯の寸法と同じ値
+        #expect(WheelGeometry.sliceInset == ResultBand.baseSliceInset)
+    }
+
     @Test func 零度は12時() {
         #expect(isClose(WheelGeometry.point(angle: 0, radius: 10), SIMD2(0, 10)))
     }

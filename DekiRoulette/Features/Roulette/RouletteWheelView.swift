@@ -202,7 +202,7 @@ struct WheelFaceView: View {
 
     var body: some View {
         let scale = side / Self.referenceSize
-        let radius = side / 2 - 16 * scale
+        let radius = CGFloat(WheelGeometry.sliceRadius(diameter: Double(side)))
         let center = CGPoint(x: side / 2, y: side / 2)
         let count = items.count
         let sliceAngle = count > 0 ? 360.0 / Double(count) : 360

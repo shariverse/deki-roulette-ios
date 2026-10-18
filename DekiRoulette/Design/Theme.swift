@@ -228,6 +228,26 @@ enum Theme {
         static let haloWidth: CGFloat = 5
         /// にじみの光の中心の不透明度（にじみの強さ × 明るさに掛ける）。
         static let haloOpacity = 0.6
+
+        /// 直径 `diameter`（pt）の盤面での電球の環の半径（pt）。スライスの円（`WheelGeometry.sliceRadius`）の外 `ringOffset`。
+        /// 2D の `WheelLightsView` と 3D の `Wheel3DScene` が同じ値を使う。
+        static func ringRadius(diameter: CGFloat) -> CGFloat {
+            CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + ringOffset * scale(diameter)
+        }
+
+        /// 直径 `diameter`（pt）の盤面での電球の半径（pt）。
+        static func bulbRadius(diameter: CGFloat) -> CGFloat {
+            bulbRadius * scale(diameter)
+        }
+
+        /// 直径 `diameter`（pt）の盤面での、にじみが最も強いときに電球の外へ広げる光の幅（pt）。
+        static func haloWidth(diameter: CGFloat) -> CGFloat {
+            haloWidth * scale(diameter)
+        }
+
+        private static func scale(_ diameter: CGFloat) -> CGFloat {
+            max(diameter, 0) / CGFloat(WheelLabel.referenceDiameter)
+        }
     }
 
     // MARK: 光の尾・残像

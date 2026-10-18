@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import DekiRoulette
@@ -179,6 +180,19 @@ struct WheelLightsTests {
         // 止まる前に遅れ（捨てた分）は一定になり、盤面と同じだけ進む
         let tail = differences.suffix(30)
         #expect(tail.allSatisfy { abs($0 - tail.first!) < 1e-9 })
+    }
+
+    @Test func 電球の環はスライスの円の外8ptで縁の中に収まる() {
+        let side: CGFloat = 320
+        let slice = CGFloat(WheelGeometry.sliceRadius(diameter: Double(side)))
+        #expect(abs(Theme.LightRing.ringRadius(diameter: side) - (slice + 8)) < 1e-9)
+        // にじみが最も強くても盤面の枠を越えない（直径に比例）
+        for diameter: CGFloat in [200, 320, 480] {
+            let outer = Theme.LightRing.ringRadius(diameter: diameter) + Theme.LightRing.bulbRadius(diameter: diameter)
+                + Theme.LightRing.haloWidth(diameter: diameter)
+            #expect(outer <= diameter / 2 + 1e-9)
+            #expect(abs(Theme.LightRing.bulbRadius(diameter: diameter) - 2.2 * diameter / 320) < 1e-9)
+        }
     }
 
     @Test func 並びは滑らかに隣へ移る() {

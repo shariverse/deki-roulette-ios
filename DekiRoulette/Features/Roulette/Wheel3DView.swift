@@ -360,7 +360,7 @@ final class Wheel3DScene {
         let diameter = Double(shape.diameter)
         let scale = diameter / WheelLabel.referenceDiameter
         // 2D の盤面と同じ割り付け（外周の縁の内側にスライスを置く）
-        let radius = diameter / 2 - 16 * scale
+        let radius = WheelGeometry.sliceRadius(diameter: diameter)
         let thickness = Double(Theme.Wheel3D.thickness) * scale
         let count = shape.count
 
@@ -470,7 +470,7 @@ final class Wheel3DScene {
     private func makeStopped(_ highlight: Wheel3DHighlight, shape: Shape, lifted: Bool) -> SCNNode {
         let diameter = Double(shape.diameter)
         let scale = diameter / WheelLabel.referenceDiameter
-        let radius = diameter / 2 - 16 * scale
+        let radius = WheelGeometry.sliceRadius(diameter: diameter)
         let count = shape.count
         // 縁より少し手前（ハブよりは奥）まで持ち上げる。動きを減らす設定では暗くする層のすぐ上に置くだけにする
         let lift = lifted ? Double(Theme.Wheel3D.rimLift) * scale + 0.5 : 0.5
@@ -694,8 +694,7 @@ private struct DimmedSlices: View {
     let diameter: Double
 
     var body: some View {
-        let scale = diameter / WheelLabel.referenceDiameter
-        let radius = diameter / 2 - 16 * scale
+        let radius = WheelGeometry.sliceRadius(diameter: diameter)
         let sliceAngle = 360 / Double(max(count, 1))
         ZStack {
             ForEach(0..<count, id: \.self) { index in
@@ -721,7 +720,7 @@ private struct StoppedSlice: View {
     var body: some View {
         let side = CGFloat(diameter)
         let scale = side / CGFloat(WheelLabel.referenceDiameter)
-        let radius = side / 2 - 16 * scale
+        let radius = CGFloat(WheelGeometry.sliceRadius(diameter: Double(side)))
         let count = items.count
         let color = Theme.sliceColor(in: items, at: index)
         let limit = WheelLabel.limit(count: count, diameter: diameter)

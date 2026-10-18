@@ -20,8 +20,8 @@ enum ResultBand {
     static let lineHeightRatio: Double = 1.2
     /// 中心のハブの直径（基準の直径での pt）。`RouletteWheelView` のハブと同じ。
     static let baseHubDiameter: Double = 38
-    /// 盤面の外枠からスライスの円までの距離（基準の直径での pt）。`RouletteWheelView` と同じ。
-    static let baseSliceInset: Double = 16
+    /// 盤面の外枠からスライスの円までの距離（基準の直径での pt）。`RouletteWheelView` と同じ（`WheelGeometry.sliceInset`）。
+    static let baseSliceInset: Double = WheelGeometry.sliceInset
 
     // MARK: 登場演出（「スピンの演出」が「なし」以外のとき）
 
