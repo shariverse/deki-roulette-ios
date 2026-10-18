@@ -322,6 +322,11 @@ final class Wheel3DScene {
     private var shownStopEffects = WheelStopEffects.Frame.none
     /// フラッシュの板を作ったか（テストで、「なし」では作らないことを見る）。
     var hasFlashNode: Bool { flashNode != nil }
+    /// フラッシュの板の一辺・縮め・盤の表面からの高さ（テストで、正面から見た半径が盤面の枠の半径になることを確かめる）。
+    var flashPlacement: (side: Double, scale: Double, z: Double)? {
+        guard let node = flashNode, let plane = node.geometry as? SCNPlane else { return nil }
+        return (Double(plane.width), Double(node.scale.x), Double(node.position.z))
+    }
     /// 止まったスライスに貼った画像の板の数（テストで、「なし」は 1 枚・余韻を出すときは 2 枚であることを見る）。
     var stoppedImagePlaneCount: Int {
         stoppedNode?.childNodes.filter { $0.geometry is SCNPlane }.count ?? 0

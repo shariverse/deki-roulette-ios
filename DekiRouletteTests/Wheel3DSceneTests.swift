@@ -1004,14 +1004,24 @@ struct Wheel3DSceneTests {
     }
 
     @Test func 紙吹雪は盤面の枠の外へ広げない() throws {
+        // 直径 480 で、遠近の広がりを打ち消しているときだけ「外」になる位置を見る
+        var large = self
+        large.size = 480
+        try large.checkConfettiInsideFrame()
+    }
+
+    /// 枠の右端に接する紙片（枠の内側 8pt）が、正面から見て枠の右端（盤の中心から半径 = 直径 ÷ 2）で切れて見えるか。
+    /// 手計算（直径 480）: 紙吹雪の面の高さ z = 針の奥行き = (6 × 1.5 + 1) + 2 = 12pt、描く範囲 624pt、カメラまでの距離
+    /// d = 312 ÷ tan 15° ≈ 1164.4pt で、縮めないと d ÷ (d − z) ≈ 1.0104 倍に広がり、紙片の外端は 240 × 1.0104 ≈ 242.5pt に見える。
+    /// 縮めれば外端は 240pt。「外」として見る 241pt は、縮めれば外（1pt）、縮めなければ内（1.5pt）になる。
+    private func checkConfettiInsideFrame() throws {
         let plain = try render(makeScene(count: 4, rotation: 0))
         let scene = makeScene(count: 4, rotation: 0)
-        // 枠の右端に接する紙片（枠の内側 8pt）
         scene.particles(WheelParticles.Frame(confetti: [confetto(at: CGPoint(x: size - 4, y: size / 2), side: 8)]))
         let pixels = try render(scene)
         let inside = location(x: Double(size) / 2 - 4, y: 0, pixels: pixels)
         #expect(isClose(pixels.color(at: inside), srgb(Theme.confettiColors[7])), "\(pixels.color(at: inside))")
-        let outside = location(x: Double(size) / 2 + 2, y: 0, pixels: pixels)
+        let outside = location(x: Double(size) / 2 + 1, y: 0, pixels: pixels)
         #expect(distance(pixels.color(at: outside), plain.color(at: outside)) < 0.01, "\(pixels.color(at: outside))")
     }
 
@@ -1068,11 +1078,16 @@ struct Wheel3DSceneTests {
         #expect(gain(hub) > 0.05, "\(gain(hub))")
         #expect(gain(inner) > 0.05, "\(gain(inner))")
         #expect(gain(inner) > gain(outer) + 0.03, "\(gain(inner)) \(gain(outer))")
-        // 枠の角（円の外）と針は変えない
+        // 枠の角（円の外）は変えない
         let corner = location(x: Double(size) / 2 - 3, y: -Double(size) / 2 + 3, pixels: pixels)
         #expect(distance(pixels.color(at: corner), plain.color(at: corner)) < 0.01, "\(pixels.color(at: corner))")
-        let pointer = pixels.color(at: location(x: 0, y: Double(size) / 2 - 8, pixels: pixels))
-        #expect(isClose(pointer, srgb(Theme.flare)), "\(pointer)")
+        // 正面から見た丸い光の半径は、浮かせた分の遠近の広がりを打ち消して盤面の枠の半径と同じ。光は縁へ向けて 0 まで薄くなるので、
+        // 縁の近くの画素では縮めの有無を見分けられない（直径 320 で縮めないと半径 ≈ 161.3pt、縁から 1pt 内の不透明度は 0.25 × 1.4 × 2.3 ÷ 161.3 ≈ 0.005）。
+        // 板の置き方から求める（縮めないと 1.0084 倍で、許容を超える）
+        let placement = try #require(scene.flashPlacement)
+        let distanceToCamera = WheelGeometry.cameraDistance(diameter: Double(canvas), fieldOfView: Theme.Wheel3D.fieldOfView)
+        let apparent = placement.side / 2 * placement.scale * distanceToCamera / (distanceToCamera - placement.z)
+        #expect(abs(apparent - Double(size) / 2) < 1e-3, "\(apparent)")
         // 消えたら今の盤面のまま
         scene.stopEffects(.none)
         let cleared = try render(scene)
