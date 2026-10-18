@@ -17,6 +17,8 @@ import SwiftUI
 /// 姿勢を読むのは、この盤面が画面に出ていてアプリが前面にある間だけ。揺れは見た目だけで、回転・結果・音・触覚には影響しない。
 /// `showsLights` のときは 2D と同じ外周の電飾を盤と同じ面の縁の上に出す（回らない）。明るさは 2D と共有の `WheelLightsTimeline` が
 /// 同じ時計（`now`）・同じ規則（`WheelLights`）で毎フレーム引き、盤の角度と同じく SceneKit のノードに写す。
+/// `showsTrails` のときは 2D と同じ光の尾と残像を盤と同じ面に出す（回らない）。2D と共有の `WheelTrailsTimeline` が同じ時計・同じ規則
+/// （`WheelTrails`）で毎フレーム引き、`Wheel3DScene.trail(_:)` が残像の角度・濃さと光の尾の切れ端の濃さだけをノードに写す。
 struct Wheel3DView: View {
     let items: [Item]
     let rotation: Double
@@ -30,7 +32,9 @@ struct Wheel3DView: View {
     var result: Wheel3DResult? = nil
     /// 外周の電飾を出すか（「スピンの演出」が電飾・全部入り）。false なら今の盤面のまま何も足さない。
     var showsLights = false
-    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れと明るさを毎フレームここから引く。
+    /// 光の尾と残像を出すか（「スピンの演出」が光の尾・全部入り）。false なら今の盤面のまま何も足さない。
+    var showsTrails = false
+    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れと明るさ、光の尾・残像を毎フレームここから引く。
     /// 指で動かしている間は、`WheelDragArea` が記録した指の動き（`WheelDragMotion`）から引く。
     var motion: TimedSpinMotion? = nil
     /// `motion` の開始時刻と同じ時計（`RouletteModel.now`）。
@@ -62,8 +66,8 @@ struct Wheel3DView: View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
             onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease,
-            // 電飾を出すときだけ、指で動かしている動きを記録する（「なし」では今のまま記録しない）
-            tracksMotion: showsLights, now: now
+            // 電飾・光の尾を出すときだけ、指で動かしている動きを記録する（「なし」では今のまま記録しない）
+            tracksMotion: showsLights || showsTrails, now: now
         ) { dragRotation, displacedByDrag, dragMotion in
             // 結果が出たあとに指で動かしたら強調を解く（結果の帯は残る）
             let highlight = displacedByDrag ? nil : highlightedIndex
@@ -77,14 +81,20 @@ struct Wheel3DView: View {
                     stoppedAt: highlight != nil ? stopStart : nil,
                     now: now
                 ) { lights in
-                    // 追従の角度は足すだけにする。ドラッグ中は `rotation` が変わらないので下の `.animation` は掛からず、指にそのまま付いてくる。
-                    // 指を離した更新では、親が追従の角度を `rotation` に取り込むのと `dragRotation` を 0 に戻すのが同じ更新に入るので、
-                    // 盤は離した角度から続く
-                    Wheel3DSurface(
-                        items: items, rotation: rotation + dragRotation, tilt: tilt, diameter: side, displayScale: displayScale,
-                        highlight: highlight.map { Wheel3DHighlight(index: $0, glowStyle: glowStyle) },
-                        result: result, lights: lights, reduceMotion: reduceMotion
-                    )
+                    // 光の尾・残像も 2D と同じ時計で毎フレーム引く。出さないときは止めたまま `.none` を渡す
+                    WheelTrailsTimeline(
+                        enabled: showsTrails, sliceCount: items.count, rotation: rotation, dragRotation: dragRotation,
+                        motion: motion, drag: dragMotion, now: now
+                    ) { trails in
+                        // 追従の角度は足すだけにする。ドラッグ中は `rotation` が変わらないので下の `.animation` は掛からず、指にそのまま付いてくる。
+                        // 指を離した更新では、親が追従の角度を `rotation` に取り込むのと `dragRotation` を 0 に戻すのが同じ更新に入るので、
+                        // 盤は離した角度から続く
+                        Wheel3DSurface(
+                            items: items, rotation: rotation + dragRotation, tilt: tilt, diameter: side, displayScale: displayScale,
+                            highlight: highlight.map { Wheel3DHighlight(index: $0, glowStyle: glowStyle) },
+                            result: result, lights: lights, trails: trails, reduceMotion: reduceMotion
+                        )
+                    }
                 }
                 .frame(width: canvas, height: canvas)
                 .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
@@ -151,6 +161,8 @@ private struct Wheel3DSurface: View, Animatable {
     let result: Wheel3DResult?
     /// 外周の電飾の場面。電飾を出さないときは nil。
     let lights: WheelLights.Scene?
+    /// 光の尾と残像。出さないとき・描かない間は `.none`。
+    let trails: WheelTrails.Frame
     let reduceMotion: Bool
 
     nonisolated var animatableData: Double {
@@ -161,7 +173,7 @@ private struct Wheel3DSurface: View, Animatable {
     var body: some View {
         Wheel3DSceneView(
             items: items, rotation: rotation, tilt: tilt, diameter: diameter, displayScale: displayScale,
-            highlight: highlight, result: result, lights: lights, reduceMotion: reduceMotion
+            highlight: highlight, result: result, lights: lights, trails: trails, reduceMotion: reduceMotion
         )
     }
 }
@@ -175,6 +187,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
     let lights: WheelLights.Scene?
+    let trails: WheelTrails.Frame
     let reduceMotion: Bool
 
     func makeCoordinator() -> Wheel3DScene {
@@ -200,6 +213,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
         context.coordinator.highlight(highlight, reduceMotion: reduceMotion)
         context.coordinator.show(result: result, reduceMotion: reduceMotion)
         context.coordinator.light(lights)
+        context.coordinator.trail(trails)
     }
 }
 
@@ -223,11 +237,31 @@ final class Wheel3DScene {
     private var stoppedNode: SCNNode?
     private var shownHighlight: Wheel3DHighlight?
     private let postNode = SCNNode()
-    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は組み直すたびに作り、出さない間は隠す。
+    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は初めて出すときに作り（「なし」では作らない）、
+    /// 組み直したら作り直し、出さない間は隠す。
     private let lightsNode = SCNNode()
     private var bulbNodes: [SCNNode] = []
     private var haloNodes: [SCNNode] = []
+    /// 電球ごとに最後に塗った明るさ。明るさが変わらない電球の素材は書き換えない。
+    private var bulbLevels: [Double?] = []
     private var shownLights: WheelLights.Scene?
+    /// 電球の素材の色を書き換えた回数（テストで、明るさの変わらない電球を書き換えていないかを見る）。
+    private(set) var bulbColorWriteCount = 0
+    /// 作った電球の数（テストで、電飾を出さない間は作らないことを見る）。
+    var bulbCount: Int { bulbNodes.count }
+    /// 残像（`tiltNode` に載せ、盤と一緒に傾くが回らない）。遅れた角度のスライスの塗り（ハブの内側は抜く）の 1 つの形を、
+    /// 残像の枚数分のノードで共有し、毎フレーム角度と不透明度だけを変える。初めて描くときに作り（「なし」では作らない）、組み直したら作り直す。
+    private let ghostsNode = SCNNode()
+    private var ghostNodes: [SCNNode] = []
+    /// 光の尾（`tiltNode` に載せ、回らない）。同じ形の弧の切れ端（芯とにじみ）を 12 時から並べ、毎フレーム濃さだけを変える。
+    private let trailNode = SCNNode()
+    private var trailCoreNodes: [SCNNode] = []
+    private var trailGlowNodes: [SCNNode] = []
+    /// 切れ端を並べている向き（尾が伸びる側）。
+    private var trailDirection: SpinDirection?
+    private var shownTrails = WheelTrails.Frame.none
+    /// 光の尾・残像のノードを作ったか（テストで、出さない間は作らないことを見る）。
+    var hasTrailNodes: Bool { !trailCoreNodes.isEmpty }
 
     private struct Shape: Equatable {
         /// 項目。比べるのはラベルと見た目だけ（`id` が変わっても見た目が同じなら組み直さない）。
@@ -270,7 +304,11 @@ final class Wheel3DScene {
 
         tiltNode.addChildNode(spinNode)
         tiltNode.addChildNode(pointerNode)
+        tiltNode.addChildNode(ghostsNode)
+        tiltNode.addChildNode(trailNode)
         tiltNode.addChildNode(lightsNode)
+        ghostsNode.isHidden = true
+        trailNode.isHidden = true
         lightsNode.isHidden = true
         scene.rootNode.addChildNode(tiltNode)
         scene.rootNode.addChildNode(postNode)
@@ -430,7 +468,178 @@ final class Wheel3DScene {
         addHub(scale: scale)
         addPost(thickness: thickness, scale: scale)
         addPointer(diameter: diameter, scale: scale)
-        addLights(diameter: diameter, scale: scale, displayScale: shape.displayScale)
+        // 電球は大きさに合わせて作り直す。出していなければ次に出すときに作る
+        removeLights()
+        if shownLights != nil { addLights(shape) }
+        applyLights()
+        removeTrails()
+        if !shownTrails.isEmpty { addTrails(shape) }
+        applyTrails()
+    }
+
+    // MARK: 光の尾・残像
+
+    /// 止まっていないスライスを暗くする層と、止まったスライスの画像。どちらも深度を書かないので、盤・ラベル（0）より後、残像より前に描く。
+    private static let dimRenderingOrder = 1
+    private static let stoppedFaceRenderingOrder = 2
+    /// 残像を重ねる順（大きいほど後に描く）。盤・縁・ハブ（0）より後で、光の尾・電飾・結果の帯より前。手前の残像ほど後に描く。
+    private static let ghostRenderingOrder = 5
+    /// 光の尾のにじみと芯。残像より後、電飾のにじみ（10）と電球（11）より前に描き、電球の奥にする。
+    private static let trailGlowRenderingOrder = 8
+    private static let trailCoreRenderingOrder = 9
+    /// 結果の帯。残像・光の尾・電飾より後に描く（帯の画像の透明な余白が、奥の残像を深度で隠さないように）。
+    private static let bandRenderingOrder = 20
+
+    /// 光の尾と残像を出す・消す。`frame` は 2D と同じ `WheelTrails.Frame`（`.none` なら出さない）で、残像の角度・不透明度と、
+    /// 光の尾の切れ端ごとの濃さ（`WheelTrails.Trail.opacity(atDistance:segments:)`）をノードに写す。盤の角度と同じく毎フレーム呼ばれる。
+    func trail(_ frame: WheelTrails.Frame) {
+        guard frame != shownTrails else { return }
+        shownTrails = frame
+        if !frame.isEmpty, !hasTrailNodes, let shape = built { addTrails(shape) }
+        applyTrails()
+    }
+
+    private func applyTrails() {
+        let frame = shownTrails
+        guard !frame.isEmpty, hasTrailNodes else {
+            ghostsNode.isHidden = true
+            trailNode.isHidden = true
+            return
+        }
+
+        // 残像。手前（遅れの少ない）から順。1 件のときは同じ色の円なので作っていない
+        ghostsNode.isHidden = frame.ghosts.isEmpty || ghostNodes.isEmpty
+        for (index, node) in ghostNodes.enumerated() {
+            guard index < frame.ghosts.count, frame.ghosts[index].opacity > 0 else {
+                node.isHidden = true
+                continue
+            }
+            let ghost = frame.ghosts[index]
+            node.isHidden = false
+            node.opacity = CGFloat(ghost.opacity)
+            // 累積の角度は大きくなるので、1 周に畳んでから写す（Float の桁落ちを避ける）
+            node.eulerAngles.z = Float(WheelGeometry.spinAngle(rotation: ghost.angle.truncatingRemainder(dividingBy: 360)))
+        }
+
+        // 光の尾。切れ端の中央の頭からの距離で 2D と同じ濃さを引く。尾の外の切れ端は隠す
+        guard let trail = frame.trail, trail.length > 0, trail.opacity > 0 else {
+            trailNode.isHidden = true
+            return
+        }
+        trailNode.isHidden = false
+        if trailDirection != trail.direction {
+            trailDirection = trail.direction
+            placeTrailPieces(direction: trail.direction)
+        }
+        let piece = Theme.Wheel3D.trailPieceAngle
+        for index in trailCoreNodes.indices {
+            let opacity = trail.opacity(atDistance: (Double(index) + 0.5) * piece, segments: Theme.TrailRing.segments)
+            let core = trailCoreNodes[index], glow = trailGlowNodes[index]
+            core.isHidden = opacity <= 0
+            glow.isHidden = opacity <= 0
+            guard opacity > 0 else { continue }
+            core.opacity = CGFloat(opacity)
+            glow.opacity = CGFloat(opacity * Theme.TrailRing.glowOpacity)
+        }
+    }
+
+    /// 光の尾の切れ端を、12 時（針の下）を頭にして回転の向きと逆へ並べる。時計回りなら反時計回りの側（12 時から負の角度）。
+    private func placeTrailPieces(direction: SpinDirection) {
+        let piece = Theme.Wheel3D.trailPieceAngle
+        for index in trailCoreNodes.indices {
+            // 切れ端の形は 0〜`piece` 度。時計回りでは −(i + 1)·piece から、反時計回りでは i·piece から並べる
+            let start = direction == .clockwise ? -Double(index + 1) * piece : Double(index) * piece
+            let angle = Float(WheelGeometry.spinAngle(rotation: start))
+            trailCoreNodes[index].eulerAngles.z = angle
+            trailGlowNodes[index].eulerAngles.z = angle
+        }
+    }
+
+    /// 残像と光の尾のノードを作る。残像はスライスの塗り（2D と同じ `Theme.sliceColor(in:at:)`。ハブの内側は抜く）を 1 つの形にして、
+    /// 残像の枚数分のノードで共有する。光の尾は縁の上の環（2D と同じ `Theme.TrailRing` の半径・太さ）の切れ端を最長の長さ分並べる。
+    /// どちらも照明に依らない塗りで、深度は書かない（重なった残像どうし・縁の上の電飾を隠さない）。
+    private func addTrails(_ shape: Shape) {
+        removeTrails()
+        let diameter = Double(shape.diameter)
+        let scale = diameter / WheelLabel.referenceDiameter
+        let radius = WheelGeometry.sliceRadius(diameter: diameter)
+        let vector = { (v: SIMD3<Double>) in SCNVector3(Float(v.x), Float(v.y), Float(v.z)) }
+
+        let count = shape.count
+        if count > 1 {
+            let sliceAngle = 360 / Double(count)
+            var vertices: [SCNVector3] = [], normals: [SCNVector3] = []
+            var elements: [SCNGeometryElement] = [], materials: [SCNMaterial] = []
+            for index in 0..<count {
+                let start = Double(index) * sliceAngle
+                let mesh = WheelGeometry.annulusMesh(start: start, end: start + sliceAngle, inner: 19 * scale, outer: radius)
+                let offset = Int32(vertices.count)
+                vertices += mesh.vertices.map(vector)
+                normals += mesh.normals.map(vector)
+                elements.append(SCNGeometryElement(indices: mesh.top.map { $0 + offset }, primitiveType: .triangles))
+                materials.append(Self.overlayMaterial(Theme.sliceColor(in: shape.items, at: index)))
+            }
+            let geometry = SCNGeometry(
+                sources: [SCNGeometrySource(vertices: vertices), SCNGeometrySource(normals: normals)], elements: elements
+            )
+            geometry.materials = materials
+            let ghostCount = WheelTrails.ghostCount(lowPower: false)
+            for index in 0..<ghostCount {
+                let node = SCNNode(geometry: geometry)
+                node.position.z = Float(Theme.Wheel3D.ghostLift)
+                node.isHidden = true
+                // 2D と同じく奥（遅れの大きい）から重ねる
+                node.renderingOrder = Self.ghostRenderingOrder + (ghostCount - 1 - index)
+                ghostsNode.addChildNode(node)
+                ghostNodes.append(node)
+            }
+        }
+
+        let ring = Double(Theme.TrailRing.ringRadius(diameter: CGFloat(diameter)))
+        let piece = Theme.Wheel3D.trailPieceAngle
+        let z = Float(Double(Theme.Wheel3D.rimLift) * scale + Double(Theme.Wheel3D.trailLift))
+        let shapeOf = { (width: Double) -> SCNGeometry in
+            let mesh = WheelGeometry.annulusMesh(start: 0, end: piece, inner: ring - width / 2, outer: ring + width / 2)
+            let geometry = SCNGeometry(
+                sources: [SCNGeometrySource(vertices: mesh.vertices.map(vector)), SCNGeometrySource(normals: mesh.normals.map(vector))],
+                elements: [SCNGeometryElement(indices: mesh.top, primitiveType: .triangles)]
+            )
+            geometry.materials = [Self.overlayMaterial(Theme.wheelTrail)]
+            return geometry
+        }
+        let core = shapeOf(Double(Theme.TrailRing.coreWidth) * scale)
+        let glow = shapeOf(Double(Theme.TrailRing.glowWidth) * scale)
+        let pieces = Int((Config.wheelTrailMaxLength / piece).rounded(.up))
+        for _ in 0..<pieces {
+            let glowNode = SCNNode(geometry: glow)
+            glowNode.position.z = z
+            glowNode.renderingOrder = Self.trailGlowRenderingOrder
+            glowNode.isHidden = true
+            trailNode.addChildNode(glowNode)
+            trailGlowNodes.append(glowNode)
+            let coreNode = SCNNode(geometry: core)
+            coreNode.position.z = z
+            coreNode.renderingOrder = Self.trailCoreRenderingOrder
+            coreNode.isHidden = true
+            trailNode.addChildNode(coreNode)
+            trailCoreNodes.append(coreNode)
+        }
+    }
+
+    private func removeTrails() {
+        ghostsNode.childNodes.forEach { $0.removeFromParentNode() }
+        trailNode.childNodes.forEach { $0.removeFromParentNode() }
+        ghostNodes = []
+        trailCoreNodes = []
+        trailGlowNodes = []
+        trailDirection = nil
+    }
+
+    /// 盤の上に薄く重ねる塗り（残像・光の尾）。照明に依らず塗りの色のままにし、不透明度はノードで掛ける。深度は読むが書かない。
+    private static func overlayMaterial(_ color: Color) -> SCNMaterial {
+        let overlay = material(color, lit: false)
+        overlay.writesToDepthBuffer = false
+        return overlay
     }
 
     // MARK: 電飾
@@ -440,14 +649,19 @@ final class Wheel3DScene {
     func light(_ scene: WheelLights.Scene?) {
         guard scene != shownLights else { return }
         shownLights = scene
+        if scene != nil, bulbNodes.isEmpty, let shape = built { addLights(shape) }
         applyLights()
     }
+
+    /// 縁と電球の色の sRGB の成分。毎フレーム塗る色を混ぜるのに使うので、一度だけ求める。
+    private static let rimComponents = components(Theme.wheelRim)
+    private static let lightComponents = components(Theme.wheelLight)
 
     /// 電球の色。2D は縁（`wheelRim`）の上に `wheelLight` を明るさの不透明度で重ねるので、その重ねた色（sRGB で混ぜる）を不透明に塗る
     /// （SceneKit は線形の色空間で重ねるので、不透明度で重ねると 2D より明るく見える）。
     static func bulbColor(brightness: Double) -> UIColor {
         let amount = CGFloat(min(max(brightness, 0), 1))
-        let rim = components(Theme.wheelRim), light = components(Theme.wheelLight)
+        let rim = rimComponents, light = lightComponents
         return UIColor(
             red: rim.r + (light.r - rim.r) * amount,
             green: rim.g + (light.g - rim.g) * amount,
@@ -472,7 +686,11 @@ final class Wheel3DScene {
         let haloFull = Theme.LightRing.bulbRadius + Theme.LightRing.haloWidth
         for index in 0..<count {
             let bulb = WheelLights.bulb(index: index, count: count, scene: scene)
-            bulbNodes[index].geometry?.firstMaterial?.diffuse.contents = Self.bulbColor(brightness: bulb.brightness)
+            if bulbLevels[index] != bulb.brightness {
+                bulbLevels[index] = bulb.brightness
+                bulbNodes[index].geometry?.firstMaterial?.diffuse.contents = Self.bulbColor(brightness: bulb.brightness)
+                bulbColorWriteCount += 1
+            }
             let halo = haloNodes[index]
             guard bulb.glow > 0 else {
                 halo.isHidden = true
@@ -488,10 +706,11 @@ final class Wheel3DScene {
 
     /// 電球を縁の上に並べる（2D と同じ数・位置・大きさ。12 時から時計回り）。縁の上面から `Theme.Wheel3D.lightLift` だけ浮かせ、
     /// 持ち上げた止まったスライスの光彩より手前、針・結果の帯より奥に置く。にじみは電球の後ろの板（放射状のグラデーションを焼いた画像）。
-    private func addLights(diameter: Double, scale: Double, displayScale: CGFloat) {
-        lightsNode.childNodes.forEach { $0.removeFromParentNode() }
-        bulbNodes = []
-        haloNodes = []
+    private func addLights(_ shape: Shape) {
+        removeLights()
+        let diameter = Double(shape.diameter)
+        let scale = diameter / WheelLabel.referenceDiameter
+        let displayScale = shape.displayScale
         let side = CGFloat(diameter)
         let ringRadius = Double(Theme.LightRing.ringRadius(diameter: side))
         let bulbRadius = Double(Theme.LightRing.bulbRadius(diameter: side))
@@ -518,6 +737,7 @@ final class Wheel3DScene {
 
             let disc = SCNCylinder(radius: bulbRadius, height: 0.1)
             disc.radialSegmentCount = Theme.Wheel3D.lightSegments
+            // 電球ごとに色を変えるので、素材は電球ごとに持つ（色は `applyLights` が明るさから塗る）
             disc.materials = [Self.material(Theme.wheelLight, lit: false)]
             let bulb = SCNNode(geometry: disc)
             bulb.eulerAngles.x = .pi / 2
@@ -526,7 +746,14 @@ final class Wheel3DScene {
             lightsNode.addChildNode(bulb)
             bulbNodes.append(bulb)
         }
-        applyLights()
+        bulbLevels = Array(repeating: nil, count: count)
+    }
+
+    private func removeLights() {
+        lightsNode.childNodes.forEach { $0.removeFromParentNode() }
+        bulbNodes = []
+        haloNodes = []
+        bulbLevels = []
     }
 
     /// にじみの画像。2D の `WheelLightsView` と同じく、電球の半径の半分から外へ `wheelLight` を透明まで薄める放射状のグラデーション
@@ -598,6 +825,9 @@ final class Wheel3DScene {
         }
         dimNode = nil
         stoppedNode = nil
+        // 消している間は深度を書かない。回し直す・指で動かすと同時に描き始める残像・光の尾（奥にある）が、薄れていく板の下で深度で隠れないように
+        Self.stopWritingDepth(dim)
+        Self.stopWritingDepth(stopped)
         SCNTransaction.begin()
         SCNTransaction.animationDuration = Self.dimDuration
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -611,12 +841,21 @@ final class Wheel3DScene {
         SCNTransaction.commit()
     }
 
+    /// `node` から下の素材をすべて深度を書かないようにする（深度は読むので、手前のものには隠れる）。
+    private static func stopWritingDepth(_ node: SCNNode) {
+        node.enumerateHierarchy { child, _ in
+            child.geometry?.materials.forEach { $0.writesToDepthBuffer = false }
+        }
+    }
+
     /// 止まっていないスライスに `Theme.sliceDim` を重ねた 1 枚の板。ラベルと境目の線より手前に置き、2D と同じく一緒に沈める。
     private func makeDim(except index: Int, shape: Shape) -> SCNNode {
         let diameter = Double(shape.diameter)
         let content = DimmedSlices(count: shape.count, except: index, diameter: diameter)
         let node = Self.imagePlane(content, side: diameter, displayScale: shape.displayScale)
         node.position.z = 0.4
+        // 深度を書かないので、奥のラベル（0.3）より後に描いてラベルごと沈める
+        node.renderingOrder = Self.dimRenderingOrder
         return node
     }
 
@@ -658,6 +897,8 @@ final class Wheel3DScene {
         .padding(margin)
         let face = Self.imagePlane(content, side: diameter + margin * 2, displayScale: shape.displayScale)
         face.position.z = 0.1
+        // 深度を書かないので、暗くする層より後に描く（板の側面と表は深度を書き、奥のものを隠す）
+        face.renderingOrder = Self.stoppedFaceRenderingOrder
         group.addChildNode(face)
         return group
     }
@@ -669,6 +910,9 @@ final class Wheel3DScene {
         let plane = SCNPlane(width: side, height: side)
         let face = material(.white, lit: false)
         face.diffuse.contents = renderer.uiImage
+        // 画像の透明な画素も深度を書くと、奥に重ねる残像・光の尾（深度を書かず後に描く）が板の形に抜ける。
+        // 板は深度を読むので手前のもの（ハブ・針・電球）には隠れ、奥の盤・ラベルより後に描かれる
+        face.writesToDepthBuffer = false
         plane.materials = [face]
         return SCNNode(geometry: plane)
     }
@@ -720,6 +964,8 @@ final class Wheel3DScene {
         let node = SCNNode(geometry: plane)
         // 場面の y は上向きなので、中心より下は負
         node.position = SCNVector3(0, Float(-ResultBand.centerOffset(diameter: diameter)), Self.bandLift(scale: scale))
+        // 指で動かして残像が出ても、帯の透明な余白が奥の残像を隠さないよう後に描く
+        node.renderingOrder = Self.bandRenderingOrder
         return node
     }
 
@@ -982,4 +1228,16 @@ private enum WheelLabelImage {
     Wheel3DView(items: ItemLabel.makeItems((1...12).map { "項目\($0)" }), rotation: 30)
         .padding(40)
         .background(Theme.ink900)
+}
+
+#Preview("Trails") {
+    Wheel3DView(
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, showsTrails: true,
+        motion: TimedSpinMotion(
+            motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
+            start: ProcessInfo.processInfo.systemUptime
+        )
+    )
+    .padding(40)
+    .background(Theme.ink900)
 }

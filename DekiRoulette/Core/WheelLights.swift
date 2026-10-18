@@ -89,6 +89,7 @@ enum WheelLights {
     /// 指で動かしている間は角度が変わる描き直し（指の動き）の経過時間が短く、角度の変わらない `TimelineView` の描き直しの経過時間が長いので、
     /// 持ち越さないと上限より遅い動きでも流れを捨ててしまう。速く回すと並びは盤面より遅れて流れ、上限を下回る速さに落ちたら遅れを取り戻し、
     /// 遅れが無くなれば盤面の角度の変化と同じだけ進む（止まれば止まる）。盤面の角度の差だけを足すので、描き直しの回数に依らない。
+    /// 盤面の角度の変化が持ち越した遅れと逆向き（指で動かす向きを変えた・焦らしで戻った）なら、遅れは捨ててその変化から流す。
     struct Flow: Equatable, Sendable {
         /// 流す角度（度）。まだ一度も進めていなければ nil。
         private(set) var angle: Double?
@@ -111,7 +112,10 @@ enum WheelLights {
                 return start
             }
             let limit = WheelLights.maxFlowAngle(elapsed: time - self.time, count: count)
-            let pending = lag + boardAngle - self.boardAngle
+            let change = boardAngle - self.boardAngle
+            // 盤面が逆へ動いたら持ち越した遅れは捨てる（向きが変わったのに前の向きへ流し続けない）
+            let carried = lag * change < 0 ? 0 : lag
+            let pending = carried + change
             let step = min(max(pending, -limit), limit)
             let next = current + step
             let maxLag = WheelLights.maxFlowLag(count: count)

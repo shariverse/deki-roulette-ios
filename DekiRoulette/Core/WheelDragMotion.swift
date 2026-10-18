@@ -152,6 +152,16 @@ enum WheelEffectMotion: Equatable, Sendable {
         }
     }
 
+    /// 残像のずらし（今の角度と遅れた時刻の角度の差）を測る基準の時刻。スピン・惰性は `now`、ドラッグは `min(now, lastTime)`。
+    /// ドラッグ中に盤面に見えている角度（`dragRotation`）は指が動いたときにしか変わらないので、指のイベントの間のフレームで
+    /// `now` から測ると、見えている角度は止まったまま差だけが縮み、残像が伸び縮みする。最後の点の時刻で測ると、見えている角度と同じ時刻の差になる。
+    func offsetReferenceTime(now: TimeInterval) -> TimeInterval {
+        switch self {
+        case .spin: now
+        case let .drag(motion): min(now, motion.lastTime)
+        }
+    }
+
     /// 時刻 `now` の角速度（度/秒、画面上の時計回りが正）。
     func angularVelocity(now: TimeInterval) -> Double {
         switch self {

@@ -205,7 +205,7 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 明るさは `WheelLights`（`Core/`）の純粋関数で、場面（`Scene`: 動きを減らす設定の `still` / 待機中・回転中・指で動かしている間の `running(angle:intensity:)` / 結果表示中の `stopped(elapsed:)`）から決める。
 並びの位置は流す角度 × `Config.wheelLightFlowFactor`（角度に比例させると角速度に比例して流れ、止まれば止まる）。流す角度は `WheelLights.Flow` が
 盤面に見えている角度（`WheelEffectMotion.displayedAngle`。`currentMotion` があれば `angle(now: now())`、無ければ `rotation`、どちらにも `dragRotation` を足す）の
-変化だけ進め、1 回に進める量を並びが 1 フレーム（`Config.effectReferenceFrameInterval` = 1/60 秒）に `Config.wheelLightMaxFlowPerFrame`（0.5）個までに抑える
+変化だけ進め（盤面の角度の変化が持ち越した遅れと逆向きなら遅れは捨てる）、1 回に進める量を並びが 1 フレーム（`Config.effectReferenceFrameInterval` = 1/60 秒）に `Config.wheelLightMaxFlowPerFrame`（0.5）個までに抑える
 （経過時間に比例させ、1 回には 1 フレーム分まで。同じフレームに 2 回描き直されても上限に収まる）。流し切れなかった分（`lag`）は `Config.wheelLightMaxFlowLag`（電球 1 個）まで
 次の描き直しに持ち越して上限の範囲で追いつかせ、超える分は捨てる（速いときは並びが盤面より遅れて流れ、上限を下回ったら遅れを取り戻して盤面と同じだけ進む）。
 指で動かしている間は角度が変わる描き直し（指の動き）が `TimelineView` の描き直しの直後に来て経過時間が短いので、持ち越さないと上限より遅い動きでも流れを捨ててしまう。
@@ -220,16 +220,21 @@ nil でなくなった `now()`。結果を出したまま 2D が出たときは�
 `Config.effectPulseFrameInterval`（1/20 秒）ごとに落とす（点滅の終わりは `.task(id: stoppedAt)` が待って `@State` を書き、描き直させる）。止まり切った惰性・指の動きは親が描き直さないので、
 `WheelLightsView` が `.task(id: 選んだ動き)` で残り時間だけ待って `@State` を書き、描き直させて止める。演出は指定・印を受け取らず、`accessibilityHidden`・`allowsHitTesting(false)`。
 
-光の尾・残像（`SpinEffectStyle.showsTrails`）も 2D の `RouletteWheelView` だけに出す（3D は後続）。`RouletteScreen` が `showsTrails` を渡し、`WheelTrailsView` を
+光の尾・残像（`SpinEffectStyle.showsTrails`）は 2D の `RouletteWheelView` と 3D の `Wheel3DView` の両方に出す（3D は下の「3D 表示の仕組み」）。
+`RouletteScreen` が `showsTrails` を渡す。毎フレームの 1 枚（`WheelTrails.Frame`）は 2D・3D で共有の `WheelTrailsTimeline`（`WheelTrailsView.swift`）が同じ時計・同じ規則で引いて
+`content` に渡し、2D は `WheelTrailsView` が `Canvas` に描き、3D は `Wheel3DScene.trail(_:)` がノードに写す。2D は `WheelTrailsView` を
 電飾と同じく `rotationEffect` の外（回らない層）で、盤面の面の上・電飾の奥に重ねる。描くもの（残像の角度と不透明度、光の尾の長さ・濃さ・向き）は
 `WheelTrails.frame(effect:…)`（`Core/`）が電飾と同じく選んだ動き（`currentMotion`（焦らしを含む区間の列。焦らしの区間は閾値に届かず描かれない）か `WheelDragMotion`）・`now()`・
 `rotation` / `dragRotation`・スライスの数・低電力モード・動きを減らす設定だけから決め、強さが `Config.wheelTrailThreshold` 未満・
-動きが無い・止まり切った・動きを減らす設定では何も描かない（`TimelineView` も止める。止まり切った惰性・指の動きは電飾と同じく
-`.task(id: 選んだ動き)` で描き直させる）。残像は `WheelFaceView` を重ねず、`Canvas` にスライスの塗りだけ（ハブの内側は抜く）を、盤面に見えている角度
-（`displayedAngle`）から動きの今の角度と `now - lag` の角度の差だけずらした角度で描く（ラベル・停止の強調は載せない。軽くするため。指の動きの角度は点の間を線形に補う）。
+動きが無い・止まり切った・動きを減らす設定では何も描かない（`TimelineView` も止める。動いているかは電飾と同じ `WheelEffectMotion.isMoving(_:settled:now:)`。
+止まり切った惰性・指の動きは電飾と同じく `.task(id: 選んだ動き)` で描き直させる）。残像は `WheelFaceView` を重ねず、`Canvas` にスライスの塗りだけ（ハブの内側は抜く）を、盤面に見えている角度
+（`displayedAngle`）から、動きの基準の時刻（`WheelEffectMotion.offsetReferenceTime`。スピン・惰性は `now`、指の動きは `min(now, lastTime)`）の角度と
+そこから `lag` だけ前の角度の差だけずらした角度で描く（ラベル・停止の強調は載せない。軽くするため。指の動きの角度は点の間を線形に補う。
+指の動きを `now` から測ると、見えている角度が変わらない指のイベントの間のフレームで差だけが縮み、残像が伸び縮みする）。
 ずらしは `WheelTrails.clampedOffsets` で上限に収め、向きは角速度（指の動きは平滑した値）の符号から取る。光の尾は縁の上を
-針の下から逆向きに伸びる弧（色は `Theme.wheelTrail`、寸法は `Theme.TrailRing`）。低電力モードは `LowPowerModeMonitor`（`@Observable`。`NSProcessInfoPowerStateDidChange`
-で読み直す）を `WheelTrailsView` が最初に画面に出たときに 1 つだけ作って持ち（`@State` の初期値にすると View の値が作られるたびに購読を作り直すため）、`WheelTrails.ghostCount(lowPower:)` で残像を 1 枚に減らす。共有画像には載せない。
+針の下から逆向きに伸びる弧（色は `Theme.wheelTrail`、寸法は `Theme.TrailRing`。区間ごとの濃さは `WheelTrails.Trail.opacity(atDistance:segments:)` で、2D・3D で共有）。
+低電力モードは `LowPowerModeMonitor`（`@Observable`。`NSProcessInfoPowerStateDidChange`
+で読み直す）を `WheelTrailsTimeline` が最初に必要になったときに 1 つだけ作って持ち（`@State` の初期値にすると View の値が作られるたびに購読を作り直すため）、`WheelTrails.ghostCount(lowPower:)` で残像を 1 枚に減らす。共有画像には載せない。
 
 火花・紙吹雪（`SpinEffectStyle.showsParticles`）も 2D の `RouletteWheelView` だけに出す（3D は後続）。`RouletteScreen` が `showsParticles` を渡し、`WheelParticlesView` を
 回らない層の針より手前に重ねる。粒は `WheelParticles`（`Core/`）が時刻からの閉じた式で決め、フレームごとのシミュレーションは積み上げない（描画が遅れても音・触覚の時刻を押さない）。
@@ -248,7 +253,7 @@ nil でなくなった `now()`。結果を出したまま 2D が出たときは�
 
 指で動かしている間の速さに連動する演出（電飾の流れ・光の尾・残像・火花）は、`RouletteWheelView` が `WheelDragArea` に `tracksMotion`（電飾・光の尾・火花の
 どれかを出すとき。「なし」では記録しない）と `now` を渡し、`WheelDragArea` が `follow` のたびに `WheelDragMotion` へ記録して `content` の 3 つ目の引数で渡す
-（3D は電飾を出すとき `tracksMotion` を立てて記録し、電飾にだけ渡す）。演出中（`interactive == false`）に始まったドラッグは記録しない。記録は次のドラッグを始めるまで残し、指を離したあとの残り
+（3D は電飾・光の尾を出すとき `tracksMotion` を立てて記録し、電飾と光の尾・残像に渡す）。演出中（`interactive == false`）に始まったドラッグは記録しない。記録は次のドラッグを始めるまで残し、指を離したあとの残り
 （強さの落ち方・飛んでいる火花）は `Config.dragEffectSettleTime`（0.5 秒）まで描く。スピン・惰性に移ったら `WheelEffectMotion.current` がそちらを選ぶ。
 抽選しないので停止の演出・焦らし・うなり・決まり音は出さず（回転音・触覚は今のまま）、`RouletteModel` は変えない。惰性は `currentMotion` に入るので
 スピンと同じ経路で出る（強さ約 0.33 未満なので光の尾・残像は閾値に届かない）。
@@ -292,8 +297,22 @@ iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・�
 `WheelDragArea` の記録から引く）、`Wheel3DSceneView.updateUIView` が `Wheel3DScene.light(_:)` に渡して `WheelLights.bulb` の明るさ・にじみをノードに写す。
 SceneKit は線形の色空間で重ねるので、電球は不透明度ではなく、2D の重ねた色（縁の `wheelRim` に `wheelLight` を明るさの割合で sRGB のまま混ぜた色、
 `Wheel3DScene.bulbColor(brightness:)`）を不透明に塗る。にじみは放射状のグラデーションを焼いた板を、にじみの強さで縮め・濃さを不透明度にして電球の後ろに重ねる。
+電球の色の成分（`wheelRim` / `wheelLight`）は static に一度だけ求め、明るさが前と同じ電球の素材は書き換えない。
 描き直しを止める条件（待機中・止まり切った・動きを減らす設定）と点滅の終わりで間隔を落とすのは 2D と同じ。「なし」では `WheelLightsTimeline` を止めたまま nil を渡し、
-電球のノードは隠したまま（見た目は今のまま）。演出に指定・印は渡さない。
+電球のノードは作らない（初めて場面を渡されたときに作り、組み直したら作り直す。見た目は今のまま）。電飾を出していない間は `Flow` を進めないので、
+`WheelLightsTimeline` は `enabled` が false になったら `Flow` を作り直し、出し直したときに溜まった角度の差を流さない。演出に指定・印は渡さない。
+
+光の尾・残像（「スピンの演出」が光の尾・全部入り）は、`WheelTrailsTimeline` を `WheelLightsTimeline` の内側で `Wheel3DSurface` を包むように置いて毎フレーム引き
+（2D と同じ `now()`・`WheelEffectMotion`・`WheelTrails.frame`。指の動きも `WheelDragArea` の記録から引く）、`Wheel3DSceneView.updateUIView` が
+`Wheel3DScene.trail(_:)` に渡す。残像は `tiltNode` の `ghostsNode` に、スライスの塗り（`Theme.sliceColor(in:at:)`、ハブの内側を抜いた
+`WheelGeometry.annulusMesh`）を 1 つの `SCNGeometry` にして残像の枚数分のノードで共有し、盤の表面から `Theme.Wheel3D.ghostLift` 浮かせる。
+光の尾は `trailNode` に、`Theme.TrailRing` と同じ半径・太さの芯とにじみの切れ端（`Theme.Wheel3D.trailPieceAngle` 度の同じ形）を最長の長さ分並べ、
+縁の上面から `trailLift` 浮かせる（電飾のにじみ・電球より奥、針の下）。毎フレームは残像の角度（1 周に畳む）・不透明度と、切れ端ごとの
+`WheelTrails.Trail.opacity(atDistance:segments:)`（切れ端の中央の頭からの距離）を不透明度に写すだけで、メッシュや画像は作り直さない（向きが変わったときだけ切れ端を並べ直す）。
+どちらも照明に依らない塗りで深度は書かず、`renderingOrder` で残像 → 光の尾 → 電飾 → 結果の帯の順に描く（帯の画像の透明な余白が深度で残像を隠さないよう、帯を最後にする）。
+強調の画像の板（暗くする層・止まったスライスの画像。`imagePlane`）も深度を書かずに残像より前（1・2）に描き、消している途中の強調（`clearHighlight`）は
+板の側面ごと深度を書かないようにする（結果を出したまま回し直す・指で動かすと、薄れていく板の下で回り始めの残像・光の尾が隠れるため）。
+「なし」・閾値未満では `.none` を渡し、ノードは作らない（初めて描くときに作り、組み直したら作り直す）。
 
 盤は端末の姿勢で傾け、動かした勢いで支点まわりに揺らす。傾きの写像は `TiltMapping`（基準は `@AppStorage(Config.tiltReferenceKey)`
 の `TiltReference`。水平に置いた状態なら `DeviceGravity.flat`、持ち方なら取り直した重力。`Config.wheelMaxTilt` で抑える）、

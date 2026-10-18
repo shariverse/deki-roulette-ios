@@ -168,6 +168,28 @@ struct WheelLightsTests {
         }
     }
 
+    @Test func 盤面が逆へ動いたら持ち越した遅れは捨てる() {
+        for direction in [1.0, -1.0] {
+            var flow = WheelLights.Flow()
+            _ = flow.advance(to: 0, at: 0, count: count)
+            // 1 フレームに 1,000 度進めて遅れ（上限 60 度）を溜める
+            _ = flow.advance(to: direction * 1000, at: 1.0 / 60, count: count)
+            #expect(abs(flow.lag - direction * 60) < 1e-9)
+            // 次のフレームで盤面が逆へ 10 度戻る。前の向きへ流し続けず、戻った分だけ戻る
+            let back = flow.advance(to: direction * 990, at: 2.0 / 60, count: count)
+            #expect(abs(back - direction * 20) < 1e-9)
+            #expect(flow.lag == 0)
+        }
+    }
+
+    @Test func 盤面が止まっている間は遅れを持ち越したまま追いつく() {
+        var flow = WheelLights.Flow()
+        _ = flow.advance(to: 0, at: 0, count: count)
+        _ = flow.advance(to: 1000, at: 1.0 / 60, count: count)
+        // 角度の変化が 0 のときは捨てない
+        #expect(abs(flow.advance(to: 1000, at: 2.0 / 60, count: count) - 60) < 1e-9)
+    }
+
     @Test func 速いスピンのあとは減速して遅れを取り戻し盤面と同じだけ進む() {
         let motion = SpinMotion(from: 0, to: 360 * 8 + 100, duration: Config.spinDuration, easing: Config.spinEasing)
         var flow = WheelLights.Flow()
