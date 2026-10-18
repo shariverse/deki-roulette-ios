@@ -44,16 +44,6 @@ enum FlickSpin {
         return Spin(fullSpins: fullSpins, direction: angularVelocity > 0 ? .clockwise : .counterclockwise)
     }
 
-    /// 盤面から指を離したときに始めるスピン。閾値以上なら `spin(angularVelocity:)` と同じ。
-    /// 閾値未満（ゆっくり動かして離した、止めてから離した）でも、最小の周回数（`Config.fullSpinRange.lowerBound`）で回す。
-    /// そのときの向きは、ドラッグで盤面を回した向き（`dragRotation` の符号）。動かしていなければ角速度の符号、それも 0 なら `fallback`。
-    static func releaseSpin(angularVelocity: Double, dragRotation: Double, fallback: SpinDirection) -> Spin {
-        if let flick = spin(angularVelocity: angularVelocity) { return flick }
-        let sign = dragRotation != 0 ? dragRotation : angularVelocity
-        let direction: SpinDirection = sign > 0 ? .clockwise : sign < 0 ? .counterclockwise : fallback
-        return Spin(fullSpins: Config.fullSpinRange.lowerBound, direction: direction)
-    }
-
     /// 角速度（度/秒）を周回数に写す。周回数は向きに依らず速さだけで決める（向きは `spin(angularVelocity:)` が返す）。
     /// 閾値未満なら nil（スピンを始めない）。閾値で最小、`flickMaxAngularVelocity` 以上で最大の周回数になる。
     static func fullSpins(angularVelocity: Double) -> Int? {
