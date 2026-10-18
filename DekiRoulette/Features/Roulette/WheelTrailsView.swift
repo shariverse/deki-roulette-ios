@@ -17,7 +17,9 @@ struct WheelTrailsView: View {
     let now: () -> TimeInterval
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var lowPower = LowPowerModeMonitor()
+    /// 最初に画面に出たときに 1 つだけ作る（`@State` の初期値の式は View の値が作られるたびに評価され、
+    /// ドラッグの指の動きのたびに購読を作り直すことになるため）。作る前は今の値を直接読む。
+    @State private var lowPower: LowPowerModeMonitor?
     /// 止まり切った動き。惰性は止まり切っても `motion` に残り、親が描き直さないので、止まり切ったらここに入れて
     /// 描き直させ、`TimelineView` を止める（電飾と同じ）。
     @State private var settledMotion: TimedSpinMotion?
@@ -33,7 +35,7 @@ struct WheelTrailsView: View {
                 now: now(),
                 dragRotation: dragRotation,
                 sliceCount: items.count,
-                lowPower: lowPower.isEnabled,
+                lowPower: lowPower?.isEnabled ?? ProcessInfo.processInfo.isLowPowerModeEnabled,
                 reduceMotion: reduceMotion
             )
             if !frame.isEmpty {
@@ -50,6 +52,9 @@ struct WheelTrailsView: View {
             try? await Task.sleep(for: .seconds(remaining))
             guard !Task.isCancelled else { return }
             settledMotion = motion
+        }
+        .onAppear {
+            if lowPower == nil { lowPower = LowPowerModeMonitor() }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)

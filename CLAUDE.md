@@ -190,7 +190,7 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 `.task(id: motion)` で描き直させる）。残像は `WheelFaceView` を重ねず、`Canvas` にスライスの塗りだけ（ハブの内側は抜く）を `motion.angle(now: now - lag)` の角度で
 描く（ラベル・停止の強調は載せない。軽くするため）。ずらしは `WheelTrails.clampedOffsets` で上限に収め、向きは角速度の符号から取る。光の尾は縁の上を
 針の下から逆向きに伸びる弧（色は `Theme.wheelTrail`、寸法は `Theme.TrailRing`）。低電力モードは `LowPowerModeMonitor`（`@Observable`。`NSProcessInfoPowerStateDidChange`
-で読み直す）を `WheelTrailsView` が持ち、`WheelTrails.ghostCount(lowPower:)` で残像を 1 枚に減らす。共有画像には載せない。
+で読み直す）を `WheelTrailsView` が最初に画面に出たときに 1 つだけ作って持ち（`@State` の初期値にすると View の値が作られるたびに購読を作り直すため）、`WheelTrails.ghostCount(lowPower:)` で残像を 1 枚に減らす。共有画像には載せない。
 
 ### 3D 表示の仕組み
 
