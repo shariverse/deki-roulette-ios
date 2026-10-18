@@ -192,6 +192,16 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 針の下から逆向きに伸びる弧（色は `Theme.wheelTrail`、寸法は `Theme.TrailRing`）。低電力モードは `LowPowerModeMonitor`（`@Observable`。`NSProcessInfoPowerStateDidChange`
 で読み直す）を `WheelTrailsView` が最初に画面に出たときに 1 つだけ作って持ち（`@State` の初期値にすると View の値が作られるたびに購読を作り直すため）、`WheelTrails.ghostCount(lowPower:)` で残像を 1 枚に減らす。共有画像には載せない。
 
+火花・紙吹雪（`SpinEffectStyle.showsParticles`）も 2D の `RouletteWheelView` だけに出す（3D は後続）。`RouletteScreen` が `showsParticles` を渡し、`WheelParticlesView` を
+回らない層の針より手前に重ねる。粒は `WheelParticles`（`Core/`）が時刻からの閉じた式で決め、フレームごとのシミュレーションは積み上げない（描画が遅れても音・触覚の時刻を押さない）。
+粒ごとの乱数は種（`WheelParticles.seed(using:)`。View は `SystemRandomNumberGenerator`、テストは固定の種）と粒の番号から作る `ParticleRandom`（SplitMix64）で引くので、同じ種なら毎フレーム同じ粒になる。
+火花（`sparks`）は `currentMotion` の生まれうる時刻（`sparkSlotInterval` = `Config.wheelSparkLifetime` ÷ 上限）ごとにその時刻の強さの確率で生まれ、
+針の先（`ShareImageLayout.basePointerHeight - 6`）から回転の向きへ飛ぶ。`motion` が nil（指で動かしている間も含む。後続）・止まり切った・動きを減らす設定では出さない。
+紙吹雪（`confetti`）は `highlightedIndex` が nil でなくなった瞬間（強調を指で解いても止めない）の `now()` からの経過で、`Config.wheelConfettiDuration`（1.6 秒）で消える。
+色は `Theme.wheelSpark` / `wheelSparkGlow` と、紙吹雪は `Theme.confettiColors`（スライスを指さないので `sliceColor(in:at:)` の例外の固定 10 色）。
+上限は `Config.wheelSparkMaxCount`（60）/ `wheelConfettiMaxCount`（80）で、低電力モード（`LowPowerModeMonitor` を光の尾と同じく `onAppear` で 1 つだけ作る）では
+`wheelParticleLowPowerDivisor` で 1/3。`TimelineView` は `WheelParticles.animates` が偽（火花も紙吹雪も出ていない・動きを減らす設定）の間は止める。指定・印・止まったスライスは受け取らず、共有画像には載せない。
+
 ### 3D 表示の仕組み
 
 設定の「3D 表示」（`@AppStorage(Config.wheel3DEnabledKey)`、既定 OFF）が ON のとき、`RouletteScreen` は `RouletteWheelView` の代わりに

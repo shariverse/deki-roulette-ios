@@ -2,7 +2,8 @@ import Combine
 import Foundation
 import Observation
 
-/// 低電力モードが ON かを追いかける。速さに連動する演出が描く量を減らすのに使う（光の尾・残像は `WheelTrails.ghostCount(lowPower:)`）。
+/// 低電力モードが ON かを追いかける。速さに連動する演出が描く量を減らすのに使う（光の尾・残像は `WheelTrails.ghostCount(lowPower:)`、
+/// 火花・紙吹雪は `WheelParticles.sparkCapacity(lowPower:)` / `confettiCapacity(lowPower:)`）。
 /// 変化は `NSProcessInfoPowerStateDidChange` で知らされ（どのスレッドから来るか決まっていない）、値は毎回読み直す。
 @MainActor
 @Observable
