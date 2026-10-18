@@ -30,6 +30,24 @@ struct ResultBandTests {
         #expect(farthest < ResultBand.sliceRadius(diameter: diameter))
     }
 
+    @Test(arguments: [120.0, 200, 320, 480])
+    func 登場のばねで行き過ぎても帯はスライスの円に収まる(diameter: Double) {
+        let scale = ResultBand.popInPeakScale
+        #expect(scale > 1 && scale < 1.1)
+        // 帯の中心で拡大するので、中心の位置は変わらず幅と高さだけ大きくなる
+        let height = ResultBand.height(diameter: diameter) * scale
+        let halfStraight = ResultBand.maxWidth(diameter: diameter) * scale / 2 - height / 2
+        let farthest = hypot(halfStraight, ResultBand.centerOffset(diameter: diameter)) + height / 2
+        #expect(farthest < ResultBand.sliceRadius(diameter: diameter))
+        // 上の端もハブに重ならない
+        #expect(ResultBand.centerOffset(diameter: diameter) - height / 2 > ResultBand.hubRadius(diameter: diameter))
+    }
+
+    @Test func 登場は小さい大きさから始める() {
+        #expect(ResultBand.popInStartScale > 0 && ResultBand.popInStartScale < 1)
+        #expect(ResultBand.popInBounce > 0 && ResultBand.popInBounce < 1)
+    }
+
     @Test func 帯は盤面のラベルより大きい文字で出す() {
         for count in 1...Config.maxItems {
             #expect(ResultBand.fontSize(diameter: 320) > WheelLabel.fontSize(count: count, diameter: 320))

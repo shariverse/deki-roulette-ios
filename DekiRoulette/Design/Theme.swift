@@ -275,6 +275,12 @@ enum Theme {
         static let haloOpacity = 0.45
     }
 
+    // MARK: 停止の瞬間のフラッシュ
+
+    /// 停止の瞬間に盤面の枠の中へ 1 回だけ重ねる光（`WheelStopEffects.flashOpacity`）。盤面と同じく外観に依らず固定の白系で、
+    /// 不透明度はいちばん明るいときも 0.25。`gold` / `flare` は使わない。縁（`wheelRim`）に対して 3:1 以上（`ThemeContrastTests`）。
+    static let stopFlash = Color(hex: 0xFFF8EC)
+
     // MARK: 結果の帯
 
     // 結果が出ている間、盤面の中心より下に重ねて結果のラベルを全文で出す帯（寸法と位置は `ResultBand`）。
@@ -287,6 +293,8 @@ enum Theme {
     static let resultBandInk = onSlice
     /// 帯の影。止まったスライスと沈めた盤面から浮かせる。
     static let resultBandShadow = pointerShadow
+    /// 「スピンの演出」が「なし」以外のときの帯の登場（小さい大きさから少し行き過ぎて収まる。`ResultBand.popIn*`）。
+    static let resultBandPopAnimation = Animation.spring(duration: ResultBand.popInDuration, bounce: ResultBand.popInBounce)
 
     /// 削除を元に戻すトーストの出入り。
     static let undoToastAnimation = Animation.easeOut(duration: 0.2)

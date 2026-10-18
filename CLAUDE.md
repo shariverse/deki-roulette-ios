@@ -184,9 +184,12 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 （寸法は `Theme.LightRing`、色は `Theme.wheelLight`）に `Canvas` で描き、盤面の枠と `WheelFaceView` は変えない（「なし」と共有画像は今のまま）。
 明るさは `WheelLights`（`Core/`）の純粋関数で、場面（`Scene`: 動きを減らす設定の `still` / 待機中・回転中の `running(angle:intensity:)` / 結果表示中の `stopped(elapsed:)`）から決める。
 並びの位置は盤面の累積回転角 × `Config.wheelLightFlowFactor`（角度に比例させると角速度に比例して流れ、止まれば止まる）で、角度は
-`currentMotion` があれば `angle(now: now())`、無ければ `rotation`、どちらにも `dragRotation` を足す。停止の点滅（`stopBlink`）と脈動（`afterglow`）は
-結果の強調が出た時刻（`highlight` が nil でなくなった `now()`）からの経過で引く。`TimelineView(.animation(paused:))` は `WheelLights.animates` が偽の間
-（待機中・止まり切った惰性 = `TimedSpinMotion.isMoving(now:)` が偽・動きを減らす設定）は止める。止まり切った惰性は親が描き直さないので、
+`currentMotion` があれば `angle(now: now())`、無ければ `rotation`、どちらにも `dragRotation` を足す。停止の点滅（`stopBlink`。停止の瞬間の明るいところから始め、
+1 回目をフラッシュと重ねて明滅を 1 秒 3 回未満に収める）と脈動（`afterglow`）は、`RouletteWheelView` が持つ結果が出た時刻（`stopStart`。`highlightedIndex` が
+nil でなくなった `now()`。結果を出したまま 2D が出たときは点滅を飛ばした時刻）を `stoppedAt` で受け取り（指で強調を解いたら nil）、その経過で引く。
+`TimelineView(.animation(minimumInterval:paused:))` は `WheelLights.animates` が偽の間
+（待機中・止まり切った惰性 = `TimedSpinMotion.isMoving(now:)` が偽・動きを減らす設定）は止め、点滅が終わって脈動だけになったら `WheelLights.frameInterval` で
+`Config.effectPulseFrameInterval`（1/20 秒）ごとに落とす（点滅の終わりは `.task(id: stoppedAt)` が待って `@State` を書き、描き直させる）。止まり切った惰性は親が描き直さないので、
 `WheelLightsView` が `.task(id: motion)` で残り時間だけ待って `@State` を書き、描き直させて止める。演出は指定・印を受け取らず、`accessibilityHidden`・`allowsHitTesting(false)`。
 
 光の尾・残像（`SpinEffectStyle.showsTrails`）も 2D の `RouletteWheelView` だけに出す（3D は後続）。`RouletteScreen` が `showsTrails` を渡し、`WheelTrailsView` を
@@ -207,6 +210,16 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 色は `Theme.wheelSpark` / `wheelSparkGlow` と、紙吹雪は `Theme.confettiColors`（スライスを指さないので `sliceColor(in:at:)` の例外の固定 10 色）。
 上限は `Config.wheelSparkMaxCount`（60）/ `wheelConfettiMaxCount`（80）で、低電力モード（`LowPowerModeMonitor` を光の尾と同じく `onAppear` で 1 つだけ作る）では
 `wheelParticleLowPowerDivisor` で 1/3。`TimelineView` は `WheelParticles.animates` が偽（火花も紙吹雪も出ていない・動きを減らす設定）の間は止める。指定・印・止まったスライスは受け取らず、共有画像には載せない。
+
+停止の瞬間のフラッシュ・結果の帯の登場演出・結果表示中の余韻（`SpinEffectStyle.showsCommonEffects`、「なし」以外のどのスタイルにも付く）も 2D だけに出す（3D は後続）。
+強さは `WheelStopEffects`（`Core/`）が停止からの経過だけで決める（項目・指定・印・止まったスライスは受け取らない）。`RouletteScreen` が `showsStopEffects` を渡し、
+フラッシュは `WheelStopFlashView` を回らない層の電飾の上・針の下に重ねる（`flashOpacity`: `Theme.stopFlash` を不透明度 0.25 から `Config.stopFlashDuration` で消す。
+光っている間だけ `TimelineView` を動かし、`stoppedAt` は指で強調を解いても止めない `highlightedIndex` 側の時刻）。余韻は `WheelFaceView` の `glowLevel`
+（`StopGlow` の `level`。1 なら色に掛けないので、共有画像と 3D の焼いた画像は変わらない）に `WheelStopEffects.glowLevel` を渡して光彩の不透明度を脈打たせ、
+`WheelFaceView` を包む `TimelineView(.animation(minimumInterval: Config.effectPulseFrameInterval, paused:))` を結果表示中（`highlight` が nil でない）だけ動かす。
+位相は電飾の脈動と同じ（`afterglowWave`）。帯の登場演出は `RouletteScreen` の `ResultBandPopIn` が `revealOnAppear` に重ねて、`ResultBand.popInStartScale` から
+`Theme.resultBandPopAnimation` のばねで出す（行き過ぎの `ResultBand.popInPeakScale` でも帯がスライスの円に収まることを `ResultBandTests` で確かめる）。
+どれも動きを減らす設定では出さず、演出中（`model.spinning`）は停止で終わるので操作を止めない。
 
 ### 3D 表示の仕組み
 

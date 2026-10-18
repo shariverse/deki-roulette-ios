@@ -81,12 +81,20 @@ enum Config {
     /// 盤面が 1 周したとき並びが元に戻るよう、`wheelLightCount` × これは `WheelLights.litStride` の倍数にする（24 × 0.25 = 6）。
     static let wheelLightFlowFactor = 0.25
 
-    /// 停止の瞬間の電飾の全灯の点滅の周期（秒）と回数。0.6 秒周期の 2 回で、1 秒に 3 回未満の明滅に収める。
+    /// 停止の瞬間の電飾の全灯の点滅の周期（秒）と回数。0.6 秒周期の 2 回（停止の瞬間と 0.6 秒後が明るい）で、
+    /// 停止の瞬間のフラッシュと 1 回目を重ねるので、合わせても 1 秒に 3 回未満の明滅に収まる。
     static let wheelLightBlinkPeriod: TimeInterval = 0.6
     static let wheelLightBlinkCount = 2
 
-    /// 結果表示中に電飾の全灯がゆっくり脈打つ周期（秒）。
+    /// 結果表示中に電飾の全灯がゆっくり脈打つ周期（秒）。止まったスライスの光彩の余韻（`WheelStopEffects`）も同じ周期・同じ位相で脈打つ。
     static let wheelLightAfterglowPeriod: TimeInterval = 2.4
+
+    /// 停止の瞬間のフラッシュ（`WheelStopEffects.flashOpacity`）が消えるまでの長さ（秒）。1 回だけ光らせる。
+    static let stopFlashDuration: TimeInterval = 0.25
+
+    /// 脈動だけを描いている間（電飾の点滅の後・光彩の余韻）の描き直しの最短間隔（秒）。周期 2.4 秒のゆっくりした変化なので、
+    /// 毎フレームでなくても段差は見えない（1 回の変化は不透明度で 0.04 未満）。
+    static let effectPulseFrameInterval: TimeInterval = 1.0 / 20
 
     /// 止まり際の焦らし（`SpinTease`）でスピンに足す長さ（秒）。焦らしを入れるスピンは入り方に依らず
     /// `spinDuration + spinTeaseDuration`（5.7 秒）で、主の区間は `spinDuration` のまま。

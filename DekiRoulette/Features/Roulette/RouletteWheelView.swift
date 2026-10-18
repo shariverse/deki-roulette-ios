@@ -26,6 +26,9 @@ struct RouletteWheelView: View {
     var showsTrails = false
     /// 針の先の火花と停止の瞬間の紙吹雪を出すか（「スピンの演出」が紙吹雪・全部入り）。false なら今の盤面のまま何も足さない。
     var showsParticles = false
+    /// 停止の瞬間のフラッシュと、結果表示中の止まったスライスの光彩の余韻を出すか（「スピンの演出」が「なし」以外）。
+    /// false なら今の盤面のまま何も足さない。
+    var showsStopEffects = false
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れ・光の尾・残像・火花を毎フレームここから引く。
     var motion: TimedSpinMotion? = nil
     /// `motion` の開始時刻と同じ時計（`RouletteModel.now`）。
@@ -36,6 +39,8 @@ struct RouletteWheelView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsing = false
+    /// 結果が出た時刻（`now()` の秒）。電飾の点滅と脈動・フラッシュ・光彩の余韻の経過時間の基準。結果が無いときは nil。
+    @State private var stopStart: TimeInterval?
 
     var body: some View {
         WheelDragArea(
@@ -44,13 +49,25 @@ struct RouletteWheelView: View {
         ) { dragRotation, displacedByDrag in
             // 強調するスライス。結果が出たあとに指で動かしたら解く（結果の表示は残る）
             let highlight = displacedByDrag ? nil : highlightedIndex
+            // 止まったスライスの光彩の余韻。次のスピン・結果が消えた・指で動かして強調を解いたら止める（光彩は今のまま）
+            let afterglowStart = WheelStopEffects.pulses(
+                enabled: showsStopEffects, reduceMotion: reduceMotion, showingResult: highlight != nil
+            ) ? stopStart : nil
             ZStack(alignment: .top) {
                 GeometryReader { proxy in
                     let side = min(proxy.size.width, proxy.size.height)
-                    WheelFaceView(
-                        items: items, side: side, highlight: highlight, glowStyle: glowStyle,
-                        highlightScale: highlightScale, animated: !reduceMotion
-                    )
+                    // 余韻はゆっくり脈打つだけなので、毎フレームではなく `Config.effectPulseFrameInterval` ごとに描き直す。
+                    // 余韻が無いときは止めたまま（光彩の倍率は 1 で今の盤面と同じ）
+                    TimelineView(.animation(minimumInterval: Config.effectPulseFrameInterval, paused: afterglowStart == nil)) { _ in
+                        WheelFaceView(
+                            items: items, side: side, highlight: highlight, glowStyle: glowStyle,
+                            highlightScale: highlightScale, animated: !reduceMotion,
+                            glowLevel: WheelStopEffects.glowLevel(
+                                enabled: showsStopEffects, reduceMotion: reduceMotion,
+                                stoppedElapsed: afterglowStart.map { now() - $0 }
+                            )
+                        )
+                    }
                     .frame(width: side, height: side)
                     .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
                 }
@@ -88,7 +105,21 @@ struct RouletteWheelView: View {
                             rotation: rotation,
                             dragRotation: dragRotation,
                             motion: motion,
-                            showingResult: highlight != nil,
+                            // 指で動かして強調を解いたら点滅・脈動も止める
+                            stoppedAt: highlight != nil ? stopStart : nil,
+                            now: now
+                        )
+                        .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                    }
+                }
+
+                // 停止の瞬間のフラッシュは回らない層で盤面の枠の中に重ねる（針はその手前）。結果が出た瞬間に 1 回だけ光るので、
+                // 指で強調を解いても止めない `highlightedIndex` の時刻を渡す
+                if showsStopEffects {
+                    GeometryReader { proxy in
+                        WheelStopFlashView(
+                            side: min(proxy.size.width, proxy.size.height),
+                            stoppedAt: highlightedIndex != nil ? stopStart : nil,
                             now: now
                         )
                         .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
@@ -114,7 +145,12 @@ struct RouletteWheelView: View {
             }
             .aspectRatio(1, contentMode: .fit)
         }
+        .onAppear {
+            // 結果を出したまま画面に戻った（2D に切り替えた）ときは、停止の瞬間の点滅とフラッシュを飛ばして脈動から始める
+            if highlightedIndex != nil, stopStart == nil { stopStart = now() - WheelLights.blinkDuration }
+        }
         .onChange(of: highlightedIndex) { _, index in
+            stopStart = index != nil ? now() : nil
             // 止まった瞬間だけ押し出す。動きを減らす設定では暗くするだけにする
             guard index != nil, !reduceMotion else {
                 pulsing = false
@@ -150,6 +186,9 @@ struct WheelFaceView: View {
     var highlightScale: CGFloat = 1
     /// 強調の変化を補間するか。動きを減らす設定と、画像に焼くときは false。
     var animated = true
+    /// 止まったスライスの光彩の倍率（0...1。光彩の不透明度に掛ける）。画面では結果表示中の余韻（`WheelStopEffects.glowLevel`）で
+    /// 脈打たせる。1 なら今の光彩のまま（共有画像は渡さないので常に 1）。
+    var glowLevel = 1.0
 
     private static let referenceSize = CGFloat(WheelLabel.referenceDiameter)
     private static let ink = Theme.onSlice
@@ -180,7 +219,7 @@ struct WheelFaceView: View {
                     )
                     .modifier(StopGlow(
                         shape: Circle(), style: glowStyle, sliceColor: Theme.sliceColor(in: items, at: 0),
-                        shown: highlighted, radius: Theme.stopGlowRadius * scale
+                        shown: highlighted, radius: Theme.stopGlowRadius * scale, level: glowLevel
                     ))
                     .animation(animated ? Theme.stopDimAnimation : nil, value: highlighted)
                     .frame(width: radius * 2, height: radius * 2)
@@ -227,7 +266,7 @@ struct WheelFaceView: View {
                     .modifier(StopGlow(
                         shape: SliceShape(startAngle: start, endAngle: end, radius: radius), style: glowStyle,
                         sliceColor: Theme.sliceColor(in: items, at: index), shown: highlighted,
-                        radius: Theme.stopGlowRadius * scale
+                        radius: Theme.stopGlowRadius * scale, level: glowLevel
                     ))
                     .animation(animated ? Theme.stopDimAnimation : nil, value: dimmed)
                     .animation(animated ? Theme.stopDimAnimation : nil, value: highlighted)
@@ -280,21 +319,27 @@ struct StopGlow<S: Shape>: ViewModifier {
     let sliceColor: Color
     let shown: Bool
     let radius: CGFloat
+    /// 光彩の倍率（結果表示中の余韻で脈打たせる）。1 なら今の光彩のまま（色に掛けないので、共有画像・3D の画像の画素も変わらない）。
+    var level = 1.0
 
     @ViewBuilder
     func body(content: Content) -> some View {
         switch style {
         case .white:
-            content.shadow(color: shown ? Theme.stopGlow : .clear, radius: radius)
+            content.shadow(color: shown ? scaled(Theme.stopGlow) : .clear, radius: radius)
         case .slice:
-            content.shadow(color: shown ? sliceColor.opacity(Theme.stopGlowOpacity) : .clear, radius: radius)
+            content.shadow(color: shown ? scaled(sliceColor.opacity(Theme.stopGlowOpacity)) : .clear, radius: radius)
         case .rainbow:
             content.background(
                 shape.stroke(Theme.stopGlowRainbow, lineWidth: radius)
                     .blur(radius: radius / 2)
-                    .opacity(shown ? 1 : 0)
+                    .opacity(shown ? min(max(level, 0), 1) : 0)
             )
         }
+    }
+
+    private func scaled(_ color: Color) -> Color {
+        level >= 1 ? color : color.opacity(max(level, 0))
     }
 }
 

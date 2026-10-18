@@ -104,7 +104,8 @@ struct WheelLightsTests {
         // 明るさの山（極大）の時刻を細かく拾う
         let dt = 0.001
         let samples = stride(from: 0.0, through: 6, by: dt).map { WheelLights.stopped(at: $0) }
-        var peaks: [Double] = []
+        // 停止の瞬間（0 秒）が 1 回目の山
+        var peaks: [Double] = samples[0] > samples[1] ? [0] : []
         for i in 1..<(samples.count - 1) where samples[i] > samples[i - 1] && samples[i] >= samples[i + 1] {
             peaks.append(Double(i) * dt)
         }
@@ -116,6 +117,16 @@ struct WheelLightsTests {
         }
         // 点滅の明るいときも抑える
         #expect(samples.allSatisfy { $0 <= WheelLights.blinkHighLevel + 1e-9 })
+    }
+
+    @Test func 点滅は停止の瞬間の明るいところから始まる() {
+        // 停止の瞬間のフラッシュと 1 回目の明るいところを重ね、合わせて 1 回の明滅にする
+        #expect(abs(WheelLights.stopped(at: 0) - WheelLights.blinkHighLevel) < 1e-9)
+        #expect(abs(WheelLights.stopped(at: Config.wheelLightBlinkPeriod) - WheelLights.blinkHighLevel) < 1e-9)
+        #expect(abs(WheelLights.stopped(at: Config.wheelLightBlinkPeriod / 2) - WheelLights.blinkLowLevel) < 1e-9)
+        // 点滅は 0.6 秒 × 1.5 で、暗いところで終える
+        #expect(abs(WheelLights.blinkDuration - 0.9) < 1e-9)
+        #expect(abs(WheelLights.stopped(at: WheelLights.blinkDuration - 1e-9) - WheelLights.blinkLowLevel) < 1e-6)
     }
 
     @Test func 点滅のあとに脈動へつながる() {
@@ -155,6 +166,20 @@ struct WheelLightsTests {
         #expect(WheelLights.scene(reduceMotion: false, angle: 10, intensity: 0.4, stoppedElapsed: nil) == .running(angle: 10, intensity: 0.4))
         #expect(WheelLights.scene(reduceMotion: false, angle: 10, intensity: 2, stoppedElapsed: nil) == .running(angle: 10, intensity: 1))
         #expect(WheelLights.scene(reduceMotion: false, angle: 10, intensity: 0.4, stoppedElapsed: 0.5) == .stopped(elapsed: 0.5))
+    }
+
+    @Test func 脈動だけになったら描き直しの間隔を落とす() {
+        // 回っている間と点滅の間は毎フレーム
+        #expect(WheelLights.frameInterval(moving: true, stoppedElapsed: nil) == nil)
+        #expect(WheelLights.frameInterval(moving: false, stoppedElapsed: nil) == nil)
+        #expect(WheelLights.frameInterval(moving: false, stoppedElapsed: 0) == nil)
+        #expect(WheelLights.frameInterval(moving: false, stoppedElapsed: WheelLights.blinkDuration - 0.01) == nil)
+        // 点滅が終わったら低頻度
+        #expect(WheelLights.frameInterval(moving: false, stoppedElapsed: WheelLights.blinkDuration) == Config.effectPulseFrameInterval)
+        #expect(WheelLights.frameInterval(moving: false, stoppedElapsed: 10) == Config.effectPulseFrameInterval)
+        // 低頻度でも 1 回の変化は小さい（脈動の明るさの変化の速さの最大 × 間隔）
+        let maxRate = (WheelLights.afterglowHighLevel - WheelLights.blinkLowLevel) * .pi / Config.wheelLightAfterglowPeriod
+        #expect(maxRate * Config.effectPulseFrameInterval < 0.04)
     }
 
     @Test func 待機中は描き直さない() {
