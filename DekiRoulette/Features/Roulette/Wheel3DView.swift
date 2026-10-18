@@ -296,6 +296,8 @@ final class Wheel3DScene {
     private var trailPieceLevels: [Double?] = []
     /// 光の尾の切れ端の不透明度を書き換えた回数（テストで、濃さの変わらない切れ端を書き換えていないかを見る）。
     private(set) var trailOpacityWriteCount = 0
+    /// 電球を縁の上面から浮かせる高さ（pt）。テストで差し替えて、浮かせないと止まったスライスに隠れることを確かめる。
+    var lightLift = Theme.Wheel3D.lightLift
     /// 火花と紙吹雪（`tiltNode` に載せ、盤と一緒に傾くが回らない）。粒のノードは初めて描くときに上限の数だけ作り（「なし」では作らない）、
     /// 毎フレーム位置・大きさ・濃さだけを変えて使い回す。紙吹雪は盤面の枠に収まるよう、浮かせた分の遠近の広がりを `confettiNode` の縮みで打ち消す。
     private let particlesNode = SCNNode()
@@ -813,7 +815,7 @@ final class Wheel3DScene {
         let ringRadius = Double(Theme.LightRing.ringRadius(diameter: side))
         let bulbRadius = Double(Theme.LightRing.bulbRadius(diameter: side))
         let haloRadius = bulbRadius + Double(Theme.LightRing.haloWidth(diameter: side))
-        let z = Float(Double(Theme.Wheel3D.rimLift) * scale + Double(Theme.Wheel3D.lightLift))
+        let z = Float(Double(Theme.Wheel3D.rimLift) * scale + Double(lightLift))
         let haloImage = Self.haloImage(bulbRadius: bulbRadius, haloRadius: haloRadius, displayScale: displayScale)
         let count = Config.wheelLightCount
         for index in 0..<count {
