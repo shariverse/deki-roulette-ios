@@ -73,6 +73,10 @@ struct RouletteScreen: View {
             sound.playChime()
         }
         // 「なし」のときは決まり音を読み込まない
+        // 画面を出したまま設定で「なし」から変えたら、最初の停止で読み込みを待たないよう先に読んでおく
+        .onChange(of: spinEffectStyle) { _, style in
+            if soundEnabled, style.showsCommonEffects { sound.prepare(chime: true) }
+        }
         .onAppear {
             onScreen = true
             if soundEnabled { sound.prepare(chime: spinEffectStyle.showsCommonEffects) }
