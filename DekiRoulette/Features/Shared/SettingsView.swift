@@ -131,9 +131,10 @@ struct SettingsView: View {
     }
 }
 
-/// 設定から進む「ルーレットの詳細設定」。止まったスライスの光彩の色、3D 表示の ON/OFF と傾きの基準を選ぶ。
+/// 設定から進む「ルーレットの詳細設定」。止まったスライスの光彩の色、スピンの演出、3D 表示の ON/OFF と傾きの基準を選ぶ。
 private struct RouletteAdvancedSettingsView: View {
     @AppStorage(Config.glowStyleKey) private var glowStyle = GlowStyle.default
+    @AppStorage(Config.spinEffectStyleKey) private var spinEffectStyle = SpinEffectStyle.default
     @AppStorage(Config.wheel3DEnabledKey) private var wheel3DEnabled = false
     @AppStorage(Config.tiltReferenceKey) private var tiltReference = TiltReference.default
 
@@ -144,6 +145,13 @@ private struct RouletteAdvancedSettingsView: View {
                     ForEach(GlowStyle.allCases, id: \.self) { style in
                         SettingsChoiceRow(title: L10n.glowStyleName(style), selected: glowStyle == style) {
                             glowStyle = style
+                        }
+                    }
+                }
+                SettingsSection(title: L10n.spinEffectStyleTitle) {
+                    ForEach(SpinEffectStyle.allCases, id: \.self) { style in
+                        SettingsChoiceRow(title: L10n.spinEffectStyleName(style), selected: spinEffectStyle == style) {
+                            spinEffectStyle = style
                         }
                     }
                 }
