@@ -293,6 +293,8 @@ enum Theme {
     static let resultBandInk = onSlice
     /// 帯の影。止まったスライスと沈めた盤面から浮かせる。
     static let resultBandShadow = pointerShadow
+    /// 「スピンの演出」が「なし」以外のときの帯の登場（小さい大きさから少し行き過ぎて収まる。`ResultBand.popIn*`）。
+    static let resultBandPopAnimation = Animation.spring(duration: ResultBand.popInDuration, bounce: ResultBand.popInBounce)
 
     /// 削除を元に戻すトーストの出入り。
     static let undoToastAnimation = Animation.easeOut(duration: 0.2)

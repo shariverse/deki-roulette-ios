@@ -216,6 +216,8 @@ struct RouletteScreen: View {
                     accent: Theme.sliceColor(in: model.items, at: outcome.index),
                     diameter: diameter
                 )
+                    // 「スピンの演出」が「なし」以外では、小さい大きさから少し行き過ぎて収まるように出す（帯の中心で拡大する）
+                    .modifier(ResultBandPopIn(enabled: spinEffectStyle.showsCommonEffects && !reduceMotion))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     // 盤面は正方形なので、枠の中心が盤面の中心
                     .offset(y: ResultBand.centerOffset(diameter: diameter))
@@ -299,6 +301,27 @@ struct RouletteScreen: View {
                 model.finishSpin()
             }
         }
+    }
+}
+
+/// 結果の帯の登場演出（「スピンの演出」が「なし」以外のとき。`docs/SPEC.md` の §5.5）。`revealOnAppear` に重ねて、
+/// 帯を `ResultBand.popInStartScale` から `Theme.resultBandPopAnimation` のばねで少し行き過ぎて 1 に収める。帯の文字・寸法・色は変えない。
+/// `enabled` が false（「なし」・動きを減らす設定）なら何もしない。出し直しは帯の `.id`（スピンごと）で作り直されたとき。
+private struct ResultBandPopIn: ViewModifier {
+    let enabled: Bool
+    @State private var popped = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(enabled && !popped ? ResultBand.popInStartScale : 1)
+            .onAppear {
+                // 出たときに無効なら登場済みにしておく（結果を出したまま設定を変えても、途中から小さくならない）
+                guard enabled else {
+                    popped = true
+                    return
+                }
+                withAnimation(Theme.resultBandPopAnimation) { popped = true }
+            }
     }
 }
 
