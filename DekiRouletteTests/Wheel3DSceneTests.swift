@@ -1059,14 +1059,25 @@ struct Wheel3DSceneTests {
         #expect(distance(cleared.color(at: inner), plain.color(at: inner)) < 0.01)
     }
 
-    @Test func 余韻の倍率で止まったスライスの光彩だけが薄くなる() throws {
-        let full = makeStoppedScene(index: 2)
-        full.stopEffects(.none)
-        let low = makeStoppedScene(index: 2)
-        low.stopEffects(WheelStopEffects.Frame(flashOpacity: 0, glowLevel: WheelStopEffects.afterglowLowLevel))
-        let fullPixels = try render(full), lowPixels = try render(low)
+    /// 止まったスライス 2 を強調した盤。`afterglow` は「スピンの演出」が「なし」以外（余韻を出せる形）か。
+    /// 動きを減らす設定では余韻を出さないので、どちらも押し出す側（`reduceMotion: false`）で比べる。
+    private func glowingScene(afterglow: Bool, level: Double? = nil) -> Wheel3DScene {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: afterglow)
+        if let level { scene.stopEffects(WheelStopEffects.Frame(flashOpacity: 0, glowLevel: level)) }
+        return scene
+    }
+
+    /// 止まったスライス 2（180〜270 度）の始まりの境目から、隣のスライス 1 へ 5pt 入った位置（光彩の中）。
+    private func glowLocation(pixels: Pixels) -> CGPoint {
         let radius = (Double(size) / 2 - 16 * Double(size) / WheelLabel.referenceDiameter) * 0.6
-        let near = location(angle: 180 - 5 / radius * 180 / .pi, fraction: 0.6, pixels: fullPixels)
+        return location(angle: 180 - 5 / radius * 180 / .pi, fraction: 0.6, pixels: pixels)
+    }
+
+    @Test func 余韻の倍率で止まったスライスの光彩だけが薄くなる() throws {
+        let fullPixels = try render(glowingScene(afterglow: true, level: 1))
+        let lowPixels = try render(glowingScene(afterglow: true, level: WheelStopEffects.afterglowLowLevel))
+        let near = glowLocation(pixels: fullPixels)
         let plain = lowPixels.color(at: location(angle: 135, fraction: 0.6, pixels: lowPixels))
         // 光彩は弱くなるが消えない
         #expect(brightness(fullPixels.color(at: near)) > brightness(lowPixels.color(at: near)) + 0.03,
@@ -1077,27 +1088,43 @@ struct Wheel3DSceneTests {
             let point = location(angle: angle, fraction: 0.6, pixels: lowPixels)
             #expect(isClose(lowPixels.color(at: point), srgb(color)), "\(angle): \(lowPixels.color(at: point))")
         }
-        // 盤を組み直して強調を出し直しても、今の倍率のまま
-        low.update(labels: Array(repeating: "", count: 4), diameter: size + 1)
-        low.update(labels: Array(repeating: "", count: 4), diameter: size)
-        low.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: true)
-        let rebuilt = try render(low)
-        #expect(abs(brightness(rebuilt.color(at: near)) - brightness(lowPixels.color(at: near))) < 0.03)
+        // 盤を組み直して強調を出し直しても、今の倍率のまま（同じく組み直した倍率 1 の盤より光彩が弱い）
+        let rebuild = { (scene: Wheel3DScene) -> Wheel3DScene in
+            scene.update(labels: Array(repeating: "", count: 4), diameter: self.size + 1)
+            scene.update(labels: Array(repeating: "", count: 4), diameter: self.size)
+            scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: true)
+            return scene
+        }
+        let rebuiltFull = try render(rebuild(glowingScene(afterglow: true, level: 1)))
+        let rebuiltLow = try render(rebuild(glowingScene(afterglow: true, level: WheelStopEffects.afterglowLowLevel)))
+        #expect(brightness(rebuiltFull.color(at: near)) > brightness(rebuiltLow.color(at: near)) + 0.03,
+                "\(rebuiltFull.color(at: near)) \(rebuiltLow.color(at: near))")
     }
 
-    @Test func なしでは粒もフラッシュの板も作らず光彩は今のまま() throws {
-        let before = try render(makeStoppedScene(index: 2))
-        let scene = makeStoppedScene(index: 2)
-        scene.stopEffects(.none)
-        scene.particles(.none)
-        #expect(!scene.hasFlashNode)
-        #expect(scene.particleNodeCount == 0)
-        let after = try render(scene)
-        let radius = (Double(size) / 2 - 16 * Double(size) / WheelLabel.referenceDiameter) * 0.6
-        for angle in [180 - 5 / radius * 180 / .pi, 225, 45] {
-            let point = location(angle: angle, fraction: 0.6, pixels: after)
-            #expect(distance(after.color(at: point), before.color(at: point)) < 0.01, "\(angle)")
+    @Test func なしでは止まったスライスを1枚で焼き粒もフラッシュの板も作らない() throws {
+        let none = glowingScene(afterglow: false)
+        none.stopEffects(.none)
+        none.particles(.none)
+        #expect(none.stoppedImagePlaneCount == 1)
+        #expect(!none.hasFlashNode)
+        #expect(none.particleNodeCount == 0)
+        // 余韻を出すときは 2 枚。動きを減らす設定では余韻を出さないので 1 枚
+        #expect(glowingScene(afterglow: true).stoppedImagePlaneCount == 2)
+        let reduced = makeScene(count: 4, rotation: 0)
+        reduced.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: true, afterglow: true)
+        #expect(reduced.stoppedImagePlaneCount == 1)
+        // 倍率 1 の 2 枚は「なし」の 1 枚と同じ見た目
+        let single = try render(none)
+        let double = try render(glowingScene(afterglow: true, level: 1))
+        for point in [glowLocation(pixels: single), location(angle: 225, fraction: 0.6, pixels: single),
+                      location(angle: 180, fraction: 0.6, pixels: single)] {
+            #expect(distance(single.color(at: point), double.color(at: point)) < 0.02, "\(single.color(at: point)) \(double.color(at: point))")
         }
+        // 結果を出したまま演出を切り替えたら、その形で出し直す
+        none.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: true)
+        #expect(none.stoppedImagePlaneCount == 2)
+        none.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: false)
+        #expect(none.stoppedImagePlaneCount == 1)
     }
 
     @Test func 結果の帯はなし以外のとき新しい結果でだけ登場演出を重ねる() {

@@ -106,7 +106,7 @@ struct Wheel3DView: View {
                                     items: items, rotation: rotation + dragRotation, tilt: tilt, diameter: side,
                                     displayScale: displayScale,
                                     highlight: cues.highlight.map { Wheel3DHighlight(index: $0, glowStyle: glowStyle) },
-                                    result: result, popsInResult: effectStyle.showsCommonEffects,
+                                    result: result, showsCommonEffects: effectStyle.showsCommonEffects,
                                     lights: lights, trails: trails, particles: particles, stopEffects: stopEffects,
                                     reduceMotion: reduceMotion
                                 )
@@ -177,8 +177,8 @@ private struct Wheel3DSurface: View, Animatable {
     let displayScale: CGFloat
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
-    /// 結果の帯を出すときに登場演出（小さい大きさからばね）を重ねるか（「スピンの演出」が「なし」以外）。
-    let popsInResult: Bool
+    /// 「スピンの演出」が「なし」以外か。結果の帯に登場演出（小さい大きさからばね）を重ね、止まったスライスの光彩を余韻で脈打たせられる形にする。
+    let showsCommonEffects: Bool
     /// 外周の電飾の場面。電飾を出さないときは nil。
     let lights: WheelLights.Scene?
     /// 光の尾と残像。出さないとき・描かない間は `.none`。
@@ -197,7 +197,7 @@ private struct Wheel3DSurface: View, Animatable {
     var body: some View {
         Wheel3DSceneView(
             items: items, rotation: rotation, tilt: tilt, diameter: diameter, displayScale: displayScale,
-            highlight: highlight, result: result, popsInResult: popsInResult, lights: lights, trails: trails,
+            highlight: highlight, result: result, showsCommonEffects: showsCommonEffects, lights: lights, trails: trails,
             particles: particles, stopEffects: stopEffects, reduceMotion: reduceMotion
         )
     }
@@ -211,7 +211,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
     let displayScale: CGFloat
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
-    let popsInResult: Bool
+    let showsCommonEffects: Bool
     let lights: WheelLights.Scene?
     let trails: WheelTrails.Frame
     let particles: WheelParticles.Frame
@@ -238,8 +238,8 @@ private struct Wheel3DSceneView: UIViewRepresentable {
         context.coordinator.update(items: items, diameter: diameter, displayScale: displayScale)
         context.coordinator.spin(to: rotation)
         context.coordinator.tilt(to: tilt)
-        context.coordinator.highlight(highlight, reduceMotion: reduceMotion)
-        context.coordinator.show(result: result, reduceMotion: reduceMotion, popIn: popsInResult)
+        context.coordinator.highlight(highlight, reduceMotion: reduceMotion, afterglow: showsCommonEffects)
+        context.coordinator.show(result: result, reduceMotion: reduceMotion, popIn: showsCommonEffects)
         context.coordinator.light(lights)
         context.coordinator.trail(trails)
         context.coordinator.stopEffects(stopEffects)
@@ -266,6 +266,8 @@ final class Wheel3DScene {
     private var dimNode: SCNNode?
     private var stoppedNode: SCNNode?
     private var shownHighlight: Wheel3DHighlight?
+    /// 止まったスライスを余韻で脈打たせられる形（光彩の板と光彩の無い面の板の 2 枚）で出しているか。
+    private var shownAfterglow = false
     private let postNode = SCNNode()
     /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は初めて出すときに作り（「なし」では作らない）、
     /// 組み直したら作り直し、出さない間は隠す。
@@ -320,6 +322,10 @@ final class Wheel3DScene {
     private var shownStopEffects = WheelStopEffects.Frame.none
     /// フラッシュの板を作ったか（テストで、「なし」では作らないことを見る）。
     var hasFlashNode: Bool { flashNode != nil }
+    /// 止まったスライスに貼った画像の板の数（テストで、「なし」は 1 枚・余韻を出すときは 2 枚であることを見る）。
+    var stoppedImagePlaneCount: Int {
+        stoppedNode?.childNodes.filter { $0.geometry is SCNPlane }.count ?? 0
+    }
     /// 結果の帯の登場演出（小さい大きさからばね）を流した回数。
     private(set) var bandPopCount = 0
 
@@ -457,8 +463,12 @@ final class Wheel3DScene {
     /// 止まったスライスは縁の高さまで持ち上げ、側面の付いた板として前に出す（隣に隠れず、傾けても浮いて見える）。
     /// 動きを減らす設定では大きさも高さも変えず、暗くする・縁取り・光彩だけを即座に出す。
     /// 大きさが変わって盤を組み直したときは、動かさずに出し直す。
-    func highlight(_ highlight: Wheel3DHighlight?, reduceMotion: Bool) {
+    func highlight(_ highlight: Wheel3DHighlight?, reduceMotion: Bool, afterglow: Bool = false) {
+        let pulsesGlow = afterglow && !reduceMotion
         let changed = highlight != shownHighlight
+        // 結果を出したまま「スピンの演出」を切り替えた（余韻の有無が変わった）ときは、動かさずに出し直す
+        if !changed, stoppedNode != nil, pulsesGlow != shownAfterglow { removeHighlightNodes() }
+        shownAfterglow = pulsesGlow
         guard changed || (highlight != nil && stoppedNode == nil) else { return }
         shownHighlight = highlight
         let animate = changed && !reduceMotion
@@ -468,13 +478,13 @@ final class Wheel3DScene {
         }
         removeHighlightNodes()
         let dim = makeDim(except: highlight.index, shape: shape)
-        let (stopped, glow) = makeStopped(highlight, shape: shape, lifted: !reduceMotion)
+        let (stopped, glow) = makeStopped(highlight, shape: shape, lifted: !reduceMotion, afterglow: pulsesGlow)
         spinNode.addChildNode(dim)
         spinNode.addChildNode(stopped)
         dimNode = dim
         stoppedNode = stopped
         stoppedGlowNode = glow
-        glow.opacity = CGFloat(shownStopEffects.glowLevel)
+        glow?.opacity = CGFloat(shownStopEffects.glowLevel)
         if !reduceMotion {
             stopped.scale = Self.planeScale(Theme.stopHoldScale)
         }
@@ -1209,10 +1219,13 @@ final class Wheel3DScene {
     }
 
     /// 前に出した止まったスライス。側面の付いた板（塗りの色）の上に、2D と同じ塗り・ラベル・縁取り・光彩を焼いた画像を貼る。
-    /// 光彩は余韻で脈打たせるので、光彩ごと焼いた画像の板（返す `glow`。不透明度を余韻の倍率にする）の上に、光彩の無い同じ面の画像の板を重ねる
-    /// （スライスの中は不透明な塗りなので、外側にはみ出した光彩だけが倍率で薄くなる。倍率 1 なら今の見た目のまま）。
+    /// `afterglow`（「なし」以外で余韻を出すとき）は光彩を脈打たせるので、光彩ごと焼いた画像の板（返す `glow`。不透明度を余韻の倍率にする）の上に、
+    /// 光彩の無い同じ面の画像の板を重ねる（スライスの中は不透明な塗りなので、外側にはみ出した光彩だけが倍率で薄くなる。倍率 1 なら 1 枚と同じ見た目）。
+    /// 「なし」・動きを減らす設定では光彩ごと焼いた 1 枚だけにする（`glow` は nil。消すときに半透明の塗りが 2 枚重なって濃く残らない）。
     /// 盤の中心を原点に置くので、`scale` は 2D の `scaleEffect` と同じく盤の中心から広がる。
-    private func makeStopped(_ highlight: Wheel3DHighlight, shape: Shape, lifted: Bool) -> (node: SCNNode, glow: SCNNode) {
+    private func makeStopped(
+        _ highlight: Wheel3DHighlight, shape: Shape, lifted: Bool, afterglow: Bool
+    ) -> (node: SCNNode, glow: SCNNode?) {
         let diameter = Double(shape.diameter)
         let scale = diameter / WheelLabel.referenceDiameter
         let radius = WheelGeometry.sliceRadius(diameter: diameter)
@@ -1250,6 +1263,7 @@ final class Wheel3DScene {
         // 深度を書かないので、暗くする層より後に描く（板の側面と表は深度を書き、奥のものを隠す）
         glow.renderingOrder = Self.stoppedGlowRenderingOrder
         group.addChildNode(glow)
+        guard afterglow else { return (group, nil) }
         let face = Self.imagePlane(
             StoppedSlice(
                 items: shape.items, index: highlight.index, diameter: diameter, glowStyle: highlight.glowStyle, showsGlow: false

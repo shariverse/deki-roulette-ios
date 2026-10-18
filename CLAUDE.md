@@ -336,7 +336,9 @@ SceneKit は線形の色空間で重ねるので、電球は不透明度では�
 `Wheel3DScene.stopEffects(_:)` が写す。フラッシュは 2D と同じ形の丸い光（`Theme.StopFlash`）を焼いた板を、ハブの上面より手前・結果の帯と針より奥に置き、
 ノードの不透明度を `flashOpacity` にする（初めて光らせるときに作る。電飾より後に描き、深度は読むので針には隠れる。浮かせた分の遠近の広がりは縮めて打ち消し、枠の外へ広げない）。
 余韻は、止まったスライスの画像を光彩ごと焼いた板（`stoppedGlowNode`）とその上の光彩の無い同じ面の板の 2 枚にして、下の板の不透明度を `glowLevel`（0.4〜1、電飾の脈動と同じ位相）にする
-（スライスの中は不透明な塗りなので、はみ出した光彩だけが薄くなる。倍率 1 なら今の見た目のまま）。結果の帯の登場演出は、`Wheel3DScene.show(result:reduceMotion:popIn:)` が
+（スライスの中は不透明な塗りなので、はみ出した光彩だけが薄くなる。倍率 1 なら 1 枚と同じ見た目）。2 枚にするのは余韻を出すとき（`highlight(_:reduceMotion:afterglow:)` の
+`afterglow` が「なし」以外で、動きを減らす設定でない）だけで、「なし」は光彩ごと焼いた 1 枚のまま（消すフェードで半透明の塗りが 2 枚重なって濃く残らない）。
+結果を出したまま演出を切り替えたら、動かさずにその形で出し直す。結果の帯の登場演出は、`Wheel3DScene.show(result:reduceMotion:popIn:)` が
 帯の親ノードに今の現れ方（`revealOnAppear` 相当）を、子の板に `ResultBand.popInStartScale` からの `CASpringAnimation(perceptualDuration: popInDuration, bounce: popInBounce)` を掛けて重ねる
 （新しい結果でだけ。組み直し・見た目の変更での焼き直しでは動かさない）。動きを減らす設定ではどれも出さない。
 
