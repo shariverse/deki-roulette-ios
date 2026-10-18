@@ -149,6 +149,13 @@ ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚
 `sound.stop()` で残りを止め、スピンを始めたら次の `play(at:)` が差し替える。惰性は `reducedMotion` では付かないので鳴らない。
 ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 
+停止時の決まり音（`Resources/Sounds/chime.wav`。`scripts/make-chime-sound.swift` が C6・E6・G6 の上がるアルペジオを 0.9 秒で合成する）は、
+「スピンの演出」（`@AppStorage(Config.spinEffectStyleKey)`）が `showsCommonEffects` で効果音が ON のときだけ鳴らす。判定は `StopChime.plays`（`Core/`。
+スタイル・効果音・止まった動き（`.spin` / `.coast`）だけを受け取り、指定や結果のラベルは受け取らない）。`RouletteScreen` が `onChange(of: model.outcome)` で
+結果が出た瞬間（`finishSpin`。保険のタイマーでも同じ）に `sound.playChime()` を呼ぶ。惰性では `outcome` が出ないので鳴らず、`reducedMotion` でも鳴らす。
+`SpinSoundPlayer` は回転音とは別の `AVAudioPlayerNode`（音量 `Config.chimeGain`）で流すので、クリックの再生を止めたり差し替えたりしない（`stop()` だけは両方止める）。
+「なし」のときは `prepare(chime:)` に false を渡して音源を読み込まない。
+
 ### 3D 表示の仕組み
 
 設定の「3D 表示」（`@AppStorage(Config.wheel3DEnabledKey)`、既定 OFF）が ON のとき、`RouletteScreen` は `RouletteWheelView` の代わりに
