@@ -3,23 +3,31 @@ import AVFAudio
 /// スピン中の「カチッ」を鳴らす。止まる位置も回転角もスピン開始時に決まっているので、
 /// 鳴らす時刻も先に分かる。`ClickTrack` で 1 本の波形にしてから一度に流し、リズムを揺らさない。
 /// 指で盤面を動かしている間は、境目を越えるたびに `playClick()` で 1 回ずつ鳴らす。
+/// 停止時の決まり音（`playChime()`）はクリックとは別のノードで鳴らすので、鳴っているクリックを止めたり差し替えたりしない。
 /// 音が出せない環境（素材が読めない、オーディオが使えない等）では黙って何もしない。
 @MainActor
 final class SpinSoundPlayer {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private var click: (samples: [Float], format: AVAudioFormat)?
+    /// 決まり音を流すノードと音源。「スピンの演出」が「なし」のときは読み込まない（`prepare(chime:)` か最初の `playChime()` で読む）。
+    private let chimePlayer = AVAudioPlayerNode()
+    private var chime: AVAudioPCMBuffer?
     /// セッションを `.ambient` にして有効化する処理。成功したかを返す。
     /// 終わる前にエンジンを起動すると既定のカテゴリで有効化され、他のアプリの音を止めてしまう。
     private var sessionSetup: Task<Bool, Never>?
     /// `stop()` や次の `play(at:)` のあとに、待っていた古い再生が始まらないようにする。
     private var generation = 0
+    /// 決まり音用。回転音の `generation` とは別に数え、クリックの再生で決まり音を取り消さない。
+    private var chimeGeneration = 0
 
     /// 素材の読み込みとオーディオの準備。画面が出たところで呼んでおく。
     /// セッションの有効化はメインスレッドで待つと UI が固まるので、別スレッドで行い `play(at:)` はその完了を待つ。
-    func prepare() {
+    /// `chime` が true なら決まり音も読み込んでおく（最初の停止で読み込みを待たない）。
+    func prepare(chime: Bool = false) {
+        if chime { prepareChime() }
         if click == nil {
-            guard let loaded = loadClick() else { return }
+            guard let loaded = loadSound(named: "click") else { return }
             click = loaded
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: loaded.format)
@@ -72,12 +80,51 @@ final class SpinSoundPlayer {
         }
     }
 
-    /// 画面から離れるときなど、鳴らしている途中で止める。
+    /// 停止時の決まり音を 1 回鳴らす（スピンが止まって結果が出たとき）。鳴らすかどうかは呼び出し側が `StopChime.plays` で決める。
+    /// 回転音のノードには触れないので、クリックの最後の音と重なってよい。続けて呼ぶと前の決まり音を頭から鳴らし直す。
+    func playChime() {
+        prepare()
+        prepareChime()
+        guard let chime, let sessionSetup else { return }
+
+        chimeGeneration += 1
+        let current = chimeGeneration
+        Task { [weak self] in
+            let ready = await sessionSetup.value
+            guard let self else { return }
+            if !ready, self.sessionSetup == sessionSetup { self.sessionSetup = nil }
+            guard ready, self.chimeGeneration == current else { return }
+            self.startChime(chime)
+        }
+    }
+
+    private func startChime(_ chime: AVAudioPCMBuffer) {
+        // 中断のあとはエンジンが止まっているので、鳴らすたびに確かめる
+        guard engine.isRunning || (try? engine.start()) != nil else { return }
+        chimePlayer.stop()
+        chimePlayer.scheduleBuffer(chime, at: nil)
+        chimePlayer.play()
+    }
+
+    /// 画面から離れるときなど、鳴らしている途中で止める。決まり音も止める。
     func stop() {
         guard click != nil else { return }
         generation += 1
+        chimeGeneration += 1
         player.stop()
+        chimePlayer.stop()
         engine.stop()
+    }
+
+    /// 決まり音を読み込んでノードをつなぐ。読めなければ何もしない（次の呼び出しでやり直す）。
+    private func prepareChime() {
+        guard chime == nil, let loaded = loadSound(named: "chime"),
+              let buffer = makeBuffer(loaded.samples, format: loaded.format)
+        else { return }
+        chime = buffer
+        engine.attach(chimePlayer)
+        engine.connect(chimePlayer, to: engine.mainMixerNode, format: loaded.format)
+        chimePlayer.volume = Config.chimeGain
     }
 
     private func start(_ times: [TimeInterval], click: (samples: [Float], format: AVAudioFormat)) {
@@ -97,8 +144,8 @@ final class SpinSoundPlayer {
         player.play()
     }
 
-    private func loadClick() -> (samples: [Float], format: AVAudioFormat)? {
-        guard let url = Bundle.main.url(forResource: "click", withExtension: "wav"),
+    private func loadSound(named name: String) -> (samples: [Float], format: AVAudioFormat)? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "wav"),
               let file = try? AVAudioFile(forReading: url),
               let buffer = AVAudioPCMBuffer(
                   pcmFormat: file.processingFormat,
