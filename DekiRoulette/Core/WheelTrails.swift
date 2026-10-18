@@ -32,6 +32,16 @@ enum WheelTrails {
         var range: ClosedRange<Double> {
             direction == .clockwise ? -length...0 : 0...length
         }
+
+        /// 頭から尾に沿って `distance` 度の位置の不透明度。尾を `segments` 区間に等分して区間ごとに一定にし、頭の区間で `opacity`、
+        /// 先の区間ほど（頭からの近さ）² で薄くする（いちばん先の区間は 1/segments の 2 乗）。尾の外（0 未満・長さ以上）は 0。
+        /// 2D は区間ごとの弧を、3D は長さに依らない細かい弧の切れ端をこの値で塗るので、同じ位置は同じ濃さになる。
+        func opacity(atDistance distance: Double, segments: Int) -> Double {
+            guard segments > 0, length > 0, distance.isFinite, distance >= 0, distance < length else { return 0 }
+            let index = min(Int(distance / (length / Double(segments))), segments - 1)
+            let nearHead = Double(segments - index) / Double(segments)
+            return opacity * nearHead * nearHead
+        }
     }
 
     /// 1 フレームに描くもの。何も描かないときは `none`。

@@ -134,6 +134,23 @@ struct WheelTrailsTests {
         #expect(WheelTrails.clampedOffsets([.nan, 4], limit: 8) == [0, 4])
     }
 
+    @Test func 光の尾は頭から先へ区間ごとに薄くなる() {
+        let trail = WheelTrails.Trail(length: 96, opacity: 0.8, direction: .clockwise)
+        // 24 区間なら 1 区間 4 度。頭の区間は頭の濃さ、先の区間ほど（頭からの近さ）² で薄い
+        #expect(abs(trail.opacity(atDistance: 0, segments: 24) - 0.8) < 1e-9)
+        #expect(abs(trail.opacity(atDistance: 3.9, segments: 24) - 0.8) < 1e-9)
+        #expect(abs(trail.opacity(atDistance: 4.1, segments: 24) - 0.8 * pow(23.0 / 24, 2)) < 1e-9)
+        #expect(abs(trail.opacity(atDistance: 95.9, segments: 24) - 0.8 * pow(1.0 / 24, 2)) < 1e-9)
+        // 尾の外は 0
+        #expect(trail.opacity(atDistance: 96, segments: 24) == 0)
+        #expect(trail.opacity(atDistance: -0.1, segments: 24) == 0)
+        #expect(trail.opacity(atDistance: .nan, segments: 24) == 0)
+        #expect(WheelTrails.Trail(length: 0, opacity: 0.8, direction: .clockwise).opacity(atDistance: 0, segments: 24) == 0)
+        // 向きに依らない（頭からの距離で決まる）
+        let reversed = WheelTrails.Trail(length: 96, opacity: 0.8, direction: .counterclockwise)
+        #expect(abs(reversed.opacity(atDistance: 50, segments: 24) - trail.opacity(atDistance: 50, segments: 24)) < 1e-12)
+    }
+
     @Test func 焦らしで角速度が一時的に負になっても向きは角速度の符号から取る() throws {
         // 時計回りのスピンの途中で戻る動き（累積角は from より大きいまま、角速度だけが負）
         let back = TimedSpinMotion(motion: SpinMotion(from: 2000, to: 1000, duration: 1, easing: Self.linear), start: 0)
