@@ -57,7 +57,7 @@ struct WheelTrailsView: View {
 
         // 光の尾。頭（針の下）がいちばん濃く、尾の先へ区間ごとに薄くする
         if let trail = frame.trail, trail.length > 0, trail.opacity > 0 {
-            let ringRadius = radius + Theme.TrailRing.ringOffset * scale
+            let ringRadius = Theme.TrailRing.ringRadius(diameter: side)
             let segments = Theme.TrailRing.segments
             let range = trail.range
             let step = (range.upperBound - range.lowerBound) / Double(segments)

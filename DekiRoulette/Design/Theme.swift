@@ -173,6 +173,15 @@ enum Theme {
         static let lightLift: CGFloat = 0.8
         /// 電球の円の細かさ（周の分割数）。
         static let lightSegments = 16
+        /// 光の尾・残像の残像（遅れた角度のスライスの塗り）を盤の表面から浮かせる高さ（pt。直径に依らない）。
+        /// ラベル（0.3pt）より手前（2D と同じくラベルの上に重なる）、止まっていないスライスを暗くする層（0.4pt）・ハブ・縁より奥に置く。
+        static let ghostLift: CGFloat = 0.35
+        /// 光の尾を外周の縁の上面から浮かせる高さ（pt。直径に依らない）。縁の外周線（上面 + 0.1pt）より手前、
+        /// 電飾のにじみ（上面 + 0.7pt）と電球（`lightLift`）より奥に置き、電飾と一緒のときは 2D と同じく電球の奥になる。
+        static let trailLift: CGFloat = 0.3
+        /// 光の尾を描く弧の切れ端 1 つの角度（度）。長さに依らない同じ形の切れ端を並べて回し、濃さだけを毎フレーム変える
+        /// （メッシュを作り直さない）。2D の 1 区間（最長 120 度 ÷ 24 区間 = 5 度）の半分。
+        static let trailPieceAngle: Double = 2.5
     }
 
     // MARK: 停止の強調
@@ -276,6 +285,16 @@ enum Theme {
         static let glowOpacity = 0.35
         /// 尾を描き分ける区間の数（頭から先へ段階的に薄くする）。
         static let segments = 24
+
+        /// 直径 `diameter`（pt）の盤面での光の尾の芯の中心の半径（pt）。スライスの円の外 `ringOffset`。
+        /// 2D の `WheelTrailsView` と 3D の `Wheel3DScene` が同じ値を使う。
+        static func ringRadius(diameter: CGFloat) -> CGFloat {
+            CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + ringOffset * scale(diameter)
+        }
+
+        private static func scale(_ diameter: CGFloat) -> CGFloat {
+            max(diameter, 0) / CGFloat(WheelLabel.referenceDiameter)
+        }
     }
 
     // MARK: 火花・紙吹雪
