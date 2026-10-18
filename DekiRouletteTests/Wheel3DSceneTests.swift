@@ -983,6 +983,26 @@ struct Wheel3DSceneTests {
         #expect(isClose(band, srgb(Theme.resultBandFill)), "\(band)")
     }
 
+    @Test func 火花は2Dと同じく紙吹雪の上に重なる() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        // 火花の芯（半径 3pt）を、それより大きい紙片（26pt 角）の真ん中に重ねる。火花は遠近で外へ広がって見えるので、紙片をその位置に置く
+        let point = CGPoint(x: size / 2 + 50, y: 70)
+        let z = Double(Wheel3DScene.pointerZ(scale: Double(size) / WheelLabel.referenceDiameter))
+        let distanceToCamera = WheelGeometry.cameraDistance(diameter: Double(canvas), fieldOfView: Theme.Wheel3D.fieldOfView)
+        let spread = distanceToCamera / (distanceToCamera - z)
+        let under = CGPoint(x: size / 2 + 50 * spread, y: size / 2 - (size / 2 - 70) * spread)
+        scene.particles(WheelParticles.Frame(
+            sparks: [WheelParticles.Spark(position: point, tail: .zero, radius: 3, opacity: 1)],
+            confetti: [confetto(at: under, side: 26)]
+        ))
+        let pixels = try render(scene)
+        let core = pixels.color(at: particleLocation(point, compensated: false, pixels: pixels))
+        #expect(isClose(core, srgb(Theme.wheelSpark)), "\(core)")
+        // 火花のにじみ（半径 9pt）の外の紙片の中は、紙吹雪の色のまま
+        let beside = pixels.color(at: particleLocation(CGPoint(x: under.x + 11, y: under.y), compensated: true, pixels: pixels))
+        #expect(isClose(beside, srgb(Theme.confettiColors[7])), "\(beside)")
+    }
+
     @Test func 紙吹雪は盤面の枠の外へ広げない() throws {
         let plain = try render(makeScene(count: 4, rotation: 0))
         let scene = makeScene(count: 4, rotation: 0)

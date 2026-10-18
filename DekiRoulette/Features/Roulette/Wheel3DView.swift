@@ -584,9 +584,11 @@ final class Wheel3DScene {
     private static let trailCoreRenderingOrder = 9
     /// 停止の瞬間のフラッシュ。電飾（10・11）より後に描いて電球の上に重ね、深度は読むので手前の針には隠れる。
     private static let flashRenderingOrder = 15
-    /// 火花の尾と、火花・紙吹雪。深度を読まずにフラッシュより後に描き、針・盤の手前に重ねる。結果の帯はその後（2D と同じく帯の奥）。
+    /// 紙吹雪、火花の尾、火花の順（2D の `WheelParticlesView` と同じく紙吹雪の上に火花）。深度を読まずにフラッシュより後に描き、
+    /// 針・盤の手前に重ねる。結果の帯はその後（2D と同じく帯の奥）。
+    private static let confettiRenderingOrder = 16
     private static let sparkTailRenderingOrder = 17
-    private static let particleRenderingOrder = 18
+    private static let sparkRenderingOrder = 18
     /// 結果の帯。残像・光の尾・電飾・火花・紙吹雪より後に描く（帯の画像の透明な余白が、奥の残像を深度で隠さないように）。
     private static let bandRenderingOrder = 20
 
@@ -976,7 +978,7 @@ final class Wheel3DScene {
             particlesNode.addChildNode(tail)
             sparkTailNodes.append(tail)
             let node = SCNNode(geometry: sprite)
-            node.renderingOrder = Self.particleRenderingOrder
+            node.renderingOrder = Self.sparkRenderingOrder
             node.isHidden = true
             particlesNode.addChildNode(node)
             sparkNodes.append(node)
@@ -992,7 +994,7 @@ final class Wheel3DScene {
         }
         for _ in 0..<Config.wheelConfettiMaxCount {
             let node = SCNNode(geometry: confettiGeometries[0])
-            node.renderingOrder = Self.particleRenderingOrder
+            node.renderingOrder = Self.confettiRenderingOrder
             node.isHidden = true
             confettiNode.addChildNode(node)
             confettiNodes.append(node)
