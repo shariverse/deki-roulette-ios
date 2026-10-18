@@ -538,7 +538,8 @@ struct Wheel3DSceneTests {
 
     // MARK: 光の尾・残像
 
-    /// 光の尾の環の上で角度 `angle`（12 時が 0 度、時計回り）の画素の位置。光の尾は縁の上面から浮かせてあるので、カメラに近い分だけ外へ広がって見える。
+    /// 光の尾の環の上で角度 `angle`（12 時が 0 度、時計回り）の画素の位置。光の尾は `Theme.Wheel3D.trailPieceAngle`（2.5 度）の切れ端を
+    /// 並べて描くので、テストは切れ端の境目（2.5 度の倍数）を避けて切れ端の中央（x.25・x.75 度）で読む。光の尾は縁の上面から浮かせてあるので、カメラに近い分だけ外へ広がって見える。
     private func trailLocation(angle: Double, pixels: Pixels) -> CGPoint {
         let ring = Double(Theme.TrailRing.ringRadius(diameter: size))
         let z = Double(Theme.Wheel3D.rimLift) * Double(size) / WheelLabel.referenceDiameter + Double(Theme.Wheel3D.trailLift)
@@ -564,7 +565,7 @@ struct Wheel3DSceneTests {
         scene.trail(trailFrame())
         let pixels = try render(scene)
         // 時計回りなら 12 時から反時計回りの側（負の角度）に伸びる
-        for angle in [-10.0, -40, -80] {
+        for angle in [-11.25, -41.25, -81.25] {
             let color = pixels.color(at: trailLocation(angle: angle, pixels: pixels))
             let before = plain.color(at: trailLocation(angle: angle, pixels: plain))
             #expect(brightness(color) > brightness(before) + 0.2, "\(angle): \(color) \(before)")
@@ -572,7 +573,7 @@ struct Wheel3DSceneTests {
             #expect(color.z > before.z + 0.1, "\(angle): \(color)")
         }
         // 回転の向きの側と、尾の長さより先は縁のまま
-        for angle in [20.0, 60, -130, -200] {
+        for angle in [21.25, 61.25, -131.25, -201.25] {
             let color = pixels.color(at: trailLocation(angle: angle, pixels: pixels))
             let before = plain.color(at: trailLocation(angle: angle, pixels: plain))
             #expect(distance(color, before) < 0.01, "\(angle): \(color) \(before)")
@@ -584,28 +585,28 @@ struct Wheel3DSceneTests {
         let scene = makeScene(count: 4, rotation: 0)
         scene.trail(trailFrame(direction: .counterclockwise))
         let pixels = try render(scene)
-        let tail = pixels.color(at: trailLocation(angle: 40, pixels: pixels))
-        #expect(brightness(tail) > brightness(plain.color(at: trailLocation(angle: 40, pixels: plain))) + 0.2)
-        let ahead = pixels.color(at: trailLocation(angle: -40, pixels: pixels))
-        #expect(distance(ahead, plain.color(at: trailLocation(angle: -40, pixels: plain))) < 0.01)
+        let tail = pixels.color(at: trailLocation(angle: 41.25, pixels: pixels))
+        #expect(brightness(tail) > brightness(plain.color(at: trailLocation(angle: 41.25, pixels: plain))) + 0.2)
+        let ahead = pixels.color(at: trailLocation(angle: -41.25, pixels: pixels))
+        #expect(distance(ahead, plain.color(at: trailLocation(angle: -41.25, pixels: plain))) < 0.01)
     }
 
     @Test func 光の尾は頭ほど濃く短いときは短く描く() throws {
         let scene = makeScene(count: 4, rotation: 0)
         scene.trail(trailFrame())
         let pixels = try render(scene)
-        let head = pixels.color(at: trailLocation(angle: -15, pixels: pixels))
-        let tip = pixels.color(at: trailLocation(angle: -100, pixels: pixels))
+        let head = pixels.color(at: trailLocation(angle: -16.25, pixels: pixels))
+        let tip = pixels.color(at: trailLocation(angle: -101.25, pixels: pixels))
         #expect(brightness(head) > brightness(tip) + 0.2, "head: \(head) tip: \(tip)")
 
-        // 長さ 40 度なら 60 度の位置には無い
+        // 長さ 40 度なら 61.25 度の位置には無い
         let plain = try render(makeScene(count: 4, rotation: 0))
         scene.trail(trailFrame(length: 40))
         let short = try render(scene)
-        #expect(distance(short.color(at: trailLocation(angle: -60, pixels: short)),
-                         plain.color(at: trailLocation(angle: -60, pixels: plain))) < 0.01)
-        #expect(brightness(short.color(at: trailLocation(angle: -10, pixels: short)))
-            > brightness(plain.color(at: trailLocation(angle: -10, pixels: plain))) + 0.2)
+        #expect(distance(short.color(at: trailLocation(angle: -61.25, pixels: short)),
+                         plain.color(at: trailLocation(angle: -61.25, pixels: plain))) < 0.01)
+        #expect(brightness(short.color(at: trailLocation(angle: -11.25, pixels: short)))
+            > brightness(plain.color(at: trailLocation(angle: -11.25, pixels: plain))) + 0.2)
     }
 
     @Test func 光の尾は針の下と電球の奥() throws {
@@ -628,10 +629,10 @@ struct Wheel3DSceneTests {
         let scene = makeScene(count: 4, rotation: 123)
         scene.trail(trailFrame())
         let pixels = try render(scene)
-        let tail = pixels.color(at: trailLocation(angle: -20, pixels: pixels))
-        #expect(brightness(tail) > brightness(plain.color(at: trailLocation(angle: -20, pixels: plain))) + 0.2)
-        let ahead = pixels.color(at: trailLocation(angle: 20, pixels: pixels))
-        #expect(distance(ahead, plain.color(at: trailLocation(angle: 20, pixels: plain))) < 0.01)
+        let tail = pixels.color(at: trailLocation(angle: -21.25, pixels: pixels))
+        #expect(brightness(tail) > brightness(plain.color(at: trailLocation(angle: -21.25, pixels: plain))) + 0.2)
+        let ahead = pixels.color(at: trailLocation(angle: 21.25, pixels: pixels))
+        #expect(distance(ahead, plain.color(at: trailLocation(angle: 21.25, pixels: plain))) < 0.01)
     }
 
     @Test func 残像は遅れた角度のスライスの塗りを重ねる() throws {
@@ -687,7 +688,7 @@ struct Wheel3DSceneTests {
         scene.trail(below)
         #expect(!scene.hasTrailNodes)
         let pixels = try render(scene)
-        for angle in [-30.0, -90, 30] {
+        for angle in [-31.25, -91.25, 31.25] {
             let ring = pixels.color(at: trailLocation(angle: angle, pixels: pixels))
             #expect(distance(ring, plain.color(at: trailLocation(angle: angle, pixels: plain))) < 0.01, "\(angle)")
             let face = pixels.color(at: location(angle: angle + 360, fraction: 0.6, pixels: pixels))
@@ -702,7 +703,7 @@ struct Wheel3DSceneTests {
         scene.trail(frame)
         scene.trail(.none)
         let cleared = try render(scene)
-        for point in [trailLocation(angle: -20, pixels: cleared), location(angle: 80, fraction: 0.6, pixels: cleared)] {
+        for point in [trailLocation(angle: -21.25, pixels: cleared), location(angle: 80, fraction: 0.6, pixels: cleared)] {
             #expect(distance(cleared.color(at: point), plain.color(at: point)) < 0.01)
         }
         // 大きさが変わって組み直しても、出していれば出し直す
@@ -710,8 +711,8 @@ struct Wheel3DSceneTests {
         scene.update(labels: Array(repeating: "", count: 4), diameter: size + 1)
         scene.update(labels: Array(repeating: "", count: 4), diameter: size)
         let rebuilt = try render(scene)
-        let tail = rebuilt.color(at: trailLocation(angle: -20, pixels: rebuilt))
-        #expect(brightness(tail) > brightness(plain.color(at: trailLocation(angle: -20, pixels: plain))) + 0.2)
+        let tail = rebuilt.color(at: trailLocation(angle: -21.25, pixels: rebuilt))
+        #expect(brightness(tail) > brightness(plain.color(at: trailLocation(angle: -21.25, pixels: plain))) + 0.2)
     }
 
     @Test func 項目が1件のときは残像を描かない() throws {
