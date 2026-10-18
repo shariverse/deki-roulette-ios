@@ -60,13 +60,13 @@ enum WheelParticles {
         lowPower: Bool,
         reduceMotion: Bool
     ) -> [Spark] {
-        guard !reduceMotion, let motion, motion.motion.duration > 0 else { return [] }
+        guard !reduceMotion, let motion, motion.path.duration > 0 else { return [] }
         let elapsed = now - motion.start
         let interval = sparkSlotInterval(lowPower: lowPower)
         let lifetime = Config.wheelSparkLifetime
         // 寿命の間（elapsed - lifetime, elapsed] に生まれうる番号。動きの外（始まる前・止まり切ったあと）では生まれない
         let first = max(Int(((elapsed - lifetime) / interval).rounded(.down)) + 1, 0)
-        let last = min(Int((elapsed / interval).rounded(.down)), Int((motion.motion.duration / interval).rounded(.up)) - 1)
+        let last = min(Int((elapsed / interval).rounded(.down)), Int((motion.path.duration / interval).rounded(.up)) - 1)
         guard first <= last else { return [] }
 
         var sparks: [Spark] = []
@@ -75,8 +75,8 @@ enum WheelParticles {
             var random = ParticleRandom(seed: seed, index: slot)
             guard let spark = spark(
                 age: elapsed - birth,
-                intensity: motion.motion.intensity(at: birth),
-                velocity: motion.motion.angularVelocity(at: birth),
+                intensity: motion.path.intensity(at: birth),
+                velocity: motion.path.angularVelocity(at: birth),
                 origin: origin,
                 scale: scale,
                 using: &random
