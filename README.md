@@ -1,10 +1,11 @@
 # deki-roulette
 
-[デキレーレット](https://roulette.basekeita.com/) の iOS アプリ。
+[デキレーレット](https://roulette.basekeita.com/) の iOS / visionOS アプリ。
 結果をユーザが事前に指定できる抽選アプリで、ルーレットと順番決めの 2 画面をタブで切り替える。
 
 機能仕様は [`docs/SPEC.md`](docs/SPEC.md) が正。Web 版（React + Vite）から移植したもので、
-プラットフォーム差分は同書の「iOS 版との対応」にまとめてある。Web 版のコードは b7b3936 以前の履歴にある。
+プラットフォーム差分は同書の「iOS 版との対応」「visionOS 版との対応」にまとめてある。
+Web 版のコードは b7b3936 以前の履歴にある。
 
 ## Status
 
@@ -19,7 +20,7 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 
 | ワークフロー | トリガー | 内容 |
 |---|---|---|
-| Build | 全ブランチへの push と Fork からの PR | シミュレータでビルドしてユニットテストを実行 |
+| Build | 全ブランチへの push と Fork からの PR | iOS と visionOS のシミュレータでビルドしてユニットテストを実行 |
 | Archive | `main` への push、手動実行 | Release 構成でアーカイブし、App Store Connect API キーで署名して IPA を書き出す |
 | Upload | `develop` と `release/**` への push、手動実行 | Archive に加えて TestFlight へアップロードし、IPA を Artifacts に残す |
 
@@ -43,7 +44,7 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 
 ## 環境
 
-- Xcode 27 / iOS 17.0 以上
+- Xcode 27 / iOS 17.0 以上 / visionOS 26.0 以上
 - Swift 6（strict concurrency: complete）
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)（`brew install xcodegen`）
 
@@ -68,10 +69,19 @@ xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-アプリアイコンは `scripts/make-icon.swift` で描いている。作り直すとき:
+visionOS（Apple Vision Pro シミュレータ）では `-destination` を差し替える:
 
 ```bash
-swift scripts/make-icon.swift DekiRoulette/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette \
+  -destination 'platform=visionOS Simulator,name=Apple Vision Pro' test
+```
+
+アプリアイコンは `scripts/make-icon.swift` で描いている。作り直すとき（第 2 引数を渡すと visionOS 用の 2 層 `AppIcon.solidimagestack` も同時に作る）:
+
+```bash
+swift scripts/make-icon.swift \
+  DekiRoulette/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png \
+  DekiRoulette/Resources/Assets.xcassets/AppIcon.solidimagestack
 ```
 
 ## 構成

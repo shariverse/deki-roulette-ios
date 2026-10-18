@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 xcodegen generate   # project.yml から DekiRoulette.xcodeproj を生成（.xcodeproj は git 管理外）
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
-swift scripts/make-icon.swift DekiRoulette/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png  # アイコン再生成
+xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'platform=visionOS Simulator,name=Apple Vision Pro' test  # visionOS も同じスキーム・同じテスト
+swift scripts/make-icon.swift DekiRoulette/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png DekiRoulette/Resources/Assets.xcassets/AppIcon.solidimagestack  # アイコン再生成（第 2 引数の visionOS 用は省略可）
 swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 回転音の再生成（--preview で 1 スピン分の試聴用）
 ```
 
@@ -16,9 +17,14 @@ swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 
 
 ## アーキテクチャ
 
-**デキレーレット** の iOS アプリ。結果をユーザが事前に指定できる抽選アプリ。`docs/SPEC.md` が機能仕様の正で、
+**デキレーレット** の iOS / visionOS アプリ（iOS 17.0 以上 / visionOS 26.0 以上のマルチプラットフォームターゲット）。結果をユーザが事前に指定できる抽選アプリ。`docs/SPEC.md` が機能仕様の正で、
 Web 版（React + Vite、b7b3936 以前の履歴にある）から README の対応表どおりにファイルを対応させて移植した。
-iOS 固有の差分は SPEC.md の「iOS 版との対応」に追記する。
+プラットフォーム固有の差分は SPEC.md の「iOS 版との対応」「visionOS 版との対応」に追記する。
+
+visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 3 つ: `UIScreen` が無い（画面キャプチャの検知は
+`UIWindowScene` の trait から読み、変化の通知も無いので trait の購読とアクティブ復帰時に読み直す）、
+ソフトウェアキーボードが無い（`scrollDismissesKeyboard` を付けない）、Vision Pro に触覚と姿勢センサが無い
+（`sensoryFeedback` と `CMMotionManager` の呼び出しは共通のまま。効果は無い）。
 
 - SwiftUI + `@Observable`（iOS 17+）。`ObservableObject` は使わない。
 - モデル (`RouletteModel` / `OrderModel`) は `@MainActor` で、View は薄く保つ。
