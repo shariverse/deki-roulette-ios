@@ -184,4 +184,36 @@ struct SpinMotionTests {
         let coarse = SpinEffectIntensity.smoothed(0, toward: 1, elapsed: tau)
         #expect(abs(fine - coarse) < 1e-9)
     }
+
+    // MARK: 開始時刻つきの動き
+
+    @Test func 開始時刻つきの動きは今の時刻から経過時間を引いて引く() {
+        let timed = TimedSpinMotion(motion: spin, start: 100)
+        #expect(abs(timed.angle(now: 100) - spin.from) < 1e-9)
+        #expect(abs(timed.angle(now: 102) - spin.angle(at: 2)) < 1e-9)
+        #expect(abs(timed.angle(now: 100 + spin.duration + 5) - spin.to) < 1e-9)
+        #expect(abs(timed.intensity(now: 101) - spin.intensity(at: 1)) < 1e-9)
+    }
+
+    @Test func 長さを過ぎたら止まっているとみなす() {
+        let timed = TimedSpinMotion(motion: spin, start: 100)
+        #expect(!timed.isMoving(now: 99.9))
+        #expect(timed.isMoving(now: 100))
+        #expect(timed.isMoving(now: 100 + spin.duration - 0.01))
+        #expect(!timed.isMoving(now: 100 + spin.duration))
+        #expect(!timed.isMoving(now: 100 + spin.duration + 10))
+        // 止まり切った惰性は角速度も強さも 0
+        #expect(timed.intensity(now: 100 + spin.duration + 10) == 0)
+    }
+
+    @Test func 止まり切るまでの残り() {
+        let timed = TimedSpinMotion(motion: spin, start: 100)
+        #expect(abs(timed.remaining(now: 101) - (spin.duration - 1)) < 1e-9)
+        #expect(timed.remaining(now: 100 + spin.duration + 1) == 0)
+    }
+
+    @Test func 長さが0の動きは動いていない() {
+        let instant = TimedSpinMotion(motion: SpinMotion(from: 0, to: 90, duration: 0, easing: Config.spinEasing), start: 0)
+        #expect(!instant.isMoving(now: 0))
+    }
 }
