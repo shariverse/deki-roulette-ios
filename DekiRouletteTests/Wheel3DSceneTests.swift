@@ -215,9 +215,11 @@ struct Wheel3DSceneTests {
         #expect(near.x + near.y + near.z > plain.x + plain.y + plain.z + 0.1, "near: \(near) plain: \(plain)")
     }
 
-    @Test func 押し出しが終わったあとも止まったスライスは前に出した大きさで残る() throws {
+    /// `afterglow` が true（「なし」以外）のときは、止まったスライスを光彩ごと焼いた板と光彩の無い板の 2 枚にするが、見た目は同じ。
+    @Test(arguments: [false, true])
+    func 押し出しが終わったあとも止まったスライスは前に出した大きさで残る(afterglow: Bool) throws {
         let scene = makeScene(count: 4, rotation: 0)
-        scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false)
+        scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: afterglow)
         // 押し出し（0.14 秒 + ばね約 0.5 秒）と暗くする動き（0.25 秒）が終わったあとを描く
         let pixels = try render(scene, atTime: CACurrentMediaTime() + 2)
         let slice2 = srgb(Theme.sliceColor(at: 2, count: 4))
@@ -235,6 +237,9 @@ struct Wheel3DSceneTests {
         let beyond = pixels.color(at: location(angle: 225, fraction: 1.04, pixels: pixels))
         #expect(distance(beyond, slice2) < 0.1, "\(beyond)")
         #expect(distance(beyond, srgb(Theme.wheelRim)) > 0.5, "\(beyond)")
+        // 針も跳ねたあと元の位置に戻っている（`針は12時に塗りの色のまま出る` と同じ、針の先より少し上の中央）
+        let pointer = pixels.color(at: location(x: 0, y: Double(size) / 2 - 8, pixels: pixels))
+        #expect(isClose(pointer, srgb(Theme.flare)), "\(pointer)")
     }
 
     @Test func 強調を解くと元の色に戻る() throws {
