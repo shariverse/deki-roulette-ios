@@ -113,7 +113,8 @@ enum WheelTrails {
     /// 時刻 `now` に描くもの。`effect` は盤面が自分で回る動き（スピン・惰性）か、指で動かしている動き（`WheelDragMotion`）。
     /// 動きを減らす設定・動きが無い・止まり切った・閾値未満のときは何も描かない。
     /// 残像は盤面に見えている角度（`WheelEffectMotion.displayedAngle`。指で動かしている間は `rotation + dragRotation`）から、
-    /// その動きの今の角度と遅れた時刻の角度の差だけずらす。向きは角速度（指で動かしている間は平滑した値）の符号から取る。
+    /// その動きの基準の時刻（`WheelEffectMotion.offsetReferenceTime`。指で動かしている間は最後に指が動いた時刻）の角度と、
+    /// そこから遅れた時刻の角度の差だけずらす。向きは角速度（指で動かしている間は平滑した値）の符号から取る。
     static func frame(
         effect: WheelEffectMotion?,
         now: TimeInterval,
@@ -129,10 +130,12 @@ enum WheelTrails {
 
         let velocity = effect.angularVelocity(now: now)
         let direction: SpinDirection = velocity < 0 ? .counterclockwise : .clockwise
-        let angle = effect.angle(now: now)
         let displayed = effect.displayedAngle(now: now, rotation: rotation, dragRotation: dragRotation)
+        // ずらしは盤面に見えている角度と同じ時刻から測る（ドラッグは最後に指が動いた時刻。指のイベントの間で伸び縮みしない）
+        let reference = effect.offsetReferenceTime(now: now)
+        let angle = effect.angle(now: reference)
         let count = ghostCount(lowPower: lowPower)
-        let raw = (0..<count).map { angle - effect.angle(now: now - lag(index: $0, count: count)) }
+        let raw = (0..<count).map { angle - effect.angle(now: reference - lag(index: $0, count: count)) }
         let offsets = clampedOffsets(raw, limit: maxGhostOffset(sliceCount: sliceCount))
         let ghosts = offsets.enumerated().map { index, offset in
             Ghost(angle: displayed - offset, opacity: ghostOpacity(index: index, count: count, strength: strength))

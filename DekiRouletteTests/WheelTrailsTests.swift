@@ -228,6 +228,43 @@ struct WheelTrailsTests {
         }
     }
 
+    @Test func 指のイベントの間のフレームでは残像は伸び縮みしない() {
+        // 盤面に見えている角度（`dragRotation`）は指が動いたときにしか変わらない
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 0.8), duration: 0.5)
+        let shown = drag.angle(now: drag.lastTime)
+        let at = { (now: TimeInterval) in
+            WheelTrails.frame(
+                effect: .drag(drag), now: now, rotation: 40, dragRotation: shown,
+                sliceCount: 2, lowPower: false, reduceMotion: false
+            )
+        }
+        let onEvent = at(drag.lastTime)
+        #expect(onEvent.ghosts.count == 3)
+        // 次の指のイベント（120Hz）までの間のフレーム
+        for fraction in [0.25, 0.5, 0.9] {
+            let between = at(drag.lastTime + fraction / 120)
+            #expect(between.ghosts.count == 3)
+            for (ghost, reference) in zip(between.ghosts, onEvent.ghosts) {
+                #expect(abs(ghost.angle - reference.angle) < 1e-9, "\(fraction)")
+            }
+        }
+    }
+
+    @Test func 点と点の間の時刻では点の間を補った角度からずらす() {
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 0.8), duration: 0.5)
+        // 最後の点より前の、点と点の間の時刻
+        let now = drag.lastTime - 0.1 + 0.5 / 120
+        let result = dragFrame(drag, now: now)
+        let lags = (0..<3).map { drag.angle(now: now) - drag.angle(now: now - WheelTrails.lag(index: $0, count: 3)) }
+        let offsets = WheelTrails.clampedOffsets(lags, limit: WheelTrails.maxGhostOffset(sliceCount: 6))
+        #expect(result.ghosts.count == 3)
+        for (ghost, offset) in zip(result.ghosts, offsets) {
+            #expect(abs(ghost.angle - (40 + drag.angle(now: now) - offset)) < 1e-9)
+        }
+        // 前の点の時刻の角度とは違う（点の間を補っている）
+        #expect(abs(drag.angle(now: now) - drag.angle(now: drag.lastTime - 0.1)) > 1)
+    }
+
     @Test func 指で反時計回りに動かすと逆へ描く() throws {
         let drag = WheelDragMotion.testCircular(velocity: -velocity(intensity: 1), duration: 0.5)
         let result = dragFrame(drag, now: drag.lastTime)
