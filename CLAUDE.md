@@ -191,7 +191,7 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 
 光の尾・残像（`SpinEffectStyle.showsTrails`）も 2D の `RouletteWheelView` だけに出す（3D は後続）。`RouletteScreen` が `showsTrails` を渡し、`WheelTrailsView` を
 電飾と同じく `rotationEffect` の外（回らない層）で、盤面の面の上・電飾の奥に重ねる。描くもの（残像の角度と不透明度、光の尾の長さ・濃さ・向き）は
-`WheelTrails.frame`（`Core/`）が `currentMotion`・`now()`・スライスの数・低電力モード・動きを減らす設定だけから決め、強さが `Config.wheelTrailThreshold` 未満・
+`WheelTrails.frame`（`Core/`）が `currentMotion`（焦らしを含む区間の列。焦らしの区間は閾値に届かず描かれない）・`now()`・スライスの数・低電力モード・動きを減らす設定だけから決め、強さが `Config.wheelTrailThreshold` 未満・
 `motion` が nil（指で動かしている間も含む）・止まり切った・動きを減らす設定では何も描かない（`TimelineView` も止める。止まり切った惰性は電飾と同じく
 `.task(id: motion)` で描き直させる）。残像は `WheelFaceView` を重ねず、`Canvas` にスライスの塗りだけ（ハブの内側は抜く）を `motion.angle(now: now - lag)` の角度で
 描く（ラベル・停止の強調は載せない。軽くするため）。ずらしは `WheelTrails.clampedOffsets` で上限に収め、向きは角速度の符号から取る。光の尾は縁の上を
