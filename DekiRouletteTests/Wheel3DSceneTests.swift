@@ -813,8 +813,9 @@ struct Wheel3DSceneTests {
             #expect(distance(pixels.color(at: stopped), plain.color(at: stopped)) > 0.02, "\(pixels.color(at: stopped)) \(plain.color(at: stopped))")
         case .settled:
             // 暗くする層が濃く出ていても、残像はその上に見え（上の確かめ）、沈めたスライスは残像の下で沈んだまま（残像が暗くする層を消さない）。
-            // 暗くする層が無い盤に同じ残像を重ねた色（緑は 0.7·lin(0.859) + 0.3·lin(0.502) → sRGB 0.773、`onSlice` から 0.706）より、
-            // 暗くした上に重ねた色（緑は 0.7·0.357 + 0.3·0.216 → sRGB 0.59、`onSlice` から約 0.52）の方が `onSlice` に近い
+            // `distance` は成分ごとの差の最大。暗くする層が無い盤に同じ残像を重ねた色は緑で最大（0.7·lin(0.859) + 0.3·lin(0.502) → sRGB 0.773、
+            // `onSlice` から 0.706）、暗くした上に重ねた色は赤で最大（0.7·0.187 + 0.3·1 → sRGB 0.688、`onSlice` から約 0.598。
+            // 緑は 0.7·0.357 + 0.3·0.216 → sRGB 0.597 で約 0.53）なので、暗くした方が `onSlice` に近い
             let bare = makeScene(count: 4, rotation: 0)
             bare.trail(frame)
             let unlit = try render(bare)
