@@ -94,6 +94,22 @@ struct ThemeContrastTests {
         }
     }
 
+    // MARK: 電飾
+
+    @Test(arguments: styles)
+    func 電飾の電球は盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.wheelLight, on: Theme.wheelRim, style) >= 3)
+    }
+
+    /// 電球は明るさを不透明度にして縁に重ねる。いちばん暗いとき（並びの間・点滅と脈動の暗いとき）でも、点いていると縁から見分けられること。
+    @Test(arguments: styles)
+    func 電飾のいちばん暗い電球も盤面の縁から1_5対1以上(style: UIUserInterfaceStyle) {
+        let dimmest = min(WheelLights.baseLevel, WheelLights.blinkLowLevel, WheelLights.stillLevel)
+        let bulb = composite(resolve(Theme.wheelLight.opacity(dimmest), style), over: resolve(Theme.wheelRim, style))
+        let rim = luminance(resolve(Theme.wheelRim, style))
+        #expect((luminance(bulb) + 0.05) / (rim + 0.05) >= 1.5)
+    }
+
     // MARK: 共有画像
 
     @Test(arguments: styles)
@@ -113,7 +129,7 @@ struct ThemeContrastTests {
         let fixed = [
             Theme.onSlice, Theme.wheelRim, Theme.wheelEdge, Theme.wheelHub, Theme.wheelHubMark,
             Theme.flare, Theme.onFlare, Theme.destructive, Theme.onDestructive, Theme.stopOutline,
-            Theme.resultBandFill, Theme.resultBandInk, Theme.shareBackground, Theme.shareInk,
+            Theme.resultBandFill, Theme.resultBandInk, Theme.shareBackground, Theme.shareInk, Theme.wheelLight,
         ] + Theme.sliceColors
         for color in fixed {
             #expect(resolve(color, .light) == resolve(color, .dark))

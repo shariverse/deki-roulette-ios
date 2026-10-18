@@ -74,6 +74,20 @@ enum Config {
     /// 演出用にドラッグ中の角速度を滑らかにする時定数（秒）。フレームごとに新しい値へこの時間で約 63% 寄せる。
     static let effectSmoothingTime: TimeInterval = 0.08
 
+    /// 2D の盤面の外周に並べる電飾の数（`WheelLights`）。12 時から時計回りに等間隔に置く。
+    static let wheelLightCount = 24
+
+    /// 電飾の光の並びが流れる角度の、盤面の回転角に対する比（`WheelLights.phase`）。並びは盤面の 1/4 の速さで同じ向きに流れる。
+    /// 盤面が 1 周したとき並びが元に戻るよう、`wheelLightCount` × これは `WheelLights.litStride` の倍数にする（24 × 0.25 = 6）。
+    static let wheelLightFlowFactor = 0.25
+
+    /// 停止の瞬間の電飾の全灯の点滅の周期（秒）と回数。0.6 秒周期の 2 回で、1 秒に 3 回未満の明滅に収める。
+    static let wheelLightBlinkPeriod: TimeInterval = 0.6
+    static let wheelLightBlinkCount = 2
+
+    /// 結果表示中に電飾の全灯がゆっくり脈打つ周期（秒）。
+    static let wheelLightAfterglowPeriod: TimeInterval = 2.4
+
     /// 削除した項目を「元に戻す」で戻せる時間。過ぎると削除が確定する。
     static let undoDuration: TimeInterval = 5
 

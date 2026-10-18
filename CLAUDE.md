@@ -162,6 +162,18 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 `SpinSoundPlayer` は回転音とは別の `AVAudioPlayerNode`（音量 `Config.chimeGain`）で流すので、クリックの再生を止めたり差し替えたりしない（`stop()` だけは両方止める）。
 「なし」のときは `prepare(chime:)` に false を渡して音源を読み込まない。
 
+### スピンの演出の仕組み
+
+電飾（`SpinEffectStyle.showsLights`、SPEC §5.5）は 2D の `RouletteWheelView` だけに出す（3D は後続）。`RouletteScreen` が `showsLights`・`model.currentMotion`・`model.now` を渡し、
+`WheelLightsView` を `WheelDragArea` の中・`rotationEffect` の外（回らない層、針の後ろ）に重ねる。電球は `Config.wheelLightCount` 個を盤面の縁の上
+（寸法は `Theme.LightRing`、色は `Theme.wheelLight`）に `Canvas` で描き、盤面の枠と `WheelFaceView` は変えない（「なし」と共有画像は今のまま）。
+明るさは `WheelLights`（`Core/`）の純粋関数で、場面（`Scene`: 動きを減らす設定の `still` / 待機中・回転中の `running(angle:intensity:)` / 結果表示中の `stopped(elapsed:)`）から決める。
+並びの位置は盤面の累積回転角 × `Config.wheelLightFlowFactor`（角度に比例させると角速度に比例して流れ、止まれば止まる）で、角度は
+`currentMotion` があれば `angle(now: now())`、無ければ `rotation`、どちらにも `dragRotation` を足す。停止の点滅（`stopBlink`）と脈動（`afterglow`）は
+結果の強調が出た時刻（`highlight` が nil でなくなった `now()`）からの経過で引く。`TimelineView(.animation(paused:))` は `WheelLights.animates` が偽の間
+（待機中・止まり切った惰性 = `TimedSpinMotion.isMoving(now:)` が偽・動きを減らす設定）は止める。止まり切った惰性は親が描き直さないので、
+`WheelLightsView` が `.task(id: motion)` で残り時間だけ待って `@State` を書き、描き直させて止める。演出は指定・印を受け取らず、`accessibilityHidden`・`allowsHitTesting(false)`。
+
 ### 3D 表示の仕組み
 
 設定の「3D 表示」（`@AppStorage(Config.wheel3DEnabledKey)`、既定 OFF）が ON のとき、`RouletteScreen` は `RouletteWheelView` の代わりに

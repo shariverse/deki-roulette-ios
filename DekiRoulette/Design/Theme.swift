@@ -198,6 +198,28 @@ enum Theme {
     /// 他のスライスが暗くなる／戻るときの変化。
     static let stopDimAnimation = Animation.easeOut(duration: 0.25)
 
+    // MARK: 電飾
+
+    // 「スピンの演出」の電飾（`WheelLights`。電球の数は `Config.wheelLightCount`）。2D の盤面の縁（スライスの円の外側にある暗い環）の上に、
+    // 回らない層で電球を並べる。盤面の枠と寸法は変えず、縁の幅（基準直径でスライスの円の外 5〜11pt）と枠までの余白（〜16pt）の中に収める。
+    // 盤面と同じく外観に依らず固定の暖かい白系にし、`gold`（順番決めの 1 位・フォーカスリング）と `flare`（開始ボタン）は使わない。
+
+    /// 電球の色。明るさ（`WheelLights.Bulb.brightness`）を不透明度にして縁の上に重ねる。縁（`wheelRim`）に対して 3:1 以上、
+    /// いちばん暗いときに重ねた色でも縁から見分けられること（`ThemeContrastTests`）。
+    static let wheelLight = Color(hex: 0xFFE7B0)
+
+    /// 電飾の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）。
+    enum LightRing {
+        /// 電球の環の半径の、スライスの円の半径からの出幅。縁の外周線（+3.5〜5pt）と縁の外周（+11pt）の間の中央。
+        static let ringOffset: CGFloat = 8
+        /// 電球の半径。縁の幅（6pt）に収まる大きさ。
+        static let bulbRadius: CGFloat = 2.2
+        /// にじみが最も強いときに電球の外へ広げる光の幅。環の外側でも盤面の枠（スライスの円の外 16pt）を越えない。
+        static let haloWidth: CGFloat = 5
+        /// にじみの光の中心の不透明度（にじみの強さ × 明るさに掛ける）。
+        static let haloOpacity = 0.6
+    }
+
     // MARK: 結果の帯
 
     // 結果が出ている間、盤面の中心より下に重ねて結果のラベルを全文で出す帯（寸法と位置は `ResultBand`）。

@@ -63,3 +63,32 @@ enum SpinEffectIntensity {
         return current + (target - current) * weight
     }
 }
+
+/// 盤面が自分で回る動き（スピン・惰性）と、その開始時刻（`RouletteModel.now()` の時計の秒）。
+/// 演出は `TimelineView` の毎フレームで、同じ時計の今の時刻（`now`）を渡して角度・強さ・動いているかを引く。
+struct TimedSpinMotion: Equatable, Sendable {
+    let motion: SpinMotion
+    let start: TimeInterval
+
+    /// 時刻 `now` の累積回転角（度）。始まる前は `from`、終わったあとは `to`。
+    func angle(now: TimeInterval) -> Double {
+        motion.angle(at: now - start)
+    }
+
+    /// 時刻 `now` の演出の強さ（0...1）。止まり切ったあとは 0。
+    func intensity(now: TimeInterval) -> Double {
+        motion.intensity(at: now - start)
+    }
+
+    /// 時刻 `now` に盤面がまだ動いているか（開始から長さまでの間）。惰性は止まり切っても次の操作まで
+    /// `currentMotion` に残るので、長さを過ぎたら止まっているとみなして毎フレームの描き直しを止める。
+    func isMoving(now: TimeInterval) -> Bool {
+        let elapsed = now - start
+        return motion.duration > 0 && elapsed >= 0 && elapsed < motion.duration
+    }
+
+    /// 時刻 `now` から止まり切るまでの残りの秒。止まっていれば 0。
+    func remaining(now: TimeInterval) -> TimeInterval {
+        max(motion.duration - (now - start), 0)
+    }
+}

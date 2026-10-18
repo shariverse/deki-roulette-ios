@@ -326,12 +326,6 @@ final class RouletteModel {
     }
 }
 
-/// 盤面が自分で回る動きと、その開始時刻（`RouletteModel.now()` の時計の秒）。
-struct TimedSpinMotion: Equatable {
-    let motion: SpinMotion
-    let start: TimeInterval
-}
-
 /// 惰性で回り始めた角度・時刻と、その動き。
 private struct Coasting {
     let from: Double
