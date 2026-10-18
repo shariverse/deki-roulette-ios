@@ -30,4 +30,8 @@ enum SpinEffectStyle: String, CaseIterable, Sendable {
     /// 「なし」以外のどのスタイルにも付ける演出（背景の光の脈動・止まり際の焦らし・針を大きく弾く・停止の瞬間のフラッシュ・
     /// 結果の帯の登場演出・結果表示中の余韻・効果音）を出すか。
     var showsCommonEffects: Bool { self != .none }
+
+    /// 指で盤面を動かしている間の動き（`WheelDragMotion`）を記録するか。速さに連動する演出（電飾・光の尾と残像・火花）の
+    /// どれかを出すときだけで、「なし」では記録しない。2D と 3D の盤面が同じ値を `WheelDragArea` に渡す。
+    var tracksDragMotion: Bool { showsLights || showsTrails || showsParticles }
 }

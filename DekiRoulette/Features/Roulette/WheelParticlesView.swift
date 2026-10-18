@@ -2,11 +2,10 @@ import SwiftUI
 
 /// 2D の盤面の針の先の火花と停止の瞬間の紙吹雪（「スピンの演出」が紙吹雪・全部入りのとき。`docs/SPEC.md` の §5.5）。
 /// 盤面が自分で回っている間（`motion`）と指で動かしている間（`drag`。指を止めた・離したあとは生まれた粒が消えるまで）は
-/// 針の先から火花を出し、結果が出た瞬間（`stopped` が偽から真になったとき）に盤面の上から紙吹雪をはじけさせる。
-/// 粒の位置・大きさ・濃さは `WheelParticles`（`Core/`）が時刻と種から決め、ここは `TimelineView` の毎フレームに
-/// `now()`（`RouletteModel.now` と同じ時計）を渡して `Canvas` に描くだけ。火花も紙吹雪も出ていない・動きを減らす設定では
-/// `TimelineView` を止めて何も描かない。低電力モードでは粒の数の上限を 1/3 にする。
-/// 入力は動き（自分で回る動き・指で動かしている動き）・結果が出ているか・時計だけで、項目・指定（`targetId`）・印・止まったスライスは受け取らない（紙吹雪は結果に依らず同じ）。
+/// 針の先から火花を出し、結果が出た瞬間（`burstAt`）に盤面の上から紙吹雪をはじけさせる。
+/// 粒の位置・大きさ・濃さは `WheelParticles`（`Core/`）が時刻と種から決め、毎フレームの値は 3D の盤面と共有の `WheelParticlesTimeline` が引く。
+/// このビューは `Canvas` に描くだけ。
+/// 入力は動き（自分で回る動き・指で動かしている動き）・紙吹雪がはじけた時刻・時計だけで、項目・指定（`targetId`）・印・止まったスライスは受け取らない（紙吹雪は結果に依らず同じ）。
 /// 読み上げず、触れられない。
 struct WheelParticlesView: View {
     /// 盤面の一辺（pt）。粒の速さ・大きさはこれに比例させる。
@@ -15,116 +14,22 @@ struct WheelParticlesView: View {
     let motion: TimedSpinMotion?
     /// 指で動かしている動き（`WheelDragArea` の記録）。指を離したあとも次のドラッグまで残る。
     let drag: WheelDragMotion?
-    /// 結果が出ている（止まったスライスの強調がある）。偽から真になった瞬間に紙吹雪をはじけさせる。
-    let stopped: Bool
+    /// 紙吹雪がはじけた時刻（`WheelStopCues.confettiStart`）。nil から値になった瞬間にはじけさせる。
+    let burstAt: TimeInterval?
     let now: () -> TimeInterval
 
-    /// 針の先の y（盤面の枠の上端から pt）。針は 26pt の高さを 6pt 上にずらして置いている（`RouletteWheelView`）。針は盤面の大きさに依らない。
-    private static let pointerTipY = CGFloat(ShareImageLayout.basePointerHeight) - 6
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// 最初に画面に出たときに 1 つだけ作る（光の尾と同じ。作る前は今の値を直接読む）。
-    @State private var lowPower: LowPowerModeMonitor?
-    /// 止まり切った動き。止まり切ったら火花の分の描き直しを止める（光の尾と同じ）。
-    @State private var settledMotion: TimedSpinMotion?
-    /// 消え切った指の動き。指の動きの火花の分の描き直しを止める。
-    @State private var settledDrag: WheelDragMotion?
-    /// 火花の種。動きが変わるたびに引き直す。
-    @State private var sparkSeed: UInt64 = 0
-    /// 指の動きの火花の種。ドラッグを始めるたびに引き直す。
-    @State private var dragSeed: UInt64 = 0
-    /// 紙吹雪がはじけた時刻（`now()` の秒）と種。消え切ったら nil。
-    @State private var burst: Burst?
-
-    private struct Burst: Equatable {
-        var start: TimeInterval
-        var seed: UInt64
-    }
-
     var body: some View {
-        let sparkMotion = motion.flatMap { moving($0) ? $0 : nil }
-        let sparkDrag = drag.flatMap { $0 != settledDrag && $0.isMoving(now: now()) ? $0 : nil }
-        let animates = WheelParticles.animates(
-            reduceMotion: reduceMotion, moving: sparkMotion != nil || sparkDrag != nil, bursting: burst != nil
-        )
-        TimelineView(.animation(paused: !animates)) { _ in
-            if animates {
-                // 時刻は `TimelineView` の日付ではなく、動きの開始時刻と同じ時計で取る
-                let time = now()
-                let lowPower = lowPower?.isEnabled ?? ProcessInfo.processInfo.isLowPowerModeEnabled
-                let scale = side / CGFloat(WheelLabel.referenceDiameter)
-                let sparks = WheelParticles.sparks(
-                    motion: sparkMotion, drag: sparkDrag, now: time, spinSeed: sparkSeed, dragSeed: dragSeed,
-                    origin: CGPoint(x: side / 2, y: Self.pointerTipY),
-                    scale: scale, lowPower: lowPower, reduceMotion: reduceMotion
-                )
-                let confetti = burst.map {
-                    WheelParticles.confetti(
-                        elapsed: time - $0.start, seed: $0.seed, side: side,
-                        colorCount: Theme.confettiColors.count, lowPower: lowPower, reduceMotion: reduceMotion
-                    )
-                } ?? []
-                if !sparks.isEmpty || !confetti.isEmpty {
-                    Canvas { context, _ in
-                        draw(confetti: confetti, in: &context)
-                        draw(sparks: sparks, in: &context)
-                    }
+        WheelParticlesTimeline(side: side, motion: motion, drag: drag, burstAt: burstAt, now: now) { frame in
+            if !frame.isEmpty {
+                Canvas { context, _ in
+                    draw(confetti: frame.confetti, in: &context)
+                    draw(sparks: frame.sparks, in: &context)
                 }
             }
         }
         .frame(width: side, height: side)
-        // 画面に出たときにすでに動いていても（回転中に演出を切り替えた）種を引く
-        .onChange(of: motion, initial: true) { _, motion in
-            guard motion != nil else { return }
-            var random = SystemRandomNumberGenerator()
-            sparkSeed = WheelParticles.seed(using: &random)
-        }
-        .onChange(of: drag?.start, initial: true) { _, start in
-            guard start != nil else { return }
-            var random = SystemRandomNumberGenerator()
-            dragSeed = WheelParticles.seed(using: &random)
-        }
-        .onChange(of: stopped) { _, stopped in
-            guard stopped, !reduceMotion else { return }
-            var random = SystemRandomNumberGenerator()
-            burst = Burst(start: now(), seed: WheelParticles.seed(using: &random))
-        }
-        .task(id: motion) {
-            guard let motion, !reduceMotion else { return }
-            let remaining = motion.remaining(now: now())
-            guard remaining > 0 else { return }
-            try? await Task.sleep(for: .seconds(remaining))
-            guard !Task.isCancelled else { return }
-            settledMotion = motion
-        }
-        .task(id: drag) {
-            // 指の動きは止まっても次のドラッグまで残り、親が描き直さないので、最後に生まれた粒が消えたら止める
-            guard let drag, !reduceMotion else { return }
-            let remaining = drag.remaining(now: now())
-            guard remaining > 0 else { return }
-            try? await Task.sleep(for: .seconds(remaining))
-            guard !Task.isCancelled else { return }
-            settledDrag = drag
-        }
-        .task(id: burst) {
-            guard let burst else { return }
-            let remaining = burst.start + Config.wheelConfettiDuration - now()
-            if remaining > 0 {
-                try? await Task.sleep(for: .seconds(remaining))
-                guard !Task.isCancelled else { return }
-            }
-            self.burst = nil
-        }
-        .onAppear {
-            if lowPower == nil { lowPower = LowPowerModeMonitor() }
-        }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-    }
-
-    /// 盤面がまだ自分で回っているか。止まり切った惰性は `motion` に残るので、止まり切ったものは除く。
-    private func moving(_ motion: TimedSpinMotion) -> Bool {
-        motion != settledMotion && motion.isMoving(now: now())
     }
 
     private func draw(confetti: [WheelParticles.Confetto], in context: inout GraphicsContext) {
@@ -170,5 +75,107 @@ struct WheelParticlesView: View {
             let core = CGRect(x: point.x - spark.radius, y: point.y - spark.radius, width: spark.radius * 2, height: spark.radius * 2)
             context.fill(Path(ellipseIn: core), with: .color(Theme.wheelSpark.opacity(spark.opacity)))
         }
+    }
+}
+
+/// 火花と紙吹雪の 1 フレーム（`WheelParticles.Frame`）を毎フレーム引いて `content` に渡す時計。2D の `WheelParticlesView` と 3D の `Wheel3DView` が
+/// 同じ規則・同じ時刻（`now()` = `RouletteModel.now`）で引くよう共有する（電飾の `WheelLightsTimeline`・光の尾の `WheelTrailsTimeline` と同じ作り）。
+/// 火花の種はスピン・惰性の動きが変わるたびとドラッグを始めるたびに、紙吹雪の種ははじけるたびに引き直す。
+/// 火花も紙吹雪も出ていない・動きを減らす設定では `TimelineView` を止めて `.none` を渡す。低電力モードでは粒の数の上限を 1/3 にする。
+/// `enabled` が false なら止めたまま `.none` を渡し、低電力モードの購読も作らない（火花・紙吹雪を出さない）。
+/// 入力は動き・紙吹雪がはじけた時刻・時計だけで、項目・指定（`targetId`）・印・止まったスライスは受け取らない。
+struct WheelParticlesTimeline<Content: View>: View {
+    var enabled = true
+    /// 盤面の一辺（pt）。
+    let side: CGFloat
+    let motion: TimedSpinMotion?
+    let drag: WheelDragMotion?
+    /// 紙吹雪がはじけた時刻。nil から値になった瞬間にはじけさせ、はじけた紙吹雪は値が nil に戻っても（次のスピン・結果が消えた）最後まで落とす。
+    let burstAt: TimeInterval?
+    let now: () -> TimeInterval
+    @ViewBuilder let content: (_ frame: WheelParticles.Frame) -> Content
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 最初に必要になったときに 1 つだけ作る（光の尾と同じ。作る前は今の値を直接読む）。
+    @State private var lowPower: LowPowerModeMonitor?
+    /// 止まり切った動き。止まり切ったら火花の分の描き直しを止める（光の尾と同じ）。
+    @State private var settledMotion: TimedSpinMotion?
+    /// 消え切った指の動き。指の動きの火花の分の描き直しを止める。
+    @State private var settledDrag: WheelDragMotion?
+    /// 火花の種。動きが変わるたびに引き直す。
+    @State private var sparkSeed: UInt64 = 0
+    /// 指の動きの火花の種。ドラッグを始めるたびに引き直す。
+    @State private var dragSeed: UInt64 = 0
+    /// はじけた紙吹雪。消え切ったら nil。
+    @State private var burst: WheelParticles.Burst?
+
+    var body: some View {
+        let sparkMotion = enabled ? motion.flatMap { moving($0) ? $0 : nil } : nil
+        let sparkDrag = enabled ? drag.flatMap { $0 != settledDrag && $0.isMoving(now: now()) ? $0 : nil } : nil
+        let shownBurst = enabled ? burst : nil
+        let animates = WheelParticles.animates(
+            reduceMotion: reduceMotion, moving: sparkMotion != nil || sparkDrag != nil, bursting: shownBurst != nil
+        )
+        TimelineView(.animation(paused: !animates)) { _ in
+            // 時刻は `TimelineView` の日付ではなく、動きの開始時刻と同じ時計で取る
+            content(animates ? WheelParticles.frame(
+                motion: sparkMotion, drag: sparkDrag, burst: shownBurst, now: now(), spinSeed: sparkSeed, dragSeed: dragSeed,
+                side: side, colorCount: Theme.confettiColors.count,
+                lowPower: lowPower?.isEnabled ?? ProcessInfo.processInfo.isLowPowerModeEnabled, reduceMotion: reduceMotion
+            ) : .none)
+        }
+        // 画面に出たときにすでに動いていても（回転中に演出を切り替えた）種を引く
+        .onChange(of: motion, initial: true) { _, motion in
+            guard motion != nil else { return }
+            var random = SystemRandomNumberGenerator()
+            sparkSeed = WheelParticles.seed(using: &random)
+        }
+        .onChange(of: drag?.start, initial: true) { _, start in
+            guard start != nil else { return }
+            var random = SystemRandomNumberGenerator()
+            dragSeed = WheelParticles.seed(using: &random)
+        }
+        .onChange(of: burstAt) { _, start in
+            guard let start, enabled, !reduceMotion else { return }
+            var random = SystemRandomNumberGenerator()
+            burst = WheelParticles.Burst(start: start, seed: WheelParticles.seed(using: &random))
+        }
+        .task(id: motion) {
+            guard let motion, !reduceMotion else { return }
+            let remaining = motion.remaining(now: now())
+            guard remaining > 0 else { return }
+            try? await Task.sleep(for: .seconds(remaining))
+            guard !Task.isCancelled else { return }
+            settledMotion = motion
+        }
+        .task(id: drag) {
+            // 指の動きは止まっても次のドラッグまで残り、親が描き直さないので、最後に生まれた粒が消えたら止める
+            guard let drag, !reduceMotion else { return }
+            let remaining = drag.remaining(now: now())
+            guard remaining > 0 else { return }
+            try? await Task.sleep(for: .seconds(remaining))
+            guard !Task.isCancelled else { return }
+            settledDrag = drag
+        }
+        .task(id: burst) {
+            guard let burst else { return }
+            let remaining = burst.start + Config.wheelConfettiDuration - now()
+            if remaining > 0 {
+                try? await Task.sleep(for: .seconds(remaining))
+                guard !Task.isCancelled else { return }
+            }
+            self.burst = nil
+        }
+        .onAppear(perform: watchLowPower)
+        .onChange(of: enabled) { watchLowPower() }
+    }
+
+    private func watchLowPower() {
+        if enabled, lowPower == nil { lowPower = LowPowerModeMonitor() }
+    }
+
+    /// 盤面がまだ自分で回っているか。止まり切った惰性は `motion` に残るので、止まり切ったものは除く。
+    private func moving(_ motion: TimedSpinMotion) -> Bool {
+        motion != settledMotion && motion.isMoving(now: now())
     }
 }

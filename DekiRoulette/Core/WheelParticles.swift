@@ -309,6 +309,64 @@ enum WheelParticles {
         )
     }
 
+    // MARK: 1 フレーム
+
+    /// 火花と紙吹雪の 1 フレーム。位置は盤面の枠（一辺 `side`）の左上を原点とする pt（y は下向き）。2D の `WheelParticlesView` は
+    /// そのまま `Canvas` に描き、3D の `Wheel3DScene.particles(_:)` は盤と同じ面（中心が原点、y が上向き）に写す。
+    struct Frame: Equatable, Sendable {
+        var sparks: [Spark] = []
+        var confetti: [Confetto] = []
+
+        /// 何も出さない。
+        static let none = Frame()
+
+        var isEmpty: Bool { sparks.isEmpty && confetti.isEmpty }
+    }
+
+    /// はじけた紙吹雪（時刻と種）。
+    struct Burst: Equatable, Sendable {
+        /// はじけた時刻（`RouletteModel.now` の秒）。
+        var start: TimeInterval
+        var seed: UInt64
+    }
+
+    /// 火花が生まれる針の先（盤面の枠の左上を原点とする pt）。針は盤面の大きさに依らない 26pt の高さで、
+    /// 盤面の枠の上端から 6pt はみ出して置く（2D の `RouletteWheelView`・3D の `Wheel3DScene` とも）ので、先は枠の上端から 20pt。
+    static func sparkOrigin(side: CGFloat) -> CGPoint {
+        CGPoint(x: side / 2, y: CGFloat(ShareImageLayout.basePointerHeight) - 6)
+    }
+
+    /// 時刻 `now` の 1 フレーム。火花は盤面が自分で回っている動き（`motion`、種 `spinSeed`）と指で動かしている動き（`drag`、種 `dragSeed`）
+    /// から、紙吹雪ははじけた紙吹雪（`burst`）から引く。2D と 3D の盤面が同じ関数・同じ時計で引く。
+    /// - Parameters:
+    ///   - side: 盤面の枠の一辺（pt）。速さ・大きさは基準直径との比で掛ける。
+    ///   - colorCount: 紙吹雪の色の数（`Theme.confettiColors.count`）。
+    static func frame(
+        motion: TimedSpinMotion?,
+        drag: WheelDragMotion?,
+        burst: Burst?,
+        now: TimeInterval,
+        spinSeed: UInt64,
+        dragSeed: UInt64,
+        side: CGFloat,
+        colorCount: Int,
+        lowPower: Bool,
+        reduceMotion: Bool
+    ) -> Frame {
+        guard !reduceMotion, side > 0 else { return .none }
+        let sparks = sparks(
+            motion: motion, drag: drag, now: now, spinSeed: spinSeed, dragSeed: dragSeed,
+            origin: sparkOrigin(side: side), scale: side / CGFloat(WheelLabel.referenceDiameter),
+            lowPower: lowPower, reduceMotion: reduceMotion
+        )
+        let confetti = burst.map {
+            Self.confetti(
+                elapsed: now - $0.start, seed: $0.seed, side: side, colorCount: colorCount, lowPower: lowPower, reduceMotion: reduceMotion
+            )
+        } ?? []
+        return Frame(sparks: sparks, confetti: confetti)
+    }
+
     // MARK: 共通
 
     /// 演出を始めるときに引く種。乱数は注入できる（画面では `SystemRandomNumberGenerator`、テストでは固定の種）。

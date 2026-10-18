@@ -61,4 +61,11 @@ struct SpinEffectStyleTests {
             #expect(style.showsCommonEffects)
         }
     }
+
+    @Test func 指の動きを記録するのは速さに連動する演出を出すときだけ() {
+        #expect(!SpinEffectStyle.none.tracksDragMotion)
+        for style in [SpinEffectStyle.lights, .trails, .confetti, .all] {
+            #expect(style.tracksDragMotion, "\(style)")
+        }
+    }
 }

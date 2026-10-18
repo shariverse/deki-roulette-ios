@@ -53,3 +53,100 @@ enum WheelStopEffects {
         return afterglowLevel(at: stoppedElapsed)
     }
 }
+
+// MARK: 毎フレームの値
+
+extension WheelStopEffects {
+    /// 停止の演出の 1 フレーム。2D の `WheelStopFlashView` と 3D の `Wheel3DScene.stopEffects(_:)` が同じ時計（`RouletteModel.now`）から
+    /// 共有の `WheelStopEffectsTimeline` で引く。
+    struct Frame: Equatable, Sendable {
+        /// フラッシュの不透明度（0 なら描かない）。
+        var flashOpacity = 0.0
+        /// 止まったスライスの光彩の倍率（1 なら今の光彩のまま）。
+        var glowLevel = 1.0
+
+        /// 何も足さない（「なし」・動きを減らす設定・結果が無いとき）。
+        static let none = Frame()
+    }
+
+    /// 時刻 `now` の 1 フレーム。`flashStart` はフラッシュを始めた時刻（停止の瞬間を見たときだけ。指で強調を解いても止めない）、
+    /// `afterglowStart` は余韻の基準の時刻（結果を出していて強調している間だけ）。演出が「なし」・動きを減らす設定では `none`。
+    static func frame(
+        enabled: Bool, reduceMotion: Bool, flashStart: TimeInterval?, afterglowStart: TimeInterval?, now: TimeInterval
+    ) -> Frame {
+        guard enabled, !reduceMotion else { return .none }
+        return Frame(
+            flashOpacity: flashStart.map { flashOpacity(at: now - $0) } ?? 0,
+            glowLevel: glowLevel(enabled: true, reduceMotion: false, stoppedElapsed: afterglowStart.map { now - $0 })
+        )
+    }
+
+    /// 描き直しの最短間隔。フラッシュが光っている間は毎フレーム（nil）、余韻の脈動だけなら `Config.effectPulseFrameInterval`。
+    static func frameInterval(flashing: Bool) -> TimeInterval? {
+        flashing ? nil : Config.effectPulseFrameInterval
+    }
+}
+
+// MARK: 停止の時刻
+
+/// 結果が出た時刻（停止の時刻）の持ち方（`docs/SPEC.md` の §5.5）。2D の `RouletteWheelView` と 3D の `Wheel3DView` が同じ規則で
+/// `@State` に持ち、電飾の点滅と脈動・光彩の余韻・フラッシュ・紙吹雪に渡す時刻を同じ関数（`cues`）で引く。
+/// 入力は結果が出ているか（止まったスライスの添字の有無）・時刻だけで、指定（`targetId`）・印は受け取らない。
+struct WheelStopMoment: Equatable, Sendable {
+    /// 結果が出た時刻（`RouletteModel.now` の秒）。結果が無いときは nil。
+    private(set) var start: TimeInterval?
+    /// 停止の瞬間を画面で見たか。結果を出したまま盤面が画面に出た（2D と 3D を切り替えた・画面に戻った）ときは偽で、
+    /// フラッシュと紙吹雪を出さない。
+    private(set) var witnessed = false
+
+    /// 盤面が画面に出た。結果を出したままなら、停止の瞬間の点滅とフラッシュを飛ばして脈動から始める
+    /// （`WheelLights.blinkDuration` だけ前に止まったことにする）。すでに時刻を持っていれば変えない。
+    mutating func appear(showingResult: Bool, now: TimeInterval) {
+        guard showingResult, start == nil else { return }
+        start = now - WheelLights.blinkDuration
+        witnessed = false
+    }
+
+    /// 結果が出た・消えた（止まったスライスの添字が変わった）。出たらその時刻を停止の時刻にする。
+    mutating func resultChanged(showingResult: Bool, now: TimeInterval) {
+        start = showingResult ? now : nil
+        witnessed = showingResult
+    }
+
+    /// 盤面が演出に渡す値。2D と 3D の盤面が同じ引数でこれを呼ぶ。
+    /// - Parameters:
+    ///   - highlightedIndex: 止まったスライスの添字（`model.outcome?.index`）。
+    ///   - displacedByDrag: 結果が出たあとに指で盤面を動かした（強調を解く）。
+    func cues(
+        style: SpinEffectStyle, reduceMotion: Bool, highlightedIndex: Int?, displacedByDrag: Bool
+    ) -> WheelStopCues {
+        let highlight = displacedByDrag ? nil : highlightedIndex
+        // 電飾の点滅と脈動・光彩の余韻は、指で動かして強調を解いたら止める
+        let emphasized = highlight != nil ? start : nil
+        // フラッシュと紙吹雪は結果が出た瞬間に 1 回だけ始めるので、指で強調を解いても止めない。見ていない停止では出さない
+        let burst = highlightedIndex != nil && witnessed && !reduceMotion ? start : nil
+        return WheelStopCues(
+            highlight: highlight,
+            lightsStoppedAt: style.showsLights ? emphasized : nil,
+            afterglowStart: WheelStopEffects.pulses(
+                enabled: style.showsCommonEffects, reduceMotion: reduceMotion, showingResult: highlight != nil
+            ) ? emphasized : nil,
+            flashStart: style.showsCommonEffects ? burst : nil,
+            confettiStart: style.showsParticles ? burst : nil
+        )
+    }
+}
+
+/// 盤面が演出に渡す、強調するスライスと停止の時刻（`WheelStopMoment.cues`）。
+struct WheelStopCues: Equatable, Sendable {
+    /// 強調するスライス。結果が出たあとに指で動かしたら nil（結果の表示は残る）。
+    var highlight: Int?
+    /// 電飾の点滅と脈動の基準（`WheelLightsTimeline` の `stoppedAt`）。電飾を出さない・強調を解いたら nil。
+    var lightsStoppedAt: TimeInterval?
+    /// 光彩の余韻の基準。脈打たせないとき（「なし」・動きを減らす設定・強調を解いた）は nil。
+    var afterglowStart: TimeInterval?
+    /// フラッシュを始めた時刻。「なし」・動きを減らす設定・見ていない停止では nil。
+    var flashStart: TimeInterval?
+    /// 紙吹雪がはじけた時刻。紙吹雪を出さないスタイル・動きを減らす設定・見ていない停止では nil。
+    var confettiStart: TimeInterval?
+}

@@ -7,7 +7,8 @@ import Testing
 /// 3D の盤面を画面外で描き、スライスの並び・回る向き・塗りの色を画素で確かめる。
 @MainActor
 struct Wheel3DSceneTests {
-    private let size: CGFloat = 320
+    /// 盤面の直径。直径 480 の確かめでは、値を変えた写しで同じ手順を描く。
+    private var size: CGFloat = 320
     /// 描く範囲（盤面の枠より `overscan` だけ広い）。
     private var canvas: CGFloat { size * (1 + 2 * Theme.Wheel3D.overscan) }
 
@@ -25,12 +26,14 @@ struct Wheel3DSceneTests {
         }
     }
 
-    private func render(_ scene: Wheel3DScene) throws -> Pixels {
+    /// 場面を描く。`time` は描く時刻（システムの時計の秒）。0 では、`SCNTransaction` で動かし始めた値は動きの始まり（変える前の値）で描かれる。
+    /// 動きが終わったあとを描くときは `CACurrentMediaTime()` より先の時刻を渡す。
+    private func render(_ scene: Wheel3DScene, atTime time: TimeInterval = 0) throws -> Pixels {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let renderer = SCNRenderer(device: device, options: nil)
         renderer.scene = scene.scene
         renderer.pointOfView = scene.cameraNode
-        let image = renderer.snapshot(atTime: 0, with: CGSize(width: canvas, height: canvas), antialiasingMode: .none)
+        let image = renderer.snapshot(atTime: time, with: CGSize(width: canvas, height: canvas), antialiasingMode: .none)
         let cgImage = try #require(image.cgImage)
         let width = cgImage.width, height = cgImage.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
@@ -210,6 +213,28 @@ struct Wheel3DSceneTests {
         let near = pixels.color(at: location(angle: 180 - 5 / radius * 180 / .pi, fraction: 0.6, pixels: pixels))
         let plain = pixels.color(at: location(angle: 135, fraction: 0.6, pixels: pixels))
         #expect(near.x + near.y + near.z > plain.x + plain.y + plain.z + 0.1, "near: \(near) plain: \(plain)")
+    }
+
+    @Test func 押し出しが終わったあとも止まったスライスは前に出した大きさで残る() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false)
+        // 押し出し（0.14 秒 + ばね約 0.5 秒）と暗くする動き（0.25 秒）が終わったあとを描く
+        let pixels = try render(scene, atTime: CACurrentMediaTime() + 2)
+        let slice2 = srgb(Theme.sliceColor(at: 2, count: 4))
+        // 止まったスライス（180〜270 度）は塗りの色、境目は縁取り、隣のスライス 1 は沈んだ色（止まったスライスの塗りが広がっていない）
+        let inside = pixels.color(at: location(angle: 225, fraction: 0.6, pixels: pixels))
+        #expect(isClose(inside, slice2), "\(inside)")
+        let edge = pixels.color(at: location(angle: 180, fraction: 0.6, pixels: pixels))
+        #expect(isClose(edge, srgb(Theme.stopOutline)), "\(edge)")
+        let neighbor = pixels.color(at: location(angle: 135, fraction: 0.6, pixels: pixels))
+        #expect(!isClose(neighbor, slice2), "\(neighbor)")
+        #expect(distance(neighbor, srgb(Theme.onSlice)) < distance(srgb(Theme.sliceColor(at: 1, count: 4)), srgb(Theme.onSlice)), "\(neighbor)")
+        // 1.07 倍に前に出したままなので、スライスの円の 4% 外（縁の上）にも止まったスライスの塗りが乗る
+        // （元の大きさなら半径 144pt の外は縁。前に出した塗りは 144 × 1.07 ≈ 154pt まで、縁取りはその内側 1.6pt から。
+        // 縁取りの光彩が少し混ざるので、縁の色ではなく塗りの色に寄っていることを見る）
+        let beyond = pixels.color(at: location(angle: 225, fraction: 1.04, pixels: pixels))
+        #expect(distance(beyond, slice2) < 0.1, "\(beyond)")
+        #expect(distance(beyond, srgb(Theme.wheelRim)) > 0.5, "\(beyond)")
     }
 
     @Test func 強調を解くと元の色に戻る() throws {
@@ -497,6 +522,16 @@ struct Wheel3DSceneTests {
         // 止まったスライス（0〜90 度）の外周の上の電球
         let color = pixels.color(at: lightLocation(index: 3, pixels: pixels))
         #expect(isClose(color, bulbColor(WheelLights.blinkLowLevel)), "\(color)")
+
+        // 浮かせなければ、前に出した止まったスライス（縁の上面 + 0.5pt）に隠れる（上の確かめが浮かせた高さで決まっていること）
+        let flat = makeScene(count: 4, rotation: 0)
+        flat.lightLift = 0
+        flat.highlight(Wheel3DHighlight(index: 0, glowStyle: .white), reduceMotion: false)
+        flat.light(.stopped(elapsed: WheelLights.blinkDuration))
+        let hidden = try render(flat)
+        let covered = hidden.color(at: lightLocation(index: 3, pixels: hidden))
+        #expect(!isClose(covered, bulbColor(WheelLights.blinkLowLevel)), "\(covered)")
+        #expect(distance(covered, color) > 0.04, "\(covered) \(color)")
     }
 
     @Test func 電飾を出さない間は電球を作らない() {
@@ -742,24 +777,450 @@ struct Wheel3DSceneTests {
         #expect(distance(after.color(at: margin), before.color(at: margin)) > 0.02, "\(after.color(at: margin)) \(before.color(at: margin))")
     }
 
-    /// 止まったスライス 1（90〜180 度）を強調した（`clearing` なら続けて消し始めた）盤に、光の尾と残像を重ねる。
-    private func highlightedScene(clearing: Bool, trails: WheelTrails.Frame) -> Wheel3DScene {
+    /// 強調の状態。
+    enum HighlightPhase: String, CaseIterable {
+        /// 強調を出した直後（暗くする層は 0 から濃くなり始めたところ。画面外描画は動きの始まりを描く）。止まったスライスは持ち上げてある。
+        case appearing
+        /// 強調を出し切った（動きを減らす設定と同じく即座に出すので、暗くする層は最初から濃い）。
+        case settled
+        /// 強調を消し始めた。
+        case clearing
+    }
+
+    /// 止まったスライス 1（90〜180 度）を `phase` の状態で強調した盤に、光の尾と残像を重ねる。
+    private func highlightedScene(_ phase: HighlightPhase, trails: WheelTrails.Frame) -> Wheel3DScene {
         let scene = makeScene(count: 4, rotation: 0)
-        scene.highlight(Wheel3DHighlight(index: 1, glowStyle: .white), reduceMotion: false)
-        if clearing { scene.highlight(nil, reduceMotion: false) }
+        scene.highlight(Wheel3DHighlight(index: 1, glowStyle: .white), reduceMotion: phase == .settled)
+        if phase == .clearing { scene.highlight(nil, reduceMotion: false) }
         scene.trail(trails)
         return scene
     }
 
-    @Test(arguments: [false, true])
-    func 強調を出したままでも消している途中でも光の尾と残像は板に隠れない(clearing: Bool) throws {
+    @Test(arguments: HighlightPhase.allCases)
+    func 強調を出したままでも消している途中でも光の尾と残像は板に隠れない(phase: HighlightPhase) throws {
         // 光の尾（−11.25 度）と残像を見る位置（300 度）は、沈めたスライス 3 の上。残像ではスライス 0 になる
         let frame = trailFrame(ghosts: [WheelTrails.Ghost(angle: -120, opacity: 0.3)])
-        let plain = try render(highlightedScene(clearing: clearing, trails: .none))
-        let pixels = try render(highlightedScene(clearing: clearing, trails: frame))
+        let plain = try render(highlightedScene(phase, trails: .none))
+        let pixels = try render(highlightedScene(phase, trails: frame))
         let tail = trailLocation(angle: -11.25, pixels: pixels)
         #expect(brightness(pixels.color(at: tail)) > brightness(plain.color(at: tail)) + 0.2, "\(pixels.color(at: tail)) \(plain.color(at: tail))")
         let ghost = location(angle: 300, fraction: 0.6, pixels: pixels)
         #expect(distance(pixels.color(at: ghost), plain.color(at: ghost)) > 0.02, "\(pixels.color(at: ghost)) \(plain.color(at: ghost))")
+        switch phase {
+        case .clearing:
+            // 消している途中は、止まったスライス（90〜180 度、持ち上げた板）の上でも残像（スライス 2）が見える
+            let stopped = location(angle: 135, fraction: 0.6, pixels: pixels)
+            #expect(distance(pixels.color(at: stopped), plain.color(at: stopped)) > 0.02, "\(pixels.color(at: stopped)) \(plain.color(at: stopped))")
+        case .settled:
+            // 暗くする層が濃く出ていても、残像はその上に見え（上の確かめ）、沈めたスライスは残像の下で沈んだまま（残像が暗くする層を消さない）。
+            // 暗くする層が無い盤に同じ残像を重ねた色（緑は 0.7·lin(0.859) + 0.3·lin(0.502) → sRGB 0.773、`onSlice` から 0.706）より、
+            // 暗くした上に重ねた色（緑は 0.7·0.357 + 0.3·0.216 → sRGB 0.59、`onSlice` から約 0.52）の方が `onSlice` に近い
+            let bare = makeScene(count: 4, rotation: 0)
+            bare.trail(frame)
+            let unlit = try render(bare)
+            let ink = srgb(Theme.onSlice)
+            #expect(distance(pixels.color(at: ghost), ink) < distance(unlit.color(at: ghost), ink) - 0.03,
+                    "\(pixels.color(at: ghost)) \(unlit.color(at: ghost))")
+        case .appearing:
+            break
+        }
+    }
+
+    // MARK: 組み直し
+
+    @Test func 項目の色が変わって組み直すと残像の塗りも新しい色にする() throws {
+        // 120 度遅れた残像の、80 度の位置（今はスライス 0、残像ではスライス 2）
+        let frame = trailFrame(ghosts: [WheelTrails.Ghost(angle: -120, opacity: 0.3)])
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.trail(frame)
+        let before = try render(scene)
+        scene.update(items: [Item(label: ""), Item(label: ""), Item(label: "", appearance: .color(.purple)), Item(label: "")], diameter: size)
+        let after = try render(scene)
+        let point = location(angle: 80, fraction: 0.6, pixels: after)
+        // 下のスライス 0 は同じ色のまま、残像のスライス 2 が紫になった分だけ紫に寄る
+        #expect(distance(after.color(at: point), srgb(purple)) < distance(before.color(at: point), srgb(purple)) - 0.02,
+                "\(after.color(at: point)) \(before.color(at: point))")
+    }
+
+    @Test func 組み直すと電球の明るさの覚えを捨てて塗り直す() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        let lights = WheelLights.Scene.running(angle: 0, intensity: 0)
+        scene.light(lights)
+        #expect(scene.bulbColorWriteCount == Config.wheelLightCount)
+        // 大きさが変わる・項目の色が変わると電球を作り直すので、明るさが同じでも全部塗り直す
+        scene.update(labels: Array(repeating: "", count: 4), diameter: size + 1)
+        #expect(scene.bulbColorWriteCount == Config.wheelLightCount * 2)
+        scene.update(items: styledItems, diameter: size)
+        #expect(scene.bulbColorWriteCount == Config.wheelLightCount * 3)
+        let pixels = try render(scene)
+        for index in [6, 7] {
+            let expected = bulbColor(WheelLights.bulb(index: index, scene: lights).brightness)
+            let color = pixels.color(at: lightLocation(index: index, pixels: pixels))
+            #expect(isClose(color, expected), "\(index): \(color) expected \(expected)")
+        }
+    }
+
+    // MARK: 光の尾の書き換え
+
+    @Test func 濃さの変わらない光の尾の切れ端は書き換えない() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        let trail = trailFrame()
+        scene.trail(trail)
+        let written = scene.trailOpacityWriteCount
+        #expect(written > 0)
+        // 残像だけが変わったフレーム・消して同じ尾を出し直したフレームでは、切れ端を書き換えない
+        scene.trail(trailFrame(ghosts: [WheelTrails.Ghost(angle: -30, opacity: 0.2)]))
+        scene.trail(.none)
+        scene.trail(trail)
+        #expect(scene.trailOpacityWriteCount == written)
+        // 出し直しても今の濃さのまま描く
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let pixels = try render(scene)
+        let tail = trailLocation(angle: -11.25, pixels: pixels)
+        #expect(brightness(pixels.color(at: tail)) > brightness(plain.color(at: tail)) + 0.2)
+        // 尾が短くなれば、濃さの変わった切れ端だけ書き換える
+        scene.trail(trailFrame(length: 40))
+        let changed = scene.trailOpacityWriteCount - written
+        #expect(changed > 0 && changed <= Int((40 / Theme.Wheel3D.trailPieceAngle).rounded(.up)))
+    }
+
+    @Test func 光の尾のにじみは外周の縁の外へはみ出さない() throws {
+        let bounds = Theme.Wheel3D.trailGlowBounds(diameter: size)
+        let scale = Double(size) / WheelLabel.referenceDiameter
+        let sliceRadius = WheelGeometry.sliceRadius(diameter: Double(size))
+        let ring = Double(Theme.TrailRing.ringRadius(diameter: size))
+        #expect(abs(Double(bounds.outer) - (sliceRadius + Double(Theme.Wheel3D.rimWidth) * scale)) < 1e-9)
+        #expect(abs(Double(bounds.inner) - (ring - Double(Theme.TrailRing.glowWidth) * scale / 2)) < 1e-9)
+
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.trail(trailFrame())
+        let pixels = try render(scene)
+        let distanceToCamera = WheelGeometry.cameraDistance(diameter: Double(canvas), fieldOfView: Theme.Wheel3D.fieldOfView)
+        let z = Double(Theme.Wheel3D.rimLift) * scale + Double(Theme.Wheel3D.trailLift)
+        for angle in [-11.25, -41.25] {
+            // 縁の外（スライスの円の外 13pt。2D のにじみの外側は 14pt まで届く）は地のまま
+            let outside = WheelGeometry.point(angle: angle, radius: (sliceRadius + 13 * scale) * distanceToCamera / (distanceToCamera - z))
+            let point = location(x: outside.x, y: outside.y, pixels: pixels)
+            #expect(distance(pixels.color(at: point), plain.color(at: point)) < 0.01, "\(angle): \(pixels.color(at: point))")
+        }
+    }
+
+    // MARK: 直径 480
+
+    @Test func 直径480でもスライス_針_電球_光の尾_帯が同じ割り付けで出る() throws {
+        var large = self
+        large.size = 480
+        try large.checkLayout()
+    }
+
+    /// 今の直径で、スライスの塗り・針・電球・光の尾・結果の帯が盤面の割り付けどおりの位置に出るか。
+    private func checkLayout() throws {
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        for index in 0..<4 {
+            let color = plain.color(at: location(angle: 45 + 90 * Double(index), fraction: 0.6, pixels: plain))
+            #expect(isClose(color, srgb(Theme.sliceColor(at: index, count: 4))), "\(size) slice \(index): \(color)")
+        }
+        let pointer = plain.color(at: location(x: 0, y: Double(size) / 2 - 8, pixels: plain))
+        #expect(isClose(pointer, srgb(Theme.flare)), "\(size) pointer: \(pointer)")
+
+        let lit = makeScene(count: 4, rotation: 0)
+        lit.light(.still)
+        let lights = try render(lit)
+        for index in [3, 6, 15] {
+            let color = lights.color(at: lightLocation(index: index, pixels: lights))
+            #expect(isClose(color, bulbColor(WheelLights.stillLevel)), "\(size) bulb \(index): \(color)")
+        }
+
+        let trailed = makeScene(count: 4, rotation: 0)
+        trailed.trail(trailFrame())
+        let trails = try render(trailed)
+        let tail = trailLocation(angle: -41.25, pixels: trails)
+        #expect(brightness(trails.color(at: tail)) > brightness(plain.color(at: tail)) + 0.2, "\(size) trail")
+
+        let banded = makeScene(count: 4, rotation: 0)
+        banded.show(result: Wheel3DResult(id: "a1", label: "\u{3000}", accent: Theme.sliceColor(at: 2, count: 4)), reduceMotion: true)
+        let band = try render(banded)
+        let center = band.color(at: location(x: 0, y: bandCenterY, pixels: band))
+        #expect(isClose(center, srgb(Theme.resultBandFill)), "\(size) band: \(center)")
+
+        let sparked = makeScene(count: 4, rotation: 0)
+        let point = CGPoint(x: size / 2 + 50 * size / 320, y: 70)
+        sparked.particles(WheelParticles.Frame(sparks: [WheelParticles.Spark(position: point, tail: .zero, radius: 3, opacity: 1)]))
+        let spark = try render(sparked)
+        let core = spark.color(at: particleLocation(point, compensated: false, pixels: spark))
+        #expect(isClose(core, srgb(Theme.wheelSpark)), "\(size) spark: \(core)")
+    }
+
+    // MARK: 火花・紙吹雪
+
+    /// 粒の面（針と同じ奥行き）の、盤面の枠の左上を原点とする位置（pt、y が下向き）の画素の位置。紙吹雪は遠近の広がりを打ち消してあるので
+    /// `compensated` で、火花は針と同じく浮かせた分だけ外へ広がって見える。
+    private func particleLocation(_ point: CGPoint, compensated: Bool, pixels: Pixels) -> CGPoint {
+        let x = Double(point.x) - Double(size) / 2, y = Double(size) / 2 - Double(point.y)
+        guard !compensated else { return location(x: x, y: y, pixels: pixels) }
+        let z = Double(Wheel3DScene.pointerZ(scale: Double(size) / WheelLabel.referenceDiameter))
+        let distance = WheelGeometry.cameraDistance(diameter: Double(canvas), fieldOfView: Theme.Wheel3D.fieldOfView)
+        let k = distance / (distance - z)
+        return location(x: x * k, y: y * k, pixels: pixels)
+    }
+
+    @Test func 火花は2Dと同じ位置に芯の色で出て尾を引く() throws {
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        let point = CGPoint(x: size / 2 + 50, y: 70)
+        // 尾は左へ 20pt（にじみの半径 9pt より長い）
+        scene.particles(WheelParticles.Frame(sparks: [
+            WheelParticles.Spark(position: point, tail: CGVector(dx: -20, dy: 0), radius: 3, opacity: 1),
+        ]))
+        let pixels = try render(scene)
+        let core = pixels.color(at: particleLocation(point, compensated: false, pixels: pixels))
+        #expect(isClose(core, srgb(Theme.wheelSpark)), "\(core)")
+        // にじみの外の尾は橙に寄る
+        let tailPoint = particleLocation(CGPoint(x: point.x - 13, y: point.y), compensated: false, pixels: pixels)
+        #expect(distance(pixels.color(at: tailPoint), plain.color(at: tailPoint)) > 0.05, "\(pixels.color(at: tailPoint))")
+        // 尾の逆側のにじみの外は盤のまま
+        let ahead = particleLocation(CGPoint(x: point.x + 13, y: point.y), compensated: false, pixels: pixels)
+        #expect(distance(pixels.color(at: ahead), plain.color(at: ahead)) < 0.01, "\(pixels.color(at: ahead))")
+    }
+
+    private func confetto(at point: CGPoint, side: CGFloat = 14, colorIndex: Int = 7) -> WheelParticles.Confetto {
+        WheelParticles.Confetto(
+            position: point, size: CGSize(width: side, height: side), rotation: 0, flip: 1, colorIndex: colorIndex, opacity: 1
+        )
+    }
+
+    @Test func 紙吹雪は2Dと同じ位置と色で針より手前_結果の帯より奥に出る() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.show(result: Wheel3DResult(id: "a1", label: "\u{3000}", accent: Theme.sliceColor(at: 2, count: 4)), reduceMotion: true)
+        let open = CGPoint(x: size / 2 - 60, y: size / 2 + 10)
+        let onPointer = CGPoint(x: size / 2, y: 8)
+        let onBand = CGPoint(x: size / 2, y: size / 2 - bandCenterY)
+        scene.particles(WheelParticles.Frame(confetti: [confetto(at: open), confetto(at: onPointer), confetto(at: onBand)]))
+        let pixels = try render(scene)
+        let color = srgb(Theme.confettiColors[7])
+        let shown = pixels.color(at: particleLocation(open, compensated: true, pixels: pixels))
+        #expect(isClose(shown, color), "\(shown)")
+        let pointer = pixels.color(at: particleLocation(onPointer, compensated: true, pixels: pixels))
+        #expect(isClose(pointer, color), "\(pointer)")
+        let band = pixels.color(at: particleLocation(onBand, compensated: true, pixels: pixels))
+        #expect(isClose(band, srgb(Theme.resultBandFill)), "\(band)")
+    }
+
+    @Test func 火花は2Dと同じく紙吹雪の上に重なる() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        // 火花の芯（半径 3pt）を、それより大きい紙片（26pt 角）の真ん中に重ねる。火花は遠近で外へ広がって見えるので、紙片をその位置に置く
+        let point = CGPoint(x: size / 2 + 50, y: 70)
+        let z = Double(Wheel3DScene.pointerZ(scale: Double(size) / WheelLabel.referenceDiameter))
+        let distanceToCamera = WheelGeometry.cameraDistance(diameter: Double(canvas), fieldOfView: Theme.Wheel3D.fieldOfView)
+        let spread = distanceToCamera / (distanceToCamera - z)
+        let under = CGPoint(x: size / 2 + 50 * spread, y: size / 2 - (size / 2 - 70) * spread)
+        scene.particles(WheelParticles.Frame(
+            sparks: [WheelParticles.Spark(position: point, tail: .zero, radius: 3, opacity: 1)],
+            confetti: [confetto(at: under, side: 26)]
+        ))
+        let pixels = try render(scene)
+        let core = pixels.color(at: particleLocation(point, compensated: false, pixels: pixels))
+        #expect(isClose(core, srgb(Theme.wheelSpark)), "\(core)")
+        // 火花のにじみ（半径 9pt）の外の紙片の中は、紙吹雪の色のまま
+        let beside = pixels.color(at: particleLocation(CGPoint(x: under.x + 11, y: under.y), compensated: true, pixels: pixels))
+        #expect(isClose(beside, srgb(Theme.confettiColors[7])), "\(beside)")
+    }
+
+    @Test func 紙吹雪は盤面の枠の外へ広げない() throws {
+        // 直径 480 で、遠近の広がりを打ち消しているときだけ「外」になる位置を見る
+        var large = self
+        large.size = 480
+        try large.checkConfettiInsideFrame()
+    }
+
+    /// 枠の右端に接する紙片（枠の内側 8pt）が、正面から見て枠の右端（盤の中心から半径 = 直径 ÷ 2）で切れて見えるか。
+    /// 手計算（直径 480）: 紙吹雪の面の高さ z = 針の奥行き = (6 × 1.5 + 1) + 2 = 12pt、描く範囲 624pt、カメラまでの距離
+    /// d = 312 ÷ tan 15° ≈ 1164.4pt で、縮めないと d ÷ (d − z) ≈ 1.0104 倍に広がり、紙片の外端は 240 × 1.0104 ≈ 242.5pt に見える。
+    /// 縮めれば外端は 240pt。「外」として見る 241pt は、縮めれば外（1pt）、縮めなければ内（1.5pt）になる。
+    private func checkConfettiInsideFrame() throws {
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.particles(WheelParticles.Frame(confetti: [confetto(at: CGPoint(x: size - 4, y: size / 2), side: 8)]))
+        let pixels = try render(scene)
+        let inside = location(x: Double(size) / 2 - 4, y: 0, pixels: pixels)
+        #expect(isClose(pixels.color(at: inside), srgb(Theme.confettiColors[7])), "\(pixels.color(at: inside))")
+        let outside = location(x: Double(size) / 2 + 1, y: 0, pixels: pixels)
+        #expect(distance(pixels.color(at: outside), plain.color(at: outside)) < 0.01, "\(pixels.color(at: outside))")
+    }
+
+    @Test func 火花と紙吹雪は2Dと同じ関数で引いた数だけ出しノードは使い回す() throws {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.particles(.none)
+        #expect(scene.particleNodeCount == 0)
+        let motion = TimedSpinMotion(
+            motion: SpinMotion(from: 0, to: 7200, duration: 10, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)), start: 0
+        )
+        for lowPower in [false, true] {
+            for now in [5.0, 5.2, 5.5] {
+                let frame = WheelParticles.frame(
+                    motion: motion, drag: nil, burst: WheelParticles.Burst(start: 4.9, seed: 3), now: now, spinSeed: 42, dragSeed: 0,
+                    side: size, colorCount: Theme.confettiColors.count, lowPower: lowPower, reduceMotion: false
+                )
+                #expect(!frame.sparks.isEmpty && !frame.confetti.isEmpty)
+                scene.particles(frame)
+                #expect(scene.visibleSparkCount == frame.sparks.filter { $0.opacity > 0 }.count)
+                #expect(scene.visibleConfettiCount == frame.confetti.filter { $0.opacity > 0 }.count)
+                #expect(scene.visibleSparkCount <= WheelParticles.sparkCapacity(lowPower: lowPower))
+                #expect(scene.visibleConfettiCount <= WheelParticles.confettiCapacity(lowPower: lowPower))
+                // 粒のノードは上限の数だけ作って使い回す
+                #expect(scene.particleNodeCount == Config.wheelSparkMaxCount + Config.wheelConfettiMaxCount)
+            }
+        }
+        // 組み直しても作り直すだけで、数は変わらない
+        scene.update(labels: Array(repeating: "", count: 4), diameter: size + 1)
+        #expect(scene.particleNodeCount == Config.wheelSparkMaxCount + Config.wheelConfettiMaxCount)
+        scene.update(labels: Array(repeating: "", count: 4), diameter: size)
+        scene.particles(.none)
+        #expect(scene.visibleSparkCount == 0)
+        #expect(scene.visibleConfettiCount == 0)
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let pixels = try render(scene)
+        for angle in [0.0, 30, 330] {
+            let point = location(angle: angle, fraction: 0.8, pixels: pixels)
+            #expect(distance(pixels.color(at: point), plain.color(at: point)) < 0.01, "\(angle)")
+        }
+    }
+
+    // MARK: 停止の瞬間のフラッシュ・余韻
+
+    @Test func フラッシュは盤面の枠の中を中心ほど明るく光らせ針と枠の外は変えない() throws {
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.stopEffects(WheelStopEffects.Frame(flashOpacity: WheelStopEffects.flashPeakOpacity, glowLevel: 1))
+        let pixels = try render(scene)
+        let gain = { (point: CGPoint) in brightness(pixels.color(at: point)) - brightness(plain.color(at: point)) }
+        // 中心寄り（ハブの上も。中心の白い点を避けてハブの暗い地で見る）ほど明るく、縁寄りは弱い
+        let hub = location(x: 11 * Double(size) / WheelLabel.referenceDiameter, y: 0, pixels: pixels)
+        let inner = location(angle: 45, fraction: 0.2, pixels: pixels)
+        let outer = location(angle: 45, fraction: 0.95, pixels: pixels)
+        #expect(gain(hub) > 0.05, "\(gain(hub))")
+        #expect(gain(inner) > 0.05, "\(gain(inner))")
+        #expect(gain(inner) > gain(outer) + 0.03, "\(gain(inner)) \(gain(outer))")
+        // 枠の角（円の外）は変えない
+        let corner = location(x: Double(size) / 2 - 3, y: -Double(size) / 2 + 3, pixels: pixels)
+        #expect(distance(pixels.color(at: corner), plain.color(at: corner)) < 0.01, "\(pixels.color(at: corner))")
+        // 正面から見た丸い光の半径は、浮かせた分の遠近の広がりを打ち消して盤面の枠の半径と同じ。光は縁へ向けて 0 まで薄くなるので、
+        // 縁の近くの画素では縮めの有無を見分けられない（直径 320 で縮めないと半径 ≈ 161.3pt、縁から 1pt 内の不透明度は 0.25 × 1.4 × 2.3 ÷ 161.3 ≈ 0.005）。
+        // 板の置き方から求める（縮めないと 1.0084 倍で、許容を超える）
+        let placement = try #require(scene.flashPlacement)
+        let distanceToCamera = WheelGeometry.cameraDistance(diameter: Double(canvas), fieldOfView: Theme.Wheel3D.fieldOfView)
+        let apparent = placement.side / 2 * placement.scale * distanceToCamera / (distanceToCamera - placement.z)
+        #expect(abs(apparent - Double(size) / 2) < 1e-3, "\(apparent)")
+        // 消えたら今の盤面のまま
+        scene.stopEffects(.none)
+        let cleared = try render(scene)
+        #expect(distance(cleared.color(at: inner), plain.color(at: inner)) < 0.01)
+    }
+
+    @Test func フラッシュは針に隠れる() throws {
+        // 針の先の近く（中心から 148pt）でも光がはっきり見えるよう、不透明度 1 で光らせる
+        // （0.25 だと針の先のあたりの不透明度は 0.25 × 1.4 × 12 ÷ 160 ≈ 0.03 で、針の色の許容 0.04 に収まってしまう）
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.stopEffects(WheelStopEffects.Frame(flashOpacity: 1, glowLevel: 1))
+        let pixels = try render(scene)
+        let y = 148 * Double(size) / WheelLabel.referenceDiameter
+        // 針のすぐ横（縁の上）は光る（不透明度 ≈ 1.4 × 12 ÷ 160 ≈ 0.1）
+        let beside = location(x: 8 * Double(size) / WheelLabel.referenceDiameter, y: y, pixels: pixels)
+        #expect(brightness(pixels.color(at: beside)) > brightness(plain.color(at: beside)) + 0.05,
+                "\(pixels.color(at: beside)) \(plain.color(at: beside))")
+        // 針（先から約 6pt 上で幅 5pt）は光の手前で、針の色のまま（光が上に重なると緑・青が約 0.07 明るくなり許容を超える）
+        let pointer = pixels.color(at: location(x: 0, y: y, pixels: pixels))
+        #expect(isClose(pointer, srgb(Theme.flare)), "\(pointer)")
+        #expect(isClose(plain.color(at: location(x: 0, y: y, pixels: plain)), srgb(Theme.flare)))
+    }
+
+    /// 止まったスライス 2 を強調した盤。`afterglow` は「スピンの演出」が「なし」以外（余韻を出せる形）か。
+    /// 動きを減らす設定では余韻を出さないので、どちらも押し出す側（`reduceMotion: false`）で比べる。
+    private func glowingScene(afterglow: Bool, level: Double? = nil) -> Wheel3DScene {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: afterglow)
+        if let level { scene.stopEffects(WheelStopEffects.Frame(flashOpacity: 0, glowLevel: level)) }
+        return scene
+    }
+
+    /// 止まったスライス 2（180〜270 度）の始まりの境目から、隣のスライス 1 へ 5pt 入った位置（光彩の中）。
+    private func glowLocation(pixels: Pixels) -> CGPoint {
+        let radius = (Double(size) / 2 - 16 * Double(size) / WheelLabel.referenceDiameter) * 0.6
+        return location(angle: 180 - 5 / radius * 180 / .pi, fraction: 0.6, pixels: pixels)
+    }
+
+    @Test func 余韻の倍率で止まったスライスの光彩だけが薄くなる() throws {
+        let fullPixels = try render(glowingScene(afterglow: true, level: 1))
+        let lowPixels = try render(glowingScene(afterglow: true, level: WheelStopEffects.afterglowLowLevel))
+        let near = glowLocation(pixels: fullPixels)
+        let plain = lowPixels.color(at: location(angle: 135, fraction: 0.6, pixels: lowPixels))
+        // 光彩は弱くなるが消えない
+        #expect(brightness(fullPixels.color(at: near)) > brightness(lowPixels.color(at: near)) + 0.03,
+                "\(fullPixels.color(at: near)) \(lowPixels.color(at: near))")
+        #expect(brightness(lowPixels.color(at: near)) > brightness(plain) + 0.02, "\(lowPixels.color(at: near)) \(plain)")
+        // 止まったスライスの塗りと縁取りは変えない
+        for (angle, color) in [(225.0, Theme.sliceColor(at: 2, count: 4)), (180, Theme.stopOutline)] {
+            let point = location(angle: angle, fraction: 0.6, pixels: lowPixels)
+            #expect(isClose(lowPixels.color(at: point), srgb(color)), "\(angle): \(lowPixels.color(at: point))")
+        }
+        // 盤を組み直して強調を出し直しても、今の倍率のまま（同じく組み直した倍率 1 の盤より光彩が弱い）
+        let rebuild = { (scene: Wheel3DScene) -> Wheel3DScene in
+            scene.update(labels: Array(repeating: "", count: 4), diameter: self.size + 1)
+            scene.update(labels: Array(repeating: "", count: 4), diameter: self.size)
+            scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: true)
+            return scene
+        }
+        let rebuiltFull = try render(rebuild(glowingScene(afterglow: true, level: 1)))
+        let rebuiltLow = try render(rebuild(glowingScene(afterglow: true, level: WheelStopEffects.afterglowLowLevel)))
+        #expect(brightness(rebuiltFull.color(at: near)) > brightness(rebuiltLow.color(at: near)) + 0.03,
+                "\(rebuiltFull.color(at: near)) \(rebuiltLow.color(at: near))")
+    }
+
+    @Test func なしでは止まったスライスを1枚で焼き粒もフラッシュの板も作らない() throws {
+        let none = glowingScene(afterglow: false)
+        none.stopEffects(.none)
+        none.particles(.none)
+        #expect(none.stoppedImagePlaneCount == 1)
+        #expect(!none.hasFlashNode)
+        #expect(none.particleNodeCount == 0)
+        // 余韻を出すときは 2 枚。動きを減らす設定では余韻を出さないので 1 枚
+        #expect(glowingScene(afterglow: true).stoppedImagePlaneCount == 2)
+        let reduced = makeScene(count: 4, rotation: 0)
+        reduced.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: true, afterglow: true)
+        #expect(reduced.stoppedImagePlaneCount == 1)
+        // 倍率 1 の 2 枚は「なし」の 1 枚と同じ見た目
+        let single = try render(none)
+        let double = try render(glowingScene(afterglow: true, level: 1))
+        for point in [glowLocation(pixels: single), location(angle: 225, fraction: 0.6, pixels: single),
+                      location(angle: 180, fraction: 0.6, pixels: single)] {
+            #expect(distance(single.color(at: point), double.color(at: point)) < 0.02, "\(single.color(at: point)) \(double.color(at: point))")
+        }
+        // 結果を出したまま演出を切り替えたら、その形で出し直す
+        none.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: true)
+        #expect(none.stoppedImagePlaneCount == 2)
+        none.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: false)
+        #expect(none.stoppedImagePlaneCount == 1)
+    }
+
+    @Test func 結果の帯はなし以外のとき新しい結果でだけ登場演出を重ねる() {
+        let scene = makeScene(count: 4, rotation: 0)
+        let result = { (id: String) in Wheel3DResult(id: id, label: "\u{3000}", accent: Theme.sliceColor(at: 1, count: 4)) }
+        scene.show(result: result("a1"), reduceMotion: false, popIn: true)
+        #expect(scene.bandPopCount == 1)
+        #expect(scene.bandRevealCount == 1)
+        // 「なし」・動きを減らす設定では重ねない
+        scene.show(result: nil, reduceMotion: false, popIn: true)
+        scene.show(result: result("a2"), reduceMotion: false, popIn: false)
+        scene.show(result: nil, reduceMotion: false, popIn: true)
+        scene.show(result: result("a3"), reduceMotion: true, popIn: true)
+        #expect(scene.bandPopCount == 1)
+        // 結果を出したまま見た目を変えて焼き直しても繰り返さない
+        scene.show(result: nil, reduceMotion: false, popIn: true)
+        scene.show(result: result("a4"), reduceMotion: false, popIn: true)
+        scene.update(items: styledItems, diameter: size)
+        scene.show(result: result("a4"), reduceMotion: false, popIn: true)
+        #expect(scene.bandPopCount == 2)
     }
 }

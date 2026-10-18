@@ -164,9 +164,9 @@ struct RouletteScreen: View {
                 rotationPath: model.rotationPath,
                 glowStyle: glowStyle,
                 result: wheel3DResult,
-                // 電飾・光の尾・残像は 2D と同じく指定・印を見ない。流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
-                showsLights: spinEffectStyle.showsLights,
-                showsTrails: spinEffectStyle.showsTrails,
+                // 電飾・光の尾・残像・火花・紙吹雪・フラッシュ・余韻・帯の登場演出は 2D と同じ値を受け取り、指定・印を見ない。
+                // 流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
+                effectStyle: spinEffectStyle,
                 motion: model.currentMotion,
                 now: model.now,
                 // 2D と同じく、指を離した角度からフリックのスピンを始める
@@ -183,11 +183,9 @@ struct RouletteScreen: View {
                 interactive: !model.spinning,
                 rotationPath: model.rotationPath,
                 glowStyle: glowStyle,
-                // 電飾・光の尾・残像・火花・紙吹雪・フラッシュ・余韻は指定・印を見ない。流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
-                showsLights: spinEffectStyle.showsLights,
-                showsTrails: spinEffectStyle.showsTrails,
-                showsParticles: spinEffectStyle.showsParticles,
-                showsStopEffects: spinEffectStyle.showsCommonEffects,
+                // 電飾・光の尾・残像・火花・紙吹雪・フラッシュ・余韻は 3D と同じ値を受け取り、指定・印を見ない。
+                // 流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
+                effectStyle: spinEffectStyle,
                 motion: model.currentMotion,
                 now: model.now,
                 onBoundaryCross: dragCrossedBoundary,

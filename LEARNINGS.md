@@ -90,6 +90,31 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - 補間中の角度は `Animatable` の層（`Wheel3DSurface`）が毎フレーム受け取るが、角度が動かない間（結果表示中の点滅・脈動、指を止めたあとの落ち方）も
   毎フレーム描くものは、その層を `TimelineView` で包んで値を渡す。止める条件は 2D と同じ関数で決め、2D と 3D で同じ時計・同じ規則の View（`WheelLightsTimeline`）を共有すると、
   同じ時刻に同じ値になる（2026-10-18）
+- 2D と同じ数・寿命・位置の粒子を 3D に出すときは、`SCNParticleSystem`（発生と寿命をシステムが乱数で持つ）ではなく、2D と同じ閉じた式で引いた粒を
+  上限の数だけ作ったノードに毎フレーム写すと一致させやすく、画素のテストにも使える（数が 140 程度なら位置・大きさ・不透明度の書き換えは軽い）（2026-10-18）
+- 長さと向きの変わる細い板（火花の尾）は、`SCNPlane(width: 1, height: 1)` のノードに `pivot = SCNMatrix4MakeTranslation(-0.5, 0, 0)` を付けると、
+  板の左端がノードの位置に来て、`scale.x` が付け根から先への長さ、`eulerAngles.z` が向きになる（2026-10-18）
+- 深度の前後に依らず「針の手前・結果の帯の奥」のように重ねたいものは、素材を `readsFromDepthBuffer = false`・`writesToDepthBuffer = false` にして
+  `renderingOrder` を針より大きく帯より小さくする（帯は後に描かれて上に重なり、帯の画像の透明な余白からは奥が見える）（2026-10-18）
+- 盤の表面から z だけ浮かせた面は、カメラまでの距離 d に対して d ÷ (d − z) 倍に広がって見える。2D と同じ枠に収めたい板（フラッシュ・紙吹雪）は
+  ノードを (d − z) ÷ d 倍に縮めると、正面から見て表面と同じ大きさになる（2026-10-18）
+- 画像に焼いた光彩だけを脈打たせるときは、光彩ごと焼いた板の上に光彩の無い同じ面の板を重ね、下の板の不透明度を倍率にする（面の中は不透明なので、
+  はみ出した光彩だけが薄くなる。倍率 1 なら 1 枚のときと同じ見た目）。毎フレーム焼き直さずに済む（2026-10-18）
+- `SCNRenderer.snapshot(atTime: 0)` の画面外描画は、直前に `SCNTransaction`（`animationDuration` > 0）で変えた値を動きの始まり（変える前の値）で描く。
+  `highlight(_:reduceMotion: false)` の直後に描くと、暗くする層は不透明度 0 のまま写る（CI で、無いはずの差を比べて落ちた）。
+  出し切った見た目を画素で確かめるときは、動きを付けない経路（動きを減らす設定）で作る（2026-10-18）
+- iOS の SceneKit で `node.setValue(NSValue(scnVector3: v), forKeyPath: "scale")` は成分を読み違える（(1.07, 1.07, 1) が (3.7e19, 1.88, 3.7e19) になる。
+  `position` の (1, 2, 3) は (0, 1.875, 0)）。macOS では起きない。値は `node.scale = v` のように型のあるプロパティに書き、`NSValue(scnVector3:)` は
+  `CABasicAnimation` / `CASpringAnimation` の `fromValue` / `toValue` にだけ使う（こちらは正しく動く）（2026-10-19）
+- `SCNRenderer.snapshot(atTime:)` の時刻はシステムの時計（`CACurrentMediaTime()`）。`CACurrentMediaTime() + 2` を渡すと、足したばかりの動き
+  （`SCNTransaction`・`addAnimation`）が終わったあとの見た目を描ける（2026-10-19）
+- テストを動かせる Mac が無いときも、手元の Xcode と起動中の Simulator があれば、アプリの Swift ファイル（`@main` の App を除く）を `swiftc -parse-as-library
+  -enable-testing -emit-library -static -emit-module` で Simulator 向けの静的ライブラリにし、テストのファイルと
+  `@main struct Runner { static func main() async { await Testing.__swiftPMEntryPoint() as Never } }` を `-framework Testing`（Simulator のプラットフォームの
+  `Developer/Library/Frameworks`）・`-plugin-path`（ツールチェーンの `usr/lib/swift/host/plugins/testing`）で実行ファイルにして、`xcrun simctl spawn <端末> <実行ファイル> --filter <型>` で流せる。
+  バンドルの資源（音源・画像・Info.plist）を読むテストと、メインの実行ループの時刻に依るテストはこの方法では落ちる（2026-10-19）
+- 同じノードの `scale` に 2 つの動き（現れ方の 0.96 倍と登場演出の 0.6 倍からのばね）を重ねるときは、親と子のノードに分けて掛ける（2026-10-18）
+
 
 ## アニメーション
 
