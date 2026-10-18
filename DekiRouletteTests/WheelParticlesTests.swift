@@ -374,7 +374,8 @@ struct WheelParticlesTests {
     func フレームは火花と紙吹雪を同じ関数で引く(lowPower: Bool) {
         let side: CGFloat = 480
         let motion = steady(velocity(intensity: 1))
-        let burst = WheelParticles.Burst(start: 4.8, seed: 7)
+        // はじけてからの経過は 2 進で割り切れる 0.25 秒にする（5 - 4.8 は 0.2 にならず、比べる側と粒の位置がずれる）
+        let burst = WheelParticles.Burst(start: 4.75, seed: 7)
         let frame = WheelParticles.frame(
             motion: motion, drag: nil, burst: burst, now: 5, spinSeed: 42, dragSeed: 1, side: side,
             colorCount: 10, lowPower: lowPower, reduceMotion: false
@@ -384,7 +385,7 @@ struct WheelParticlesTests {
             scale: side / CGFloat(WheelLabel.referenceDiameter), lowPower: lowPower, reduceMotion: false
         )
         let confetti = WheelParticles.confetti(
-            elapsed: 0.2, seed: 7, side: side, colorCount: 10, lowPower: lowPower, reduceMotion: false
+            elapsed: 5 - burst.start, seed: 7, side: side, colorCount: 10, lowPower: lowPower, reduceMotion: false
         )
         #expect(!frame.sparks.isEmpty)
         #expect(frame.sparks == sparks)
