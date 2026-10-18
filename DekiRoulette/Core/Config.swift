@@ -86,10 +86,13 @@ enum Config {
     static let wheelLightBlinkPeriod: TimeInterval = 0.6
     static let wheelLightBlinkCount = 2
 
-    /// 結果表示中に電飾の全灯がゆっくり脈打つ周期（秒）。
+    /// 結果表示中に電飾の全灯がゆっくり脈打つ周期（秒）。止まったスライスの光彩の余韻（`WheelStopEffects`）も同じ周期・同じ位相で脈打つ。
     static let wheelLightAfterglowPeriod: TimeInterval = 2.4
 
-    /// 脈動だけを描いている間（電飾の点滅の後）の描き直しの最短間隔（秒）。周期 2.4 秒のゆっくりした変化なので、
+    /// 停止の瞬間のフラッシュ（`WheelStopEffects.flashOpacity`）が消えるまでの長さ（秒）。1 回だけ光らせる。
+    static let stopFlashDuration: TimeInterval = 0.25
+
+    /// 脈動だけを描いている間（電飾の点滅の後・光彩の余韻）の描き直しの最短間隔（秒）。周期 2.4 秒のゆっくりした変化なので、
     /// 毎フレームでなくても段差は見えない（1 回の変化は不透明度で 0.04 未満）。
     static let effectPulseFrameInterval: TimeInterval = 1.0 / 20
 

@@ -157,6 +157,24 @@ struct ThemeContrastTests {
         }
     }
 
+    /// 停止の瞬間のフラッシュは盤面の縁の上でも見える白系で、`gold` / `flare` を流用しない。
+    @Test(arguments: styles)
+    func フラッシュは盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.stopFlash, on: Theme.wheelRim, style) >= 3)
+        #expect(resolve(Theme.stopFlash, style) != resolve(Theme.gold, style))
+        #expect(resolve(Theme.stopFlash, style) != resolve(Theme.flare, style))
+    }
+
+    /// フラッシュがいちばん明るいときも、結果の帯の文字は帯の地に対して 4.5:1 以上（帯はフラッシュより手前だが、重なっても読める）。
+    @Test(arguments: styles)
+    func フラッシュが重なっても結果の帯の文字は4_5対1以上(style: UIUserInterfaceStyle) {
+        let flash = resolve(Theme.stopFlash.opacity(WheelStopEffects.flashPeakOpacity), style)
+        let fill = composite(flash, over: resolve(Theme.resultBandFill, style))
+        let ink = composite(flash, over: resolve(Theme.resultBandInk, style))
+        let (high, low) = (luminance(fill), luminance(ink))
+        #expect((high + 0.05) / (low + 0.05) >= 4.5)
+    }
+
     // MARK: 共有画像
 
     @Test(arguments: styles)
@@ -177,7 +195,7 @@ struct ThemeContrastTests {
             Theme.onSlice, Theme.wheelRim, Theme.wheelEdge, Theme.wheelHub, Theme.wheelHubMark,
             Theme.flare, Theme.onFlare, Theme.destructive, Theme.onDestructive, Theme.stopOutline,
             Theme.resultBandFill, Theme.resultBandInk, Theme.shareBackground, Theme.shareInk, Theme.wheelLight,
-            Theme.wheelTrail, Theme.wheelSpark, Theme.wheelSparkGlow,
+            Theme.wheelTrail, Theme.wheelSpark, Theme.wheelSparkGlow, Theme.stopFlash,
         ] + Theme.sliceColors + Theme.confettiColors
         for color in fixed {
             #expect(resolve(color, .light) == resolve(color, .dark))
