@@ -63,7 +63,8 @@ struct WheelParticlesView: View {
             }
         }
         .frame(width: side, height: side)
-        .onChange(of: motion) { _, motion in
+        // 画面に出たときにすでに動いていても（回転中に演出を切り替えた）種を引く
+        .onChange(of: motion, initial: true) { _, motion in
             guard motion != nil else { return }
             var random = SystemRandomNumberGenerator()
             sparkSeed = WheelParticles.seed(using: &random)

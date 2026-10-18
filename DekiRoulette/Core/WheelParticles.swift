@@ -258,17 +258,26 @@ enum WheelParticles {
 
 /// 粒ごとの乱数。演出の種と粒の番号から決まる SplitMix64 で、同じ種・番号なら毎フレーム同じ値を返す。
 struct ParticleRandom: RandomNumberGenerator {
+    /// SplitMix64 の状態の増分（黄金比の定数）。
+    static let increment: UInt64 = 0x9E37_79B9_7F4A_7C15
+
     private var state: UInt64
 
     init(seed: UInt64, index: Int) {
-        // 番号ごとに種を散らす（黄金比の定数を掛けて足す）
-        state = seed ^ (UInt64(bitPattern: Int64(index)) &* 0x9E37_79B9_7F4A_7C15)
+        // 番号は仕上げの式（`mix`）に一度通してから種と混ぜる。番号に定数を掛けて足すだけだと、種が 0 のとき
+        // 粒 i + 1 の状態が粒 i の状態を 1 歩進めたものになり、粒 i + 1 の列が粒 i の列を 1 つずらしたものになる
+        state = seed ^ Self.mix(UInt64(bitPattern: Int64(index)) &+ Self.increment)
         _ = next()
     }
 
     mutating func next() -> UInt64 {
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
+        state &+= Self.increment
+        return Self.mix(state)
+    }
+
+    /// SplitMix64 の仕上げの式。入力の近い値（隣り合う番号）を、ビットのそろわない値に散らす。
+    static func mix(_ value: UInt64) -> UInt64 {
+        var z = value
         z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
         z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
         return z ^ (z >> 31)

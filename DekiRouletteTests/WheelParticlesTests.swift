@@ -182,6 +182,38 @@ struct WheelParticlesTests {
         #expect(WheelParticles.seed(using: &a) == WheelParticles.seed(using: &b))
     }
 
+    // MARK: 粒ごとの乱数
+
+    @Test func 仕上げの式はSplitMix64と同じ() {
+        // SplitMix64 を種 0 で始めたときの最初の出力（よく知られた値）
+        #expect(ParticleRandom.mix(ParticleRandom.increment) == 0xE220_A839_7B1D_CDAF)
+        #expect(ParticleRandom.mix(0) == 0)
+    }
+
+    @Test func 粒ごとの乱数は既知の値を返す() {
+        var first = ParticleRandom(seed: 0, index: 0)
+        #expect([first.next(), first.next(), first.next()] == [0xB382_A305_F441_4F5E, 0x631A_9154_FBAB_F717, 0xA80A_BA8C_8664_0906])
+        var other = ParticleRandom(seed: 42, index: 3)
+        #expect([other.next(), other.next(), other.next()] == [0x57D5_8A8A_5A80_75DE, 0x3DDE_2C09_FC39_C00B, 0x288F_24AD_D176_7A40])
+    }
+
+    @Test(arguments: [UInt64(0), 1, 42, .max])
+    func 番号が違えば列が違う(seed: UInt64) {
+        func values(_ index: Int) -> [UInt64] {
+            var random = ParticleRandom(seed: seed, index: index)
+            return (0..<4).map { _ in random.next() }
+        }
+        let sequences = (0..<200).map(values)
+        // 同じ種・番号なら同じ列
+        #expect(values(7) == sequences[7])
+        // どの番号の最初の値も重ならない
+        #expect(Set(sequences.map { $0[0] }).count == sequences.count)
+        // 隣の番号の列が 1 つずらした列にならない（番号を混ぜずに種と合わせると、種 0 でそうなる）
+        for index in 0..<(sequences.count - 1) {
+            #expect(Array(sequences[index + 1].prefix(3)) != Array(sequences[index].dropFirst()))
+        }
+    }
+
     @Test func 描き直すのは回っている間か紙吹雪が出ている間だけ() {
         #expect(WheelParticles.animates(reduceMotion: false, moving: true, bursting: false))
         #expect(WheelParticles.animates(reduceMotion: false, moving: false, bursting: true))
