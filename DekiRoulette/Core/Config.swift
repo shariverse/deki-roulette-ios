@@ -88,6 +88,34 @@ enum Config {
     /// 結果表示中に電飾の全灯がゆっくり脈打つ周期（秒）。
     static let wheelLightAfterglowPeriod: TimeInterval = 2.4
 
+    /// 止まり際の焦らし（`SpinTease`）でスピンに足す長さ（秒）。焦らしを入れるスピンは入り方に依らず
+    /// `spinDuration + spinTeaseDuration`（5.7 秒）で、主の区間は `spinDuration` のまま。
+    static let spinTeaseDuration: TimeInterval = 1.2
+
+    /// 焦らしを入れたスピンの完了の保険（`spinFallback` と同じく、長さの 0.6 秒後）。
+    static let spinTeaseFallback: TimeInterval = spinDuration + spinTeaseDuration + 0.6
+
+    /// 焦らしの区間の曲線（ease-in-out）。始点・終点の傾きが 0 なので、主の区間（終点の傾きが 0 の `spinEasing`）や
+    /// 前後の焦らしの区間と角速度 0 でつながる。
+    static let spinTeaseEasing = CubicBezierCurve(0.42, 0, 0.58, 1)
+
+    /// ためらい・戻りかけで主の区間を止める、止まるスライスに入る境目の手前の距離。スライス幅に対する割合と上限（度）の小さい方。
+    static let spinTeaseApproachFraction: Double = 0.25
+    static let spinTeaseApproachMax: Double = 5
+
+    /// 戻りかけで戻る角度。スライス幅に対する割合と上限（度）の小さい方。手前の距離と足してもスライス幅の半分に収まり、
+    /// 戻りで 1 つ前の境目を越えない。
+    static let spinTeaseRollBackFraction: Double = 0.2
+    static let spinTeaseRollBackMax: Double = 3
+
+    /// 戻りかけの焦らしの長さのうち、戻る区間に使う割合。残りで越えて止まる。
+    static let spinTeaseRollBackShare: Double = 1.0 / 3
+
+    /// 行き過ぎで止まる角度を越える角度。スライス幅に対する割合と上限（度）の小さい方。スライス幅未満なので、
+    /// 隣のスライスに入ることはあってもその次には入らない。
+    static let spinTeaseOvershootFraction: Double = 0.4
+    static let spinTeaseOvershootMax: Double = 8
+
     /// 削除した項目を「元に戻す」で戻せる時間。過ぎると削除が確定する。
     static let undoDuration: TimeInterval = 5
 
