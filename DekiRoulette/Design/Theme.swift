@@ -325,6 +325,12 @@ enum Theme {
     /// 不透明度はいちばん明るいときも 0.25。`gold` / `flare` は使わない。縁（`wheelRim`）に対して 3:1 以上（`ThemeContrastTests`）。
     static let stopFlash = Color(hex: 0xFFF8EC)
 
+    /// フラッシュの丸い光の形。中心で不透明度 × 1、半径の半ばで × `middleOpacity`、盤面の枠の縁（半径 = 一辺 ÷ 2）で 0 にする。
+    /// 2D の `WheelStopFlashView` と 3D の `Wheel3DScene` が同じ形にする。
+    enum StopFlash {
+        static let middleOpacity = 0.7
+    }
+
     // MARK: 結果の帯
 
     // 結果が出ている間、盤面の中心より下に重ねて結果のラベルを全文で出す帯（寸法と位置は `ResultBand`）。
