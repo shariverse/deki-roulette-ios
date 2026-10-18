@@ -69,17 +69,24 @@ struct RouletteScreen: View {
         // 停止時の決まり音。結果（`outcome`）は抽選したスピンの完了（`finishSpin`。保険のタイマーでも同じ）でだけ出るので、
         // 惰性では鳴らない。動きを減らす設定でも鳴らす。判定に指定や結果のラベルは使わない
         .onChange(of: model.outcome) { _, outcome in
-            guard onScreen, outcome != nil, StopChime.plays(style: spinEffectStyle, soundEnabled: soundEnabled, stop: .spin) else { return }
+            guard outcome != nil else { return }
+            // うなりは止まる前に消えているが、保険のタイマーで止まったときも決まり音と重ねないよう、ここで切る
+            sound.stopHum()
+            guard onScreen, StopChime.plays(style: spinEffectStyle, soundEnabled: soundEnabled, stop: .spin) else { return }
             sound.playChime()
         }
-        // 「なし」のときは決まり音を読み込まない
-        // 画面を出したまま設定で「なし」から変えたら、最初の停止で読み込みを待たないよう先に読んでおく
+        // 「なし」のときは効果音（決まり音・うなり）を読み込まない
+        // 画面を出したまま設定で「なし」から変えた・効果音を ON にしたら、最初のスピンで読み込みを待たないよう先に読んでおく。
+        // 画面を離れている間（別のタブ）は読まず、戻ったときの `onAppear` に任せる
         .onChange(of: spinEffectStyle) { _, style in
-            if soundEnabled, style.showsCommonEffects { sound.prepare(chime: true) }
+            if onScreen, soundEnabled { sound.prepare(effects: style.showsCommonEffects) }
+        }
+        .onChange(of: soundEnabled) { _, enabled in
+            if onScreen, enabled { sound.prepare(effects: spinEffectStyle.showsCommonEffects) }
         }
         .onAppear {
             onScreen = true
-            if soundEnabled { sound.prepare(chime: spinEffectStyle.showsCommonEffects) }
+            if soundEnabled { sound.prepare(effects: spinEffectStyle.showsCommonEffects) }
         }
         .onDisappear {
             onScreen = false
@@ -289,7 +296,11 @@ struct RouletteScreen: View {
             reducedMotion: reduceMotion, style: spinEffectStyle, fullSpins: fullSpins, direction: direction,
             releaseVelocity: releaseVelocity
         ) else { return }
-        if soundEnabled { sound.play(at: model.clickTimes) }
+        if soundEnabled {
+            sound.play(at: model.clickTimes)
+            // うなりは「なし」・動きを減らす設定では空（鳴っていたものを止めるだけ）。指定は渡さない
+            sound.playHum(model.humStrokes)
+        }
         if reduceMotion {
             // 動きを減らす設定では回さずに止まる。終了は保険のタイマーが担う
             model.rotation = next
