@@ -29,6 +29,10 @@ final class RouletteModel {
     /// スピン中（または惰性で回る間）にクリック音を鳴らす時刻（開始からの秒）。View が再生に渡す。
     private(set) var clickTimes: [TimeInterval] = []
 
+    /// スピン中に流すうなり（ドラムロール）の打ち（`SpinHum.strokes(along:)`）。View が再生に渡す。
+    /// 「スピンの演出」が「なし」・動きを減らす設定・惰性では空（鳴らさない）。指定の有無では変わらない。
+    private(set) var humStrokes: [SpinHum.Stroke] = []
+
     /// 始めたスピンの回数。同じラベルが続けて出ても結果表示を出し直すための識別子に使う（`rotation` は指で動かしても変わるため使わない）。
     private(set) var spinCount = 0
 
@@ -187,6 +191,8 @@ final class RouletteModel {
         currentMotion = TimedSpinMotion(path: path, start: start)
 
         clickTimes = SpinTicks.boundaryCrossings(along: path, count: items.count, minInterval: Config.clickMinInterval)
+        // 抽選しないので、うなりは付けない
+        humStrokes = []
         tickTask?.cancel()
         let crossings = HapticSchedule.boundaryCrossings(along: path, count: items.count, minInterval: Config.hapticMinInterval)
         tickTask = TickScheduler.run(at: crossings) { [weak self] in self?.boundaryTick += 1 }
@@ -271,6 +277,8 @@ final class RouletteModel {
         clickTimes = reducedMotion ? [] : SpinTicks.boundaryCrossings(
             along: path, count: items.count, minInterval: Config.clickMinInterval
         )
+        // うなりも同じ動きから打つ時刻と強さを先に求める。「なし」と動きを減らす設定では付けない
+        humStrokes = SpinHum.plays(style: style, reducedMotion: reducedMotion) ? SpinHum.strokes(along: path) : []
 
         // 完了コールバックが来ない環境（バックグラウンド等）向けの保険。長さ（焦らしを含む）の 0.6 秒後
         fallbackTask?.cancel()
