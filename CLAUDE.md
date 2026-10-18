@@ -12,6 +12,7 @@ xcodebuild -project DekiRoulette.xcodeproj -scheme DekiRoulette -destination 'pl
 swift scripts/make-icon.swift DekiRoulette/Resources  # アイコン再生成（DekiRoulette/Resources の AppIcon.icon・代替アイコンの AppIcon-<名前>.icon・visionOS 用の Assets.xcassets/AppIcon.solidimagestack と、設定画面の見本の imageset を書き出す）
 dir=$(mktemp -d) && swift scripts/make-icon.swift --candidates "$dir/icons" && swift scripts/preview-icons.swift "$dir/icons" "$dir/preview"  # アイコンの案と一覧の画像（案はアプリに入れない）
 swift scripts/make-click-sound.swift DekiRoulette/Resources/Sounds/click.wav  # 回転音の再生成（--preview で 1 スピン分の試聴用）
+swift scripts/make-chime-sound.swift DekiRoulette/Resources/Sounds/chime.wav  # 停止時の決まり音の再生成（決定的。同じスクリプトなら差分は出ない）
 ```
 
 ファイルを追加・削除したら `xcodegen generate` を再実行する（`project.yml` はディレクトリ単位で sources を拾う）。
@@ -153,6 +154,13 @@ ON/OFF は `@AppStorage(Config.hapticsEnabledKey)`。設定の文言は「触覚
 求めた `clickTimes` を `play(at:)` で一度に流す（1 発ずつタイマーでは鳴らさない）。惰性の途中で盤面に触れたら `RouletteScreen.grab` が
 `sound.stop()` で残りを止め、スピンを始めたら次の `play(at:)` が差し替える。惰性は `reducedMotion` では付かないので鳴らない。
 ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
+
+停止時の決まり音（`Resources/Sounds/chime.wav`。`scripts/make-chime-sound.swift` が C6・E6・G6 の上がるアルペジオを 0.9 秒で合成する）は、
+「スピンの演出」（`@AppStorage(Config.spinEffectStyleKey)`）が `showsCommonEffects` で効果音が ON のときだけ鳴らす。判定は `StopChime.plays`（`Core/`。
+スタイル・効果音・止まった動き（`.spin` / `.coast`）だけを受け取り、指定や結果のラベルは受け取らない）。`RouletteScreen` が `onChange(of: model.outcome)` で
+結果が出た瞬間（`finishSpin`。保険のタイマーでも同じ）に `sound.playChime()` を呼ぶ。惰性では `outcome` が出ないので鳴らず、`reducedMotion` でも鳴らす。
+`SpinSoundPlayer` は回転音とは別の `AVAudioPlayerNode`（音量 `Config.chimeGain`）で流すので、クリックの再生を止めたり差し替えたりしない（`stop()` だけは両方止める）。
+「なし」のときは `prepare(chime:)` に false を渡して音源を読み込まない。
 
 ### 3D 表示の仕組み
 
