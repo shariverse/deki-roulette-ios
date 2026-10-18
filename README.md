@@ -42,7 +42,10 @@ visionOS の 2 つを上げるので、その分だけ枠を使う）。
 
 署名もアップロードもこの API キーで行う。Upload が通るには、App Store Connect に Bundle ID
 `com.basekeita.roulette` のアプリがあらかじめ登録されている必要がある。iOS と visionOS は同じアプリ
-（同じ Bundle ID）に上がり、TestFlight ではプラットフォームごとに並ぶ。
+（同じ Bundle ID）に上がり、TestFlight ではプラットフォームごとに並ぶ。visionOS はアプリのページの
+サイドバーの「Add Platform」でプラットフォームを追加しておく（追加前は altool が
+`Cannot determine the Apple ID from Bundle ID ... and platform 'VISION_OS'` で止まる。ロールは
+Account Holder / Admin / App Manager が必要）。
 
 ## 環境
 
