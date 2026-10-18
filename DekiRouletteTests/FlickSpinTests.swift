@@ -120,6 +120,40 @@ struct FlickSpinTests {
         #expect(FlickSpin.angularVelocity(samples: Array(arc(degreesPerSecond: 600, duration: 0.1).prefix(1)), center: center) == 0)
     }
 
+    // MARK: ドラッグ中の角速度
+
+    @Test func ドラッグ中の角速度は回している速さ() {
+        let samples = arc(degreesPerSecond: -480, duration: 0.5)
+        for now in [0.2, 0.3, 0.5] {
+            let velocity = FlickSpin.angularVelocity(samples: samples, center: center, at: now)
+            #expect(abs(velocity + 480) < 1)
+        }
+    }
+
+    @Test func 最後の点の時刻では離したときの角速度と同じ() throws {
+        let samples = arc(degreesPerSecond: 700, duration: 0.3)
+        let last = try #require(samples.last)
+        let during = FlickSpin.angularVelocity(samples: samples, center: center, at: last.time)
+        let release = FlickSpin.angularVelocity(samples: samples, center: center)
+        #expect(abs(during - release) < 1e-9)
+    }
+
+    @Test func 指を止めると窓の長さで0に落ちる() throws {
+        let samples = arc(degreesPerSecond: 600, duration: 0.3)
+        let last = try #require(samples.last).time
+        let moving = FlickSpin.angularVelocity(samples: samples, center: center, at: last)
+        let pausing = FlickSpin.angularVelocity(samples: samples, center: center, at: last + Config.flickSampleWindow / 2)
+        #expect(pausing > 0)
+        #expect(pausing < moving)
+        #expect(FlickSpin.angularVelocity(samples: samples, center: center, at: last + Config.flickSampleWindow + 0.01) == 0)
+    }
+
+    @Test func 記録より前の時刻なら0() {
+        let samples = arc(degreesPerSecond: 600, duration: 0.3, startTime: 10)
+        #expect(FlickSpin.angularVelocity(samples: samples, center: center, at: 9) == 0)
+        #expect(FlickSpin.angularVelocity(samples: samples, center: center, at: 10) == 0)
+    }
+
     // MARK: 記録
 
     @Test @MainActor func 間が空いたら前の記録を捨てる() {
