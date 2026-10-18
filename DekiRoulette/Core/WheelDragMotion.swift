@@ -119,11 +119,20 @@ enum WheelEffectMotion: Equatable, Sendable {
 
     /// 時刻 `now` に演出が引く動き。盤面が自分で回っている間はその動き、そうでなく指で動かした動きが残っていればそれ、
     /// どちらでもなければ止まり切った惰性（角度だけ引く）。どれも無ければ nil。
+    /// ただし、スピン・惰性が指の動きの最後の点より後に始まったら（指を離して惰性・スピンに移った）、止まり切ったあとも
+    /// そちらを引く（短い惰性が止まり切ったあとに、それより前の指の動きの残りへ戻らない）。
     /// ドラッグを始めると惰性は止まる（`RouletteModel.stopCoast`）ので、ふつうは同時に動いていない。
     static func current(spin: TimedSpinMotion?, drag: WheelDragMotion?, now: TimeInterval) -> WheelEffectMotion? {
         if let spin, spin.isMoving(now: now) { return .spin(spin) }
-        if let drag, drag.isMoving(now: now) { return .drag(drag) }
+        if let drag, drag.isMoving(now: now), !(spin.map { $0.start >= drag.lastTime } ?? false) { return .drag(drag) }
         return spin.map(WheelEffectMotion.spin)
+    }
+
+    /// 時刻 `now` に `effect` がまだ動いていて、毎フレーム描き直す必要があるか。`settled` は View が止まり切ったと記録した動き
+    /// （止まり切った惰性・指の動きは親が描き直さないので、View が残り時間だけ待って記録し、描き直させる）で、同じなら止まっているとみなす。
+    static func isMoving(_ effect: WheelEffectMotion?, settled: WheelEffectMotion?, now: TimeInterval) -> Bool {
+        guard let effect, effect != settled else { return false }
+        return effect.isMoving(now: now)
     }
 
     /// 時刻 `now` の角度（度）。スピン・惰性は累積回転角、ドラッグは追従で回した角度の累計。残像のずらし（差）に使う。

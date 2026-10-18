@@ -160,6 +160,34 @@ struct WheelDragMotionTests {
         #expect(WheelEffectMotion.current(spin: nil, drag: nil, now: 0) == nil)
     }
 
+    @Test func 指を離したあとに始まった惰性は止まり切っても指の動きの残りへ戻らない() {
+        let linear = CubicBezierCurve(0.33, 0.33, 0.67, 0.67)
+        let finger = drag(velocity: 300, start: 20, duration: 0.3)
+        // 指を離した直後に始まった 0.1 秒の短い惰性
+        let coast = TimedSpinMotion(motion: SpinMotion(from: 90, to: 92, duration: 0.1, easing: linear), start: finger.lastTime)
+        #expect(WheelEffectMotion.current(spin: coast, drag: finger, now: finger.lastTime + 0.05) == .spin(coast))
+        // 惰性が止まり切っても、指の動きの残り（0.5 秒）の間に指の動きへ戻らない
+        #expect(finger.isMoving(now: finger.lastTime + 0.2))
+        #expect(WheelEffectMotion.current(spin: coast, drag: finger, now: finger.lastTime + 0.2) == .spin(coast))
+        // 惰性より後に指で動かしたら、指の動き
+        let later = drag(velocity: 300, start: finger.lastTime + 1, duration: 0.3)
+        #expect(WheelEffectMotion.current(spin: coast, drag: later, now: later.lastTime + 0.2) == .drag(later))
+    }
+
+    @Test func 止まり切ったと記録した動きは動いていないとみなす() {
+        let linear = CubicBezierCurve(0.33, 0.33, 0.67, 0.67)
+        let spin = WheelEffectMotion.spin(
+            TimedSpinMotion(motion: SpinMotion(from: 0, to: 360, duration: 1, easing: linear), start: 10)
+        )
+        #expect(WheelEffectMotion.isMoving(spin, settled: nil, now: 10.5))
+        #expect(!WheelEffectMotion.isMoving(spin, settled: spin, now: 10.5))
+        #expect(!WheelEffectMotion.isMoving(spin, settled: nil, now: 11))
+        #expect(!WheelEffectMotion.isMoving(nil, settled: nil, now: 10.5))
+        // 別の動きを止まり切ったと記録していても、今の動きが動いていれば動いている
+        let finger = WheelEffectMotion.drag(drag(velocity: 300, start: 10, duration: 0.3))
+        #expect(WheelEffectMotion.isMoving(spin, settled: finger, now: 10.5))
+    }
+
     @Test func 盤面に見えている角度() {
         let linear = CubicBezierCurve(0.33, 0.33, 0.67, 0.67)
         let spin = WheelEffectMotion.spin(
