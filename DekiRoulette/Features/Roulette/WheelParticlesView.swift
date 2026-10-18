@@ -1,17 +1,20 @@
 import SwiftUI
 
 /// 2D の盤面の針の先の火花と停止の瞬間の紙吹雪（「スピンの演出」が紙吹雪・全部入りのとき。`docs/SPEC.md` の §5.5）。
-/// 盤面が自分で回っている間（`motion`）は針の先から火花を出し、結果が出た瞬間（`stopped` が偽から真になったとき）に盤面の上から紙吹雪をはじけさせる。
+/// 盤面が自分で回っている間（`motion`）と指で動かしている間（`drag`。指を止めた・離したあとは生まれた粒が消えるまで）は
+/// 針の先から火花を出し、結果が出た瞬間（`stopped` が偽から真になったとき）に盤面の上から紙吹雪をはじけさせる。
 /// 粒の位置・大きさ・濃さは `WheelParticles`（`Core/`）が時刻と種から決め、ここは `TimelineView` の毎フレームに
 /// `now()`（`RouletteModel.now` と同じ時計）を渡して `Canvas` に描くだけ。火花も紙吹雪も出ていない・動きを減らす設定では
 /// `TimelineView` を止めて何も描かない。低電力モードでは粒の数の上限を 1/3 にする。
-/// 入力は動き・結果が出ているか・時計だけで、項目・指定（`targetId`）・印・止まったスライスは受け取らない（紙吹雪は結果に依らず同じ）。
+/// 入力は動き（自分で回る動き・指で動かしている動き）・結果が出ているか・時計だけで、項目・指定（`targetId`）・印・止まったスライスは受け取らない（紙吹雪は結果に依らず同じ）。
 /// 読み上げず、触れられない。
 struct WheelParticlesView: View {
     /// 盤面の一辺（pt）。粒の速さ・大きさはこれに比例させる。
     let side: CGFloat
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。
     let motion: TimedSpinMotion?
+    /// 指で動かしている動き（`WheelDragArea` の記録）。指を離したあとも次のドラッグまで残る。
+    let drag: WheelDragMotion?
     /// 結果が出ている（止まったスライスの強調がある）。偽から真になった瞬間に紙吹雪をはじけさせる。
     let stopped: Bool
     let now: () -> TimeInterval
@@ -24,8 +27,12 @@ struct WheelParticlesView: View {
     @State private var lowPower: LowPowerModeMonitor?
     /// 止まり切った動き。止まり切ったら火花の分の描き直しを止める（光の尾と同じ）。
     @State private var settledMotion: TimedSpinMotion?
+    /// 消え切った指の動き。指の動きの火花の分の描き直しを止める。
+    @State private var settledDrag: WheelDragMotion?
     /// 火花の種。動きが変わるたびに引き直す。
     @State private var sparkSeed: UInt64 = 0
+    /// 指の動きの火花の種。ドラッグを始めるたびに引き直す。
+    @State private var dragSeed: UInt64 = 0
     /// 紙吹雪がはじけた時刻（`now()` の秒）と種。消え切ったら nil。
     @State private var burst: Burst?
 
@@ -36,7 +43,10 @@ struct WheelParticlesView: View {
 
     var body: some View {
         let sparkMotion = motion.flatMap { moving($0) ? $0 : nil }
-        let animates = WheelParticles.animates(reduceMotion: reduceMotion, moving: sparkMotion != nil, bursting: burst != nil)
+        let sparkDrag = drag.flatMap { $0 != settledDrag && $0.isMoving(now: now()) ? $0 : nil }
+        let animates = WheelParticles.animates(
+            reduceMotion: reduceMotion, moving: sparkMotion != nil || sparkDrag != nil, bursting: burst != nil
+        )
         TimelineView(.animation(paused: !animates)) { _ in
             if animates {
                 // 時刻は `TimelineView` の日付ではなく、動きの開始時刻と同じ時計で取る
@@ -44,7 +54,7 @@ struct WheelParticlesView: View {
                 let lowPower = lowPower?.isEnabled ?? ProcessInfo.processInfo.isLowPowerModeEnabled
                 let scale = side / CGFloat(WheelLabel.referenceDiameter)
                 let sparks = WheelParticles.sparks(
-                    motion: sparkMotion, now: time, seed: sparkSeed,
+                    motion: sparkMotion, drag: sparkDrag, now: time, spinSeed: sparkSeed, dragSeed: dragSeed,
                     origin: CGPoint(x: side / 2, y: Self.pointerTipY),
                     scale: scale, lowPower: lowPower, reduceMotion: reduceMotion
                 )
@@ -63,10 +73,16 @@ struct WheelParticlesView: View {
             }
         }
         .frame(width: side, height: side)
-        .onChange(of: motion) { _, motion in
+        // 画面に出たときにすでに動いていても（回転中に演出を切り替えた）種を引く
+        .onChange(of: motion, initial: true) { _, motion in
             guard motion != nil else { return }
             var random = SystemRandomNumberGenerator()
             sparkSeed = WheelParticles.seed(using: &random)
+        }
+        .onChange(of: drag?.start, initial: true) { _, start in
+            guard start != nil else { return }
+            var random = SystemRandomNumberGenerator()
+            dragSeed = WheelParticles.seed(using: &random)
         }
         .onChange(of: stopped) { _, stopped in
             guard stopped, !reduceMotion else { return }
@@ -80,6 +96,15 @@ struct WheelParticlesView: View {
             try? await Task.sleep(for: .seconds(remaining))
             guard !Task.isCancelled else { return }
             settledMotion = motion
+        }
+        .task(id: drag) {
+            // 指の動きは止まっても次のドラッグまで残り、親が描き直さないので、最後に生まれた粒が消えたら止める
+            guard let drag, !reduceMotion else { return }
+            let remaining = drag.remaining(now: now())
+            guard remaining > 0 else { return }
+            try? await Task.sleep(for: .seconds(remaining))
+            guard !Task.isCancelled else { return }
+            settledDrag = drag
         }
         .task(id: burst) {
             guard let burst else { return }

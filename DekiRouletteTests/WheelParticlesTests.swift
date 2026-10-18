@@ -120,6 +120,145 @@ struct WheelParticlesTests {
         }
     }
 
+    // MARK: 焦らしの動き（区間の列）
+
+    @Test func 区間の列では全体の長さまで生まれうる() {
+        // 主の区間（4.5 秒）のあとの区間も速ければ火花が出る（焦らしの 5.7 秒まで生まれうる時刻がある）
+        let path = SpinPath(segments: [
+            SpinMotion(from: 0, to: 4.5 * velocity(intensity: 1), duration: Config.spinDuration, easing: Self.linear),
+            SpinMotion(
+                from: 4.5 * velocity(intensity: 1), to: 5.7 * velocity(intensity: 1),
+                duration: Config.spinTeaseDuration, easing: Self.linear
+            ),
+        ])
+        let motion = TimedSpinMotion(path: path, start: 0)
+        #expect(abs(path.duration - 5.7) < 1e-9)
+        #expect(!sparks(motion, now: 5.6).isEmpty)
+        // 止まり切ってから寿命が過ぎたら出ない
+        #expect(sparks(motion, now: path.duration + Config.wheelSparkLifetime).isEmpty)
+    }
+
+    @Test(arguments: SpinTease.allCases, [2, 8, 24])
+    func 焦らしの区間では火花はごくわずか(tease: SpinTease, count: Int) {
+        for direction in [1.0, -1.0] {
+            let path = SpinPath.teased(tease, from: 30, to: 30 + direction * (360 * 5 + 200), count: count)
+            let motion = TimedSpinMotion(path: path, start: 0)
+            // 焦らしの区間は数十°/秒で、強さは 0.05 に届かない
+            for step in 0...Int(Config.spinTeaseDuration * 1000) {
+                #expect(path.intensity(at: Config.spinDuration + Double(step) / 1000) < 0.05)
+            }
+            // 主の区間で生まれた火花が消えたあと（焦らしの区間で生まれた火花だけ）は、どのフレームでも上限の 1/10 以下
+            for step in 0...Int((path.duration - Config.spinDuration - Config.wheelSparkLifetime) * 20) {
+                let now = Config.spinDuration + Config.wheelSparkLifetime + Double(step) / 20
+                for seed in UInt64(0)..<20 {
+                    #expect(sparks(motion, now: now, seed: seed).count <= WheelParticles.sparkCapacity(lowPower: false) / 10)
+                }
+            }
+        }
+    }
+
+    @Test(arguments: [2, 8, 24])
+    func 焦らしで戻る区間の火花は逆向きに飛ぶ(count: Int) {
+        // 時計回りのスピンの、戻りかけの戻る区間（主の区間のあと 0.4 秒）と、行き過ぎの戻る区間（焦らしの区間すべて）
+        let probes: [(SpinTease, TimeInterval)] = [
+            (.rollBack, Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseRollBackShare),
+            (.overshoot, Config.spinDuration + 0.8),
+        ]
+        for (tease, now) in probes {
+            let path = SpinPath.teased(tease, from: 30, to: 30 + 360 * 5 + 200, count: count)
+            let motion = TimedSpinMotion(path: path, start: 0)
+            let all = (UInt64(0)..<200).flatMap { sparks(motion, now: now, seed: $0) }
+            // 生まれたばかりの粒は針の先にいる。それ以外は左（反時計回りの向き）へ飛んでいる
+            #expect(all.allSatisfy { $0.position.x <= Self.origin.x })
+            #expect(all.contains { $0.position.x < Self.origin.x })
+        }
+    }
+
+    // MARK: 指で動かしている間・惰性
+
+    private func dragSparks(
+        _ drag: WheelDragMotion?, now: TimeInterval, seed: UInt64 = 42, reduceMotion: Bool = false
+    ) -> [WheelParticles.Spark] {
+        WheelParticles.sparks(
+            drag: drag, now: now, seed: seed, origin: Self.origin, scale: 1, lowPower: false, reduceMotion: reduceMotion
+        )
+    }
+
+    @Test func 指で速く動かしている間も火花が出る() {
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 1), duration: 1)
+        let now = drag.lastTime
+        let all = dragSparks(drag, now: now)
+        #expect(all.count >= WheelParticles.sparkCapacity(lowPower: false) / 2)
+        #expect(all.count <= WheelParticles.sparkCapacity(lowPower: false))
+        #expect(all.allSatisfy { $0.position.x >= Self.origin.x })
+        // 反時計回りに動かすと左へ
+        let counter = WheelDragMotion.testCircular(velocity: -velocity(intensity: 1), duration: 1)
+        let left = dragSparks(counter, now: counter.lastTime)
+        #expect(!left.isEmpty)
+        #expect(left.allSatisfy { $0.position.x <= Self.origin.x })
+    }
+
+    @Test func 指の動きの火花の数は動かす速さに比例する() {
+        func average(_ intensity: Double) -> Double {
+            let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: intensity), duration: 1)
+            let counts = (UInt64(0)..<40).map { dragSparks(drag, now: drag.lastTime, seed: $0).count }
+            return Double(counts.reduce(0, +)) / Double(counts.count)
+        }
+        let full = average(1)
+        #expect(full > 0)
+        #expect(abs(average(0.5) / full - 0.5) < 0.12)
+        #expect(average(0) == 0)
+    }
+
+    @Test func 後から指が動いても前に生まれた火花は変わらない() {
+        let shorter = WheelDragMotion.testCircular(velocity: velocity(intensity: 0.8), duration: 0.5)
+        let longer = WheelDragMotion.testCircular(velocity: velocity(intensity: 0.8), duration: 0.8)
+        for seed in UInt64(0)..<10 {
+            #expect(dragSparks(shorter, now: shorter.lastTime, seed: seed) == dragSparks(longer, now: shorter.lastTime, seed: seed))
+        }
+    }
+
+    @Test func 指を止めたら新しく生まれず寿命で消える() {
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 1), duration: 1)
+        let last = drag.lastTime
+        #expect(!dragSparks(drag, now: last + 0.1).isEmpty)
+        // 最後に指が動いた時刻より後には生まれないので、寿命が過ぎたら消える
+        #expect(dragSparks(drag, now: last + Config.wheelSparkLifetime).isEmpty)
+        #expect(Config.wheelSparkLifetime <= Config.dragEffectSettleTime)
+        #expect(dragSparks(nil, now: last).isEmpty)
+        #expect(dragSparks(drag, now: last, reduceMotion: true).isEmpty)
+    }
+
+    @Test func 指を離してスピンに移っても合わせて上限まで() {
+        // 指で速く動かして離した直後に、同じ時刻から速いスピンが始まった
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 1), start: 0, duration: 1)
+        let spin = TimedSpinMotion(
+            motion: SpinMotion(from: 0, to: velocity(intensity: 1) * 10, duration: 10, easing: Self.linear), start: drag.lastTime
+        )
+        for step in 0..<12 {
+            let now = drag.lastTime + Double(step) * 0.05
+            let both = WheelParticles.sparks(
+                motion: spin, drag: drag, now: now, spinSeed: 1, dragSeed: 2,
+                origin: Self.origin, scale: 1, lowPower: false, reduceMotion: false
+            )
+            let fromDrag = dragSparks(drag, now: now, seed: 2)
+            #expect(both.count <= WheelParticles.sparkCapacity(lowPower: false))
+            // 指の動きで生まれた粒は消えるまで残す
+            #expect(Array(both.prefix(fromDrag.count)) == fromDrag)
+        }
+    }
+
+    @Test func 惰性でも動きに応じて火花が出る() throws {
+        // 惰性は強さ約 0.33 以下なので、出ても少ない
+        let coast = try #require(FlickCoast.coast(angularVelocity: 230))
+        let motion = TimedSpinMotion(motion: coast.motion(from: 0), start: 0)
+        let counts = (UInt64(0)..<40).map { sparks(motion, now: 0.2, seed: $0).count }
+        let average = Double(counts.reduce(0, +)) / Double(counts.count)
+        #expect(average > 0)
+        #expect(average < Double(WheelParticles.sparkCapacity(lowPower: false)) / 3)
+        #expect(sparks(motion, now: coast.duration + Config.wheelSparkLifetime).isEmpty)
+    }
+
     // MARK: 紙吹雪
 
     @Test func 紙吹雪の上限は80で低電力モードでは3分の1() {
@@ -180,6 +319,38 @@ struct WheelParticlesTests {
         var a = SeededGenerator(seed: 5)
         var b = SeededGenerator(seed: 5)
         #expect(WheelParticles.seed(using: &a) == WheelParticles.seed(using: &b))
+    }
+
+    // MARK: 粒ごとの乱数
+
+    @Test func 仕上げの式はSplitMix64と同じ() {
+        // SplitMix64 を種 0 で始めたときの最初の出力（よく知られた値）
+        #expect(ParticleRandom.mix(ParticleRandom.increment) == 0xE220_A839_7B1D_CDAF)
+        #expect(ParticleRandom.mix(0) == 0)
+    }
+
+    @Test func 粒ごとの乱数は既知の値を返す() {
+        var first = ParticleRandom(seed: 0, index: 0)
+        #expect([first.next(), first.next(), first.next()] == [0xB382_A305_F441_4F5E, 0x631A_9154_FBAB_F717, 0xA80A_BA8C_8664_0906])
+        var other = ParticleRandom(seed: 42, index: 3)
+        #expect([other.next(), other.next(), other.next()] == [0x57D5_8A8A_5A80_75DE, 0x3DDE_2C09_FC39_C00B, 0x288F_24AD_D176_7A40])
+    }
+
+    @Test(arguments: [UInt64(0), 1, 42, .max])
+    func 番号が違えば列が違う(seed: UInt64) {
+        func values(_ index: Int) -> [UInt64] {
+            var random = ParticleRandom(seed: seed, index: index)
+            return (0..<4).map { _ in random.next() }
+        }
+        let sequences = (0..<200).map(values)
+        // 同じ種・番号なら同じ列
+        #expect(values(7) == sequences[7])
+        // どの番号の最初の値も重ならない
+        #expect(Set(sequences.map { $0[0] }).count == sequences.count)
+        // 隣の番号の列が 1 つずらした列にならない（番号を混ぜずに種と合わせると、種 0 でそうなる）
+        for index in 0..<(sequences.count - 1) {
+            #expect(Array(sequences[index + 1].prefix(3)) != Array(sequences[index].dropFirst()))
+        }
     }
 
     @Test func 描き直すのは回っている間か紙吹雪が出ている間だけ() {

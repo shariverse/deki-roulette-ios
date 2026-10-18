@@ -30,6 +30,7 @@ struct RouletteWheelView: View {
     /// false なら今の盤面のまま何も足さない。
     var showsStopEffects = false
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れ・光の尾・残像・火花を毎フレームここから引く。
+    /// 指で動かしている間は、`WheelDragArea` が記録した指の動き（`WheelDragMotion`）から引く。
     var motion: TimedSpinMotion? = nil
     /// `motion` の開始時刻と同じ時計（`RouletteModel.now`）。
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
@@ -45,8 +46,10 @@ struct RouletteWheelView: View {
     var body: some View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
-            onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease
-        ) { dragRotation, displacedByDrag in
+            onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease,
+            // 速さに連動する演出を出すときだけ、指で動かしている動きを記録する（「なし」では今のまま記録しない）
+            tracksMotion: showsLights || showsTrails || showsParticles, now: now
+        ) { dragRotation, displacedByDrag, dragMotion in
             // 強調するスライス。結果が出たあとに指で動かしたら解く（結果の表示は残る）
             let highlight = displacedByDrag ? nil : highlightedIndex
             // 止まったスライスの光彩の余韻。次のスピン・結果が消えた・指で動かして強調を解いたら止める（光彩は今のまま）
@@ -89,8 +92,10 @@ struct RouletteWheelView: View {
                         WheelTrailsView(
                             items: items,
                             side: min(proxy.size.width, proxy.size.height),
+                            rotation: rotation,
                             dragRotation: dragRotation,
                             motion: motion,
+                            drag: dragMotion,
                             now: now
                         )
                         .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
@@ -105,6 +110,7 @@ struct RouletteWheelView: View {
                             rotation: rotation,
                             dragRotation: dragRotation,
                             motion: motion,
+                            drag: dragMotion,
                             // 指で動かして強調を解いたら点滅・脈動も止める
                             stoppedAt: highlight != nil ? stopStart : nil,
                             now: now
@@ -136,6 +142,7 @@ struct RouletteWheelView: View {
                         WheelParticlesView(
                             side: min(proxy.size.width, proxy.size.height),
                             motion: motion,
+                            drag: dragMotion,
                             stopped: highlightedIndex != nil,
                             now: now
                         )

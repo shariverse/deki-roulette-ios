@@ -70,6 +70,60 @@ struct WheelLightsTests {
         }
     }
 
+    // MARK: 流れの速さの上限
+
+    /// 盤面の角度の列を 1 フレームずつ流したときの、各フレームの並びの位置（電球の個数）。
+    private func flowPhases(_ angles: [Double], frame: TimeInterval) -> [Double] {
+        var flow = WheelLights.Flow()
+        return angles.enumerated().map { index, angle in
+            WheelLights.phase(angle: flow.advance(to: angle, at: Double(index) * frame, count: count), count: count)
+        }
+    }
+
+    @Test func 流れの上限は1フレームに電球0_5個() {
+        #expect(abs(WheelLights.maxFlowAngle(elapsed: Config.effectReferenceFrameInterval, count: count) - 30) < 1e-9)
+        #expect(abs(WheelLights.maxFlowAngle(elapsed: Config.effectReferenceFrameInterval / 2, count: count) - 15) < 1e-9)
+        // 間が空いても 1 回には 1 フレーム分まで。時間が戻ったら進めない
+        #expect(abs(WheelLights.maxFlowAngle(elapsed: 3, count: count) - 30) < 1e-9)
+        #expect(WheelLights.maxFlowAngle(elapsed: -1, count: count) == 0)
+    }
+
+    @Test func 上限より遅ければ盤面の角度と同じだけ流す() {
+        var flow = WheelLights.Flow()
+        #expect(flow.advance(to: 37, at: 0, count: count) == 37)
+        // 60Hz で 1 フレームに 10 度（600°/秒）。並びは 1 フレームに約 0.17 個
+        for frame in 1...120 {
+            let board = 37 + Double(frame) * 10
+            #expect(abs(flow.advance(to: board, at: Double(frame) / 60, count: count) - board) < 1e-9)
+        }
+    }
+
+    @Test(arguments: [1.0 / 60, 1.0 / 120, 1.0 / 90])
+    func 速いスピンでも並びは1フレームに0_5個までしか進まない(frame: TimeInterval) {
+        // 8 周・初速の大きいスピン（回り始めは 2,000°/秒を超える）
+        for direction in [1.0, -1.0] {
+            let motion = SpinMotion(from: 0, to: direction * (360 * 8 + 100), duration: Config.spinDuration, easing: Config.spinEasing)
+            let frames = Int((Config.spinDuration / frame).rounded(.up)) + 30
+            let angles = (0...frames).map { motion.angle(at: Double($0) * frame) }
+            let phases = flowPhases(angles, frame: frame)
+            let steps = zip(phases, phases.dropFirst()).map { $1 - $0 }
+            #expect(steps.allSatisfy { abs($0) <= Config.wheelLightMaxFlowPerFrame + 1e-9 })
+            // 回り始めは上限で流れ、向きは回転と同じ
+            #expect(abs(steps[0] - direction * Config.wheelLightMaxFlowPerFrame * frame / Config.effectReferenceFrameInterval) < 1e-9)
+            // 盤面が止まれば並びも止まる
+            #expect(steps.suffix(10).allSatisfy { $0 == 0 })
+        }
+    }
+
+    @Test func 同じフレームに2回描き直しても上限に収まる() {
+        var flow = WheelLights.Flow()
+        _ = flow.advance(to: 0, at: 0, count: count)
+        let first = flow.advance(to: 200, at: 1.0 / 60, count: count)
+        let second = flow.advance(to: 400, at: 1.0 / 60, count: count)
+        #expect(abs(first - 30) < 1e-9)
+        #expect(abs(second - 30) < 1e-9)
+    }
+
     @Test func 並びは滑らかに隣へ移る() {
         // 電球の半分ぶん進んだところでは、隣り合う 2 個が半分ずつ点く
         let half = 360 / Double(count) / Config.wheelLightFlowFactor / 2

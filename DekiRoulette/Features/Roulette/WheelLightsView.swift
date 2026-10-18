@@ -4,7 +4,9 @@ import SwiftUI
 /// 盤面の縁の上に `Config.wheelLightCount` 個の電球を回らない層で並べ、明るさは `WheelLights`（`Core/`）が決める。
 /// 補間中の角度は observable でないので、盤面が自分で回っている間（`motion`）は `TimelineView` で毎フレーム、
 /// `now()`（`RouletteModel.now` と同じ時計）から角度と強さを引く。動いていないときは `rotation + dragRotation`。
-/// 待機中・止まり切った惰性・指で動かしている間は `TimelineView` を止め（角度が変われば親の描き直しで足りる）、
+/// 光の並びは盤面の角度の変化だけ流し、1 フレームに `Config.wheelLightMaxFlowPerFrame` 個を超える分は抑える（`WheelLights.Flow`）。
+/// 指で動かしている間（`drag`）は、指が回した角度の変化から求めた角速度で強さを引き、指を止めたあとの落ち方も描くので `TimelineView` を動かす。
+/// 待機中・止まり切った惰性・指の動きが止まり切ったあとは `TimelineView` を止め（角度が変われば親の描き直しで足りる）、
 /// 結果表示中は点滅と脈動のために動かす（点滅の間は毎フレーム、脈動だけになったら `Config.effectPulseFrameInterval` ごと）。
 /// 動きを減らす設定では止めたまま一定の明るさで点ける。
 /// 入力は角度・動き・結果を出しているかだけで、項目・指定（`targetId`）・印は受け取らない。読み上げず、触れられない。
@@ -15,6 +17,8 @@ struct WheelLightsView: View {
     let dragRotation: Double
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。
     let motion: TimedSpinMotion?
+    /// 指で動かしている動き（`WheelDragArea` の記録）。指を離したあとも次のドラッグまで残る。
+    let drag: WheelDragMotion?
     /// 結果を出していて止まったスライスを強調している間だけ、結果が出た時刻（`now()` の秒）。点滅と脈動の経過時間の基準。
     /// 結果が無い・指で動かして強調を解いたら nil。止まったスライスの光彩の余韻と同じ時刻を親（`RouletteWheelView`）から受け取る。
     let stoppedAt: TimeInterval?
@@ -23,12 +27,16 @@ struct WheelLightsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 点滅が終わった結果の `stoppedAt`。点滅の終わりに書いて描き直させ、描き直しの間隔を落とす。
     @State private var blinkEndedAt: TimeInterval?
-    /// 止まり切った動き。惰性は止まり切っても `motion` に残り、親が描き直さないので、止まり切ったらここに入れて
+    /// 止まり切った動き。惰性・指の動きは止まり切っても残り、親が描き直さないので、止まり切ったらここに入れて
     /// 描き直させ、`TimelineView` を止める。
-    @State private var settledMotion: TimedSpinMotion?
+    @State private var settledMotion: WheelEffectMotion?
+    /// 光の並びを流す角度（`WheelLights.Flow`）。描くたびに進めるので、書き換えても描き直さないよう参照型に入れて持つ。
+    @State private var flow = LightFlowBox()
 
     var body: some View {
-        let moving = motion.map { $0 != settledMotion && $0.isMoving(now: now()) } ?? false
+        let current = now()
+        let effect = WheelEffectMotion.current(spin: motion, drag: drag, now: current)
+        let moving = effect.map { $0 != settledMotion && $0.isMoving(now: current) } ?? false
         let animates = WheelLights.animates(reduceMotion: reduceMotion, moving: moving, showingResult: stoppedAt != nil)
         // 点滅が終わるまでは毎フレーム。終わりは下の `.task(id: stoppedAt)` が待って `blinkEndedAt` に書く
         let interval = WheelLights.frameInterval(
@@ -38,10 +46,16 @@ struct WheelLightsView: View {
         TimelineView(.animation(minimumInterval: interval, paused: !animates)) { _ in
             // 時刻は `TimelineView` の日付ではなく、動きの開始時刻と同じ時計で取る
             let time = now()
+            // 並びは盤面の角度の変化だけ流す。速すぎる分は 1 フレームに `Config.wheelLightMaxFlowPerFrame` 個までに抑える
+            let flowAngle = reduceMotion ? 0 : flow.value.advance(
+                to: effect?.displayedAngle(now: time, rotation: rotation, dragRotation: dragRotation) ?? rotation + dragRotation,
+                at: time
+            )
             let scene = WheelLights.scene(
                 reduceMotion: reduceMotion,
-                angle: (motion?.angle(now: time) ?? rotation) + dragRotation,
-                intensity: motion?.intensity(now: time) ?? 0,
+                angle: flowAngle,
+                // 盤面が自分で回っている間はその動きの、指で動かしている間は指が回した角度の変化から求めた強さ
+                intensity: effect?.intensity(now: time) ?? 0,
                 stoppedElapsed: stoppedAt.map { time - $0 }
             )
             Canvas { context, size in
@@ -58,13 +72,13 @@ struct WheelLightsView: View {
             }
             blinkEndedAt = stoppedAt
         }
-        .task(id: motion) {
-            guard let motion, !reduceMotion else { return }
-            let remaining = motion.remaining(now: now())
+        .task(id: effect) {
+            guard let effect, !reduceMotion else { return }
+            let remaining = effect.remaining(now: now())
             guard remaining > 0 else { return }
             try? await Task.sleep(for: .seconds(remaining))
             guard !Task.isCancelled else { return }
-            settledMotion = motion
+            settledMotion = effect
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -102,4 +116,10 @@ struct WheelLightsView: View {
             context.fill(Path(ellipseIn: rect), with: .color(Theme.wheelLight.opacity(bulb.brightness)))
         }
     }
+}
+
+/// 電飾の光の並びを流す角度の入れ物。描くたびに進めても View を描き直さないよう参照型にする。
+@MainActor
+final class LightFlowBox {
+    var value = WheelLights.Flow()
 }

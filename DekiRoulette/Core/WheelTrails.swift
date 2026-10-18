@@ -2,7 +2,8 @@ import Foundation
 
 /// 2D の盤面に重ねる光の尾と残像（`docs/SPEC.md` の §5.5）の、時刻と動き → 残像の角度・濃さと光の尾の長さ・濃さ。
 /// 盤面が速く回っている間（演出の強さが `Config.wheelTrailThreshold` 以上）だけ出し、減速につれて薄くして閾値で 0 につなぐ。
-/// 入力は盤面が自分で回る動き・時刻・スライスの数・低電力モード・動きを減らす設定だけで、
+/// 指で速く動かしている間も、その動き（`WheelDragMotion`）の角速度から同じように出す。
+/// 入力は盤面の動き（自分で回る動きか指で動かしている動き）・時刻・角度・スライスの数・低電力モード・動きを減らす設定だけで、
 /// 項目のラベル・指定（`targetId`）・印・止まったスライスは受け取らない。
 enum WheelTrails {
     /// いちばん手前（遅れの少ない）の残像の不透明度（強さ 1 のとき）。後ろの残像ほど薄くする（`ghostOpacity`）。
@@ -93,8 +94,8 @@ enum WheelTrails {
     }
 
     /// 時刻 `now` に描くもの。`motion` は区間の列（`SpinPath`）の動きで、焦らしの区間も同じ時刻の角度・角速度で引く。
-    /// 動きを減らす設定・盤面が自分で回っていない（`motion` が nil。指で動かしている間も含む）・
-    /// 止まり切った・閾値未満のときは何も描かない。`dragRotation` は指で回した角度（回っている間はふつう 0）で、残像の角度に足す。
+    /// 動きを減らす設定・盤面が自分で回っていない（`motion` が nil）・止まり切った・閾値未満のときは何も描かない。
+    /// `dragRotation` は指で回した角度（回っている間はふつう 0）で、残像の角度に足す。
     static func frame(
         motion: TimedSpinMotion?,
         now: TimeInterval,
@@ -103,24 +104,44 @@ enum WheelTrails {
         lowPower: Bool,
         reduceMotion: Bool
     ) -> Frame {
-        guard !reduceMotion, let motion, motion.isMoving(now: now) else { return .none }
-        let strength = strength(intensity: motion.intensity(now: now))
+        frame(
+            effect: motion.map(WheelEffectMotion.spin), now: now, dragRotation: dragRotation,
+            sliceCount: sliceCount, lowPower: lowPower, reduceMotion: reduceMotion
+        )
+    }
+
+    /// 時刻 `now` に描くもの。`effect` は盤面が自分で回る動き（スピン・惰性）か、指で動かしている動き（`WheelDragMotion`）。
+    /// 動きを減らす設定・動きが無い・止まり切った・閾値未満のときは何も描かない。
+    /// 残像は盤面に見えている角度（`WheelEffectMotion.displayedAngle`。指で動かしている間は `rotation + dragRotation`）から、
+    /// その動きの今の角度と遅れた時刻の角度の差だけずらす。向きは角速度（指で動かしている間は平滑した値）の符号から取る。
+    static func frame(
+        effect: WheelEffectMotion?,
+        now: TimeInterval,
+        rotation: Double = 0,
+        dragRotation: Double = 0,
+        sliceCount: Int,
+        lowPower: Bool,
+        reduceMotion: Bool
+    ) -> Frame {
+        guard !reduceMotion, let effect, effect.isMoving(now: now) else { return .none }
+        let strength = strength(intensity: effect.intensity(now: now))
         guard strength > 0 else { return .none }
 
-        let velocity = motion.angularVelocity(now: now)
+        let velocity = effect.angularVelocity(now: now)
         let direction: SpinDirection = velocity < 0 ? .counterclockwise : .clockwise
-        let angle = motion.angle(now: now)
+        let angle = effect.angle(now: now)
+        let displayed = effect.displayedAngle(now: now, rotation: rotation, dragRotation: dragRotation)
         let count = ghostCount(lowPower: lowPower)
-        let raw = (0..<count).map { angle - motion.angle(now: now - lag(index: $0, count: count)) }
+        let raw = (0..<count).map { angle - effect.angle(now: now - lag(index: $0, count: count)) }
         let offsets = clampedOffsets(raw, limit: maxGhostOffset(sliceCount: sliceCount))
         let ghosts = offsets.enumerated().map { index, offset in
-            Ghost(angle: angle - offset + dragRotation, opacity: ghostOpacity(index: index, count: count, strength: strength))
+            Ghost(angle: displayed - offset, opacity: ghostOpacity(index: index, count: count, strength: strength))
         }
         let trail = Trail(length: trailLength(strength: strength), opacity: trailPeakOpacity * strength, direction: direction)
         return Frame(ghosts: ghosts, trail: trail)
     }
 
-    /// 毎フレーム描き直す必要があるか（`TimelineView` を止める条件の反対）。盤面が自分で回っている間だけ動かし、
+    /// 毎フレーム描き直す必要があるか（`TimelineView` を止める条件の反対）。盤面が動いている間（指で動かした動きの残りを含む）だけ動かし、
     /// 動きを減らす設定では止める。
     static func animates(reduceMotion: Bool, moving: Bool) -> Bool {
         !reduceMotion && moving

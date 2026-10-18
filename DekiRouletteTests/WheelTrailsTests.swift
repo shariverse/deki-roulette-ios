@@ -174,7 +174,7 @@ struct WheelTrailsTests {
     }
 
     @Test func 盤面が自分で回っていないときは出さない() {
-        // 指で動かしている間・止まったあと（motion が nil）
+        // 止まったあと（motion が nil）
         #expect(frame(nil).isEmpty)
         // 止まり切ったあと・始まる前
         #expect(frame(steady(velocity(intensity: 1)), now: 10).isEmpty)
@@ -196,6 +196,65 @@ struct WheelTrailsTests {
             let opacity = frame(spin, now: Double(step) / 10).trail?.opacity ?? 0
             #expect(opacity <= previous + 1e-9)
             previous = opacity
+        }
+    }
+
+    // MARK: 指で動かしている間・惰性
+
+    private func dragFrame(
+        _ drag: WheelDragMotion, now: TimeInterval, rotation: Double = 40, reduceMotion: Bool = false
+    ) -> WheelTrails.Frame {
+        WheelTrails.frame(
+            effect: .drag(drag), now: now, rotation: rotation, dragRotation: drag.angle(now: now),
+            sliceCount: 6, lowPower: false, reduceMotion: reduceMotion
+        )
+    }
+
+    @Test func 指で速く動かしている間は動かす速さで描く() throws {
+        let drag = WheelDragMotion.testCircular(velocity: velocity(intensity: 1), duration: 0.5)
+        let now = drag.lastTime
+        let result = dragFrame(drag, now: now)
+        let trail = try #require(result.trail)
+        #expect(trail.direction == .clockwise)
+        #expect(abs(trail.opacity - WheelTrails.trailPeakOpacity) < 0.02)
+        // 残像は盤面に見えている角度（rotation + dragRotation）から、指の動きの遅れた角度の差だけ後ろへずらす
+        let displayed = 40 + drag.angle(now: now)
+        let lags = (0..<3).map { drag.angle(now: now) - drag.angle(now: now - WheelTrails.lag(index: $0, count: 3)) }
+        let offsets = WheelTrails.clampedOffsets(lags, limit: WheelTrails.maxGhostOffset(sliceCount: 6))
+        #expect(result.ghosts.count == 3)
+        for (ghost, offset) in zip(result.ghosts, offsets) {
+            #expect(offset > 0)
+            #expect(abs(ghost.angle - (displayed - offset)) < 1e-9)
+        }
+    }
+
+    @Test func 指で反時計回りに動かすと逆へ描く() throws {
+        let drag = WheelDragMotion.testCircular(velocity: -velocity(intensity: 1), duration: 0.5)
+        let result = dragFrame(drag, now: drag.lastTime)
+        #expect(try #require(result.trail).direction == .counterclockwise)
+        #expect(result.ghosts.allSatisfy { $0.angle > 40 + drag.angle(now: drag.lastTime) })
+    }
+
+    @Test func 指でゆっくり動かしている間と止めたあとは描かない() {
+        // 閾値（強さ 0.35）に届かない速さ
+        let slow = WheelDragMotion.testCircular(velocity: velocity(intensity: 0.3), duration: 0.5)
+        #expect(dragFrame(slow, now: slow.lastTime).isEmpty)
+        // 速く動かしてから止めた: 窓と平滑の分だけ遅れて消える
+        let fast = WheelDragMotion.testCircular(velocity: velocity(intensity: 1), duration: 0.5)
+        #expect(dragFrame(fast, now: fast.lastTime + Config.flickSampleWindow + 0.1).isEmpty)
+        #expect(dragFrame(fast, now: fast.lastTime + Config.dragEffectSettleTime).isEmpty)
+        #expect(dragFrame(fast, now: fast.lastTime, reduceMotion: true).isEmpty)
+    }
+
+    @Test(arguments: [100.0, 200, 239, -239])
+    func 惰性は閾値に届かないので描かない(releaseVelocity: Double) throws {
+        // 惰性は離した角速度が 240°/秒未満（強さ約 0.33 未満）のときだけ付き、そこから減速する
+        let coast = try #require(FlickCoast.coast(angularVelocity: releaseVelocity))
+        let motion = TimedSpinMotion(motion: coast.motion(from: 50), start: 0)
+        #expect(motion.intensity(now: 0) > 0)
+        #expect(motion.intensity(now: 0) < Config.wheelTrailThreshold)
+        for step in 0...100 {
+            #expect(frame(motion, now: coast.duration * Double(step) / 100).isEmpty)
         }
     }
 

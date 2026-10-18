@@ -67,7 +67,8 @@ enum WheelLights {
     }
 
     /// 毎フレーム描き直す必要があるか（`TimelineView` を止める条件の反対）。動きを減らす設定では描き直さない。
-    /// 盤面が自分で回っている間と、結果表示中（点滅と脈動）だけ描き直す。待機中・止まり切った惰性・指で動かしている間は
+    /// 盤面が動いている間（自分で回っている間と、指で動かしている間。指を止めたあと強さが 0 に落ちるまでを含む）と、
+    /// 結果表示中（点滅と脈動）だけ描き直す。待機中・止まり切った惰性・指の動きが止まり切ったあとは、
     /// 角度が変わったときに親の描き直しで足りるので止める。
     static func animates(reduceMotion: Bool, moving: Bool, showingResult: Bool) -> Bool {
         !reduceMotion && (moving || showingResult)
@@ -78,6 +79,49 @@ enum WheelLights {
     static func phase(angle: Double, count: Int = Config.wheelLightCount) -> Double {
         guard count > 0, angle.isFinite else { return 0 }
         return angle * Config.wheelLightFlowFactor / (360 / Double(count))
+    }
+
+    /// 光の並びを流す角度。ふつうは盤面の累積回転角と同じだけ進めるが、1 回に進める量を、並びが 1 フレームに
+    /// `Config.wheelLightMaxFlowPerFrame` 個（電球の個数）を超えないように抑える。速く回すと並びは盤面より遅れて流れ、
+    /// 上限を下回る速さに落ちたら盤面と同じだけ進む（止まれば止まる）。並びの位置は `phase(angle:)` にこの角度を渡す。
+    /// 1 回に進める量は、前に進めてからの経過時間 × `Config.effectReferenceFrameInterval` あたりの上限と、1 回あたりの上限の小さい方。
+    /// 同じフレームに 2 回描き直されても（親の描き直しと `TimelineView`）合わせて上限に収まる。
+    /// 盤面の角度の差だけを足すので、描き直しの回数に依らず、遅れが無ければ盤面の角度と同じになる。
+    struct Flow: Equatable, Sendable {
+        /// 流す角度（度）。まだ一度も進めていなければ nil。
+        private(set) var angle: Double?
+        private var boardAngle = 0.0
+        private var time: TimeInterval = 0
+
+        init() {}
+
+        /// 盤面の累積回転角が時刻 `time`（秒）に `boardAngle` になった。流す角度を進めて返す。
+        /// 最初の 1 回は盤面の角度そのものから始める。
+        mutating func advance(to boardAngle: Double, at time: TimeInterval, count: Int = Config.wheelLightCount) -> Double {
+            guard let current = angle, boardAngle.isFinite, time.isFinite else {
+                let start = boardAngle.isFinite ? boardAngle : 0
+                angle = start
+                self.boardAngle = start
+                self.time = time
+                return start
+            }
+            let limit = WheelLights.maxFlowAngle(elapsed: time - self.time, count: count)
+            let next = current + min(max(boardAngle - self.boardAngle, -limit), limit)
+            angle = next
+            self.boardAngle = boardAngle
+            self.time = max(time, self.time)
+            return next
+        }
+    }
+
+    /// 経過時間 `elapsed`（秒）の間に光の並びを流してよい角度（盤面の角度の度）。並びが進む電球の個数で
+    /// `Config.wheelLightMaxFlowPerFrame` 個を 1 フレーム（`Config.effectReferenceFrameInterval`）あたりの上限とし、
+    /// 経過時間に比例させて、1 回には 1 フレーム分までにする。時間が戻ったら 0。
+    static func maxFlowAngle(elapsed: TimeInterval, count: Int = Config.wheelLightCount) -> Double {
+        guard count > 0, elapsed > 0 else { return 0 }
+        let frames = min(elapsed / Config.effectReferenceFrameInterval, 1)
+        let bulbs = Config.wheelLightMaxFlowPerFrame * frames
+        return bulbs * (360 / Double(count)) / Config.wheelLightFlowFactor
     }
 
     /// 電球 `index` が光の並びにどれだけ重なっているか（0...1）。並びの位置ちょうどで 1、隣との中間で 0.5 ずつに分け、

@@ -51,7 +51,7 @@ struct Wheel3DView: View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
             onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease
-        ) { dragRotation, displacedByDrag in
+        ) { dragRotation, displacedByDrag, _ in
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
                 let canvas = side * (1 + 2 * Theme.Wheel3D.overscan)

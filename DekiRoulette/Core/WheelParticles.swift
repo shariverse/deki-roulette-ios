@@ -5,7 +5,7 @@ import Foundation
 /// 粒の状態はフレームごとに積み上げず、生まれた時刻からの経過と粒ごとの乱数だけで決める（どのフレームから描いても同じ絵になり、
 /// 描画が遅れても溜まった計算が音・触覚の時刻を押し出さない）。粒ごとの乱数は、演出の開始時に引いた種（`seed(using:)`。
 /// 乱数は注入できる）と粒の番号から作る `ParticleRandom` で引くので、同じ種なら毎フレーム同じ粒になる。
-/// 入力は盤面が自分で回る動き・時刻・種・盤面の大きさ・低電力モード・動きを減らす設定だけで、項目・指定（`targetId`）・印・
+/// 入力は盤面の動き（自分で回る動きか指で動かしている動き）・時刻・種・盤面の大きさ・低電力モード・動きを減らす設定だけで、項目・指定（`targetId`）・印・
 /// 止まったスライスは受け取らない（紙吹雪は指定の有無・結果に依らず同じ）。
 enum WheelParticles {
     // MARK: 火花
@@ -48,7 +48,7 @@ enum WheelParticles {
 
     /// 時刻 `now` に出ている火花。盤面が自分で回っている動き（`motion`）の、生まれうる時刻ごとに、その時刻の強さ（0...1）の確率で
     /// 1 粒生まれる（数は強さに比例し、強さ 1 で上限）。粒は針の先 `origin` から盤面の表面が動く向きへ飛び、重力で落ちながら消える。
-    /// 動きを減らす設定・動きが無い（指で動かしている間も含む）ときは何も出さない。
+    /// 動きを減らす設定・動きが無いときは何も出さない（指で動かしている間は `sparks(drag:…)`）。
     /// - Parameters:
     ///   - scale: 盤面の直径 ÷ 基準直径。速さ・重力・大きさに掛ける。
     static func sparks(
@@ -61,12 +61,79 @@ enum WheelParticles {
         reduceMotion: Bool
     ) -> [Spark] {
         guard !reduceMotion, let motion, motion.path.duration > 0 else { return [] }
-        let elapsed = now - motion.start
+        let interval = sparkSlotInterval(lowPower: lowPower)
+        // 動きの外（止まり切ったあと）では生まれない
+        let lastSlot = Int((motion.path.duration / interval).rounded(.up)) - 1
+        return sparks(
+            start: motion.start, lastSlot: lastSlot, now: now, seed: seed, origin: origin, scale: scale, lowPower: lowPower,
+            intensity: { motion.path.intensity(at: $0) }, velocity: { motion.path.angularVelocity(at: $0) }
+        )
+    }
+
+    /// 時刻 `now` に出ている、指で盤面を動かしている動き（`drag`）の火花。盤面が自分で回る動きと同じく、ドラッグを始めた時刻から
+    /// 生まれうる時刻を区切り、その時刻の強さ（平滑した角速度から）の確率で 1 粒生まれる。生まれうるのは最後に指が動いた時刻まで
+    /// （その時刻までの点だけで決まるので、後から点が増えても前に生まれた粒は変わらない）。指を離したあとも、それまでに生まれた粒は
+    /// 寿命まで描く。動きを減らす設定・動きが無いときは何も出さない。
+    static func sparks(
+        drag: WheelDragMotion?,
+        now: TimeInterval,
+        seed: UInt64,
+        origin: CGPoint,
+        scale: CGFloat,
+        lowPower: Bool,
+        reduceMotion: Bool
+    ) -> [Spark] {
+        guard !reduceMotion, let drag else { return [] }
+        let interval = sparkSlotInterval(lowPower: lowPower)
+        let lastSlot = Int(((drag.lastTime - drag.start) / interval).rounded(.down))
+        return sparks(
+            start: drag.start, lastSlot: lastSlot, now: now, seed: seed, origin: origin, scale: scale, lowPower: lowPower,
+            intensity: { drag.intensity(now: drag.start + $0) }, velocity: { drag.angularVelocity(now: drag.start + $0) }
+        )
+    }
+
+    /// 時刻 `now` に出ている火花を、盤面が自分で回る動き（`motion`、種 `spinSeed`）と指で動かした動き（`drag`、種 `dragSeed`）の
+    /// 両方から集める。フリックで指を離してスピンに移ったときは、指の動きで生まれた粒が寿命まで残り、スピンの粒が加わる。
+    /// 合わせても上限まで（先に生まれた指の動きの粒を残し、溢れた分は新しい粒を出さない）。
+    static func sparks(
+        motion: TimedSpinMotion?,
+        drag: WheelDragMotion?,
+        now: TimeInterval,
+        spinSeed: UInt64,
+        dragSeed: UInt64,
+        origin: CGPoint,
+        scale: CGFloat,
+        lowPower: Bool,
+        reduceMotion: Bool
+    ) -> [Spark] {
+        let fromDrag = sparks(
+            drag: drag, now: now, seed: dragSeed, origin: origin, scale: scale, lowPower: lowPower, reduceMotion: reduceMotion
+        )
+        let fromSpin = sparks(
+            motion: motion, now: now, seed: spinSeed, origin: origin, scale: scale, lowPower: lowPower, reduceMotion: reduceMotion
+        )
+        return Array((fromDrag + fromSpin).prefix(sparkCapacity(lowPower: lowPower)))
+    }
+
+    /// 開始時刻 `start` から区切った生まれうる時刻（番号 0...`lastSlot`）のうち、寿命の間に生まれた火花。
+    /// `intensity` / `velocity` は開始からの秒でその時刻の強さ・角速度を返す。
+    private static func sparks(
+        start: TimeInterval,
+        lastSlot: Int,
+        now: TimeInterval,
+        seed: UInt64,
+        origin: CGPoint,
+        scale: CGFloat,
+        lowPower: Bool,
+        intensity: (TimeInterval) -> Double,
+        velocity: (TimeInterval) -> Double
+    ) -> [Spark] {
+        let elapsed = now - start
         let interval = sparkSlotInterval(lowPower: lowPower)
         let lifetime = Config.wheelSparkLifetime
-        // 寿命の間（elapsed - lifetime, elapsed] に生まれうる番号。動きの外（始まる前・止まり切ったあと）では生まれない
+        // 寿命の間（elapsed - lifetime, elapsed] に生まれうる番号。始まる前・`lastSlot` より後では生まれない
         let first = max(Int(((elapsed - lifetime) / interval).rounded(.down)) + 1, 0)
-        let last = min(Int((elapsed / interval).rounded(.down)), Int((motion.path.duration / interval).rounded(.up)) - 1)
+        let last = min(Int((elapsed / interval).rounded(.down)), lastSlot)
         guard first <= last else { return [] }
 
         var sparks: [Spark] = []
@@ -75,8 +142,8 @@ enum WheelParticles {
             var random = ParticleRandom(seed: seed, index: slot)
             guard let spark = spark(
                 age: elapsed - birth,
-                intensity: motion.path.intensity(at: birth),
-                velocity: motion.path.angularVelocity(at: birth),
+                intensity: intensity(birth),
+                velocity: velocity(birth),
                 origin: origin,
                 scale: scale,
                 using: &random
@@ -249,7 +316,7 @@ enum WheelParticles {
         random.next()
     }
 
-    /// 毎フレーム描き直す必要があるか（`TimelineView` を止める条件の反対）。盤面が自分で回っている間か、紙吹雪が出ている間だけ動かし、
+    /// 毎フレーム描き直す必要があるか（`TimelineView` を止める条件の反対）。盤面が動いている間（指で動かした動きの残りを含む）か、紙吹雪が出ている間だけ動かし、
     /// 動きを減らす設定では止める。
     static func animates(reduceMotion: Bool, moving: Bool, bursting: Bool) -> Bool {
         !reduceMotion && (moving || bursting)
@@ -258,17 +325,26 @@ enum WheelParticles {
 
 /// 粒ごとの乱数。演出の種と粒の番号から決まる SplitMix64 で、同じ種・番号なら毎フレーム同じ値を返す。
 struct ParticleRandom: RandomNumberGenerator {
+    /// SplitMix64 の状態の増分（黄金比の定数）。
+    static let increment: UInt64 = 0x9E37_79B9_7F4A_7C15
+
     private var state: UInt64
 
     init(seed: UInt64, index: Int) {
-        // 番号ごとに種を散らす（黄金比の定数を掛けて足す）
-        state = seed ^ (UInt64(bitPattern: Int64(index)) &* 0x9E37_79B9_7F4A_7C15)
+        // 番号は仕上げの式（`mix`）に一度通してから種と混ぜる。番号に定数を掛けて足すだけだと、種が 0 のとき
+        // 粒 i + 1 の状態が粒 i の状態を 1 歩進めたものになり、粒 i + 1 の列が粒 i の列を 1 つずらしたものになる
+        state = seed ^ Self.mix(UInt64(bitPattern: Int64(index)) &+ Self.increment)
         _ = next()
     }
 
     mutating func next() -> UInt64 {
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
+        state &+= Self.increment
+        return Self.mix(state)
+    }
+
+    /// SplitMix64 の仕上げの式。入力の近い値（隣り合う番号）を、ビットのそろわない値に散らす。
+    static func mix(_ value: UInt64) -> UInt64 {
+        var z = value
         z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
         z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
         return z ^ (z >> 31)
