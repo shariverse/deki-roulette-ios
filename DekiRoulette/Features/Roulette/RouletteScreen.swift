@@ -64,7 +64,11 @@ struct RouletteScreen: View {
             hapticsEnabled && outcome != nil ? .success : nil
         }
         .onAppear { if soundEnabled { sound.prepare() } }
-        .onDisappear { sound.stop() }
+        .onDisappear {
+            sound.stop()
+            // 惰性の残りの触覚の刻みも止める
+            model.stopCoast()
+        }
         // 結果が出て演出が終わったあとに 1 回だけ共有画像を描く。スピン中・結果が無いときは描かず、前の画像も捨てる。
         // 3D 表示が ON でも 2D の盤面で描く。光彩は画面の設定に合わせる
         .task(id: shareImageKey) {
@@ -233,6 +237,8 @@ struct RouletteScreen: View {
     /// 盤面は離した瞬間の速さで回り出して止まる（`FlickCoast`）。動きを減らす設定では付けない（離した角度のまま）。
     private func coast(angularVelocity: Double) {
         guard let next = model.beginCoast(angularVelocity: angularVelocity, reducedMotion: reduceMotion) else { return }
+        // 惰性で回る間も、針が境目を越えるたびに鳴らす（時刻は惰性の曲線から先に求めてある。触覚はモデルが刻む）
+        if soundEnabled { sound.play(at: model.clickTimes) }
         withAnimation(Theme.spinAnimation(easing: model.spinEasing, duration: model.rotationDuration)) {
             model.rotation = next
         }
@@ -240,13 +246,16 @@ struct RouletteScreen: View {
 
     /// 盤面に再び触れた。惰性で回っている途中なら、今の角度で止めてから指に追従させる。
     /// 補間中の角度は observable でないので、モデルが曲線から逆算した角度を補間なしで書く（盤面の `.animation` も掛けない）。
-    private func grab() {
-        guard let angle = model.stopCoast() else { return }
+    /// 惰性の残りの回転音と触覚の刻みも止める。止めた角度を返す（追従の境目の判定の基準にする）。止めるものが無ければ nil。
+    private func grab() -> Double? {
+        guard let angle = model.stopCoast() else { return nil }
+        sound.stop()
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             model.rotation = angle
         }
+        return angle
     }
 
     private func spin(fullSpins: Int?, direction: SpinDirection?, releaseVelocity: Double?) {
