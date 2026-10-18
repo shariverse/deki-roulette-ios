@@ -67,7 +67,8 @@ enum WheelLights {
     }
 
     /// 毎フレーム描き直す必要があるか（`TimelineView` を止める条件の反対）。動きを減らす設定では描き直さない。
-    /// 盤面が自分で回っている間と、結果表示中（点滅と脈動）だけ描き直す。待機中・止まり切った惰性・指で動かしている間は
+    /// 盤面が動いている間（自分で回っている間と、指で動かしている間。指を止めたあと強さが 0 に落ちるまでを含む）と、
+    /// 結果表示中（点滅と脈動）だけ描き直す。待機中・止まり切った惰性・指の動きが止まり切ったあとは、
     /// 角度が変わったときに親の描き直しで足りるので止める。
     static func animates(reduceMotion: Bool, moving: Bool, showingResult: Bool) -> Bool {
         !reduceMotion && (moving || showingResult)
