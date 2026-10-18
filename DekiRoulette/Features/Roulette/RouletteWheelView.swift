@@ -16,9 +16,12 @@ struct RouletteWheelView: View {
     var highlightedIndex: Int? = nil
     var interactive = true
     var spinEasing = Config.spinEasing
+    /// 回転の補間の長さ。スピンは `Config.spinDuration`、勢いが足りずに惰性で回すときは親が `FlickCoast` から決める。
+    var rotationDuration = Config.spinDuration
     /// 止まったスライスの光彩の色（設定の「ルーレットの詳細設定」）。
     var glowStyle = GlowStyle.default
     var onBoundaryCross: ((_ time: TimeInterval) -> Void)? = nil
+    var onGrab: (() -> Double?)? = nil
     var onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -27,7 +30,7 @@ struct RouletteWheelView: View {
     var body: some View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
-            onBoundaryCross: onBoundaryCross, onRelease: onRelease
+            onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease
         ) { dragRotation, displacedByDrag in
             // 強調するスライス。結果が出たあとに指で動かしたら解く（結果の表示は残る）
             let highlight = displacedByDrag ? nil : highlightedIndex
@@ -49,7 +52,7 @@ struct RouletteWheelView: View {
                 // `withAnimation` の更新に重なって補間が落ちる（盤面が最終角度へ飛び、音だけが鳴る）。回転の値の変化だけは
                 // 外側のトランザクションに依らずスピンの曲線で補間させる。曲線は親の `withAnimation` と同じ `spinEasing`。
                 // 動きを減らす設定では親が値を直接書くので付けない
-                .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing), value: rotation)
+                .animation(reduceMotion ? nil : Theme.spinAnimation(easing: spinEasing, duration: rotationDuration), value: rotation)
                 .shadow(color: Theme.wheelShadow, radius: 15, y: 10)
 
                 WheelPointerView()

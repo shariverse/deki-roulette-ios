@@ -64,7 +64,11 @@ struct RouletteScreen: View {
             hapticsEnabled && outcome != nil ? .success : nil
         }
         .onAppear { if soundEnabled { sound.prepare() } }
-        .onDisappear { sound.stop() }
+        .onDisappear {
+            sound.stop()
+            // 惰性の残りの触覚の刻みも止める
+            model.stopCoast()
+        }
         // 結果が出て演出が終わったあとに 1 回だけ共有画像を描く。スピン中・結果が無いときは描かず、前の画像も捨てる。
         // 3D 表示が ON でも 2D の盤面で描く。光彩は画面の設定に合わせる
         .task(id: shareImageKey) {
@@ -133,10 +137,12 @@ struct RouletteScreen: View {
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
                 spinEasing: model.spinEasing,
+                rotationDuration: model.rotationDuration,
                 glowStyle: glowStyle,
                 result: wheel3DResult,
                 // 2D と同じく、指を離した角度からフリックのスピンを始める
                 onBoundaryCross: dragCrossedBoundary,
+                onGrab: grab,
                 onRelease: release
             )
         } else {
@@ -147,8 +153,10 @@ struct RouletteScreen: View {
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
                 spinEasing: model.spinEasing,
+                rotationDuration: model.rotationDuration,
                 glowStyle: glowStyle,
                 onBoundaryCross: dragCrossedBoundary,
+                onGrab: grab,
                 onRelease: release
             )
         }
@@ -206,22 +214,48 @@ struct RouletteScreen: View {
         if model.crossDragBoundary(at: time), soundEnabled { sound.playClick() }
     }
 
-    /// 盤面から指を離した。追従で回した角度を取り込み、その角度からフリックのスピンを始める。
+    /// 盤面から指を離した。追従で回した角度を取り込み、勢いがあればその角度からフリックのスピンを始める。
     /// `dragRotation` の取り込みとスピンの開始は同じ更新に入れる（盤面が離した位置から回り出す）。
     /// 指を離さずにジェスチャが取り消されたとき（`angularVelocity` が nil）は、追従した角度を残すだけで回さない。
     private func release(angularVelocity: Double?, dragRotation: Double) {
         model.rotate(by: dragRotation)
         guard let angularVelocity else { return }
-        flick(angularVelocity: angularVelocity, dragRotation: dragRotation)
+        flick(angularVelocity: angularVelocity)
     }
 
     /// 盤面のフリック。強さは周回数にだけ反映し、フリックした向きに回す。盤面は離した瞬間の速さで回り出し、そこから減速する。
-    /// 閾値未満の弱いドラッグでも、最小の周回数で動かした向きに回す（`FlickSpin.releaseSpin`）。
-    private func flick(angularVelocity: Double, dragRotation: Double) {
-        let flick = FlickSpin.releaseSpin(
-            angularVelocity: angularVelocity, dragRotation: dragRotation, fallback: model.lastDirection
-        )
+    /// 閾値未満（ゆっくり動かして離した、止めてから離した）ならスピンを始めず、離した速さに応じて少しだけ惰性で回して止める。
+    private func flick(angularVelocity: Double) {
+        guard let flick = FlickSpin.spin(angularVelocity: angularVelocity) else {
+            coast(angularVelocity: angularVelocity)
+            return
+        }
         spin(fullSpins: flick.fullSpins, direction: flick.direction, releaseVelocity: angularVelocity)
+    }
+
+    /// 勢いの足りないフリックの惰性。抽選しないので、結果の表示・`spinCount`・「スピン」ボタンの向きは変わらない。
+    /// 盤面は離した瞬間の速さで回り出して止まる（`FlickCoast`）。動きを減らす設定では付けない（離した角度のまま）。
+    private func coast(angularVelocity: Double) {
+        guard let next = model.beginCoast(angularVelocity: angularVelocity, reducedMotion: reduceMotion) else { return }
+        // 惰性で回る間も、針が境目を越えるたびに鳴らす（時刻は惰性の曲線から先に求めてある。触覚はモデルが刻む）
+        if soundEnabled { sound.play(at: model.clickTimes) }
+        withAnimation(Theme.spinAnimation(easing: model.spinEasing, duration: model.rotationDuration)) {
+            model.rotation = next
+        }
+    }
+
+    /// 盤面に再び触れた。惰性で回っている途中なら、今の角度で止めてから指に追従させる。
+    /// 補間中の角度は observable でないので、モデルが曲線から逆算した角度を補間なしで書く（盤面の `.animation` も掛けない）。
+    /// 惰性の残りの回転音と触覚の刻みも止める。止めた角度を返す（追従の境目の判定の基準にする）。止めるものが無ければ nil。
+    private func grab() -> Double? {
+        guard let angle = model.stopCoast() else { return nil }
+        sound.stop()
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            model.rotation = angle
+        }
+        return angle
     }
 
     private func spin(fullSpins: Int?, direction: SpinDirection?, releaseVelocity: Double?) {

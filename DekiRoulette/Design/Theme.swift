@@ -109,8 +109,9 @@ enum Theme {
     static let spinAnimation = spinAnimation(easing: Config.spinEasing)
 
     /// フリックで始めたスピンは、離した瞬間の速さに合わせた曲線（`RouletteModel.spinEasing`）で回す。長さは同じ。
-    static func spinAnimation(easing: CubicBezierCurve) -> Animation {
-        .timingCurve(easing.x1, easing.y1, easing.x2, easing.y2, duration: Config.spinDuration)
+    /// 勢いが足りずに惰性で回すときは、曲線と長さを `FlickCoast` が決める（`RouletteModel.rotationDuration`）。
+    static func spinAnimation(easing: CubicBezierCurve, duration: TimeInterval = Config.spinDuration) -> Animation {
+        .timingCurve(easing.x1, easing.y1, easing.x2, easing.y2, duration: duration)
     }
 
     /// 結果が現れる演出。両画面で使い回す。
