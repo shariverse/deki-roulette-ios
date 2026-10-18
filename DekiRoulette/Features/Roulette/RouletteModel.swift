@@ -43,6 +43,12 @@ final class RouletteModel {
     /// 直前のフリックの向き。「スピン」ボタンはこの向きで回す。保存しないので起動ごとに時計回りから始まる。
     private(set) var lastDirection: SpinDirection = .clockwise
 
+    /// いま盤面が自分で回っている動き（スピン・惰性）と、その開始時刻（`now()` の時計の秒）。
+    /// 補間中の角度は observable でないので、速さに連動する演出は `TimelineView` で毎フレーム
+    /// `motion.angle(at:)` / `angularVelocity(at:)` に `now() - start` を渡して引く。動きを減らす設定のスピン（回らない）と、
+    /// 止まったあと（スピンの完了・惰性を止めた・指で回した）は nil。惰性は止まり切っても次の操作までは残る（長さを過ぎた角速度は 0）。
+    private(set) var currentMotion: TimedSpinMotion?
+
     private var pendingOutcome: SpinOutcome?
     /// 惰性で回っている動き。補間中の角度は observable でないので、途中で盤面に触れたときはここから今の角度を逆算する。
     private var coasting: Coasting?
@@ -160,6 +166,7 @@ final class RouletteModel {
     /// 次のスピンはこの角度から始まり、止まる累積角・回転音・触覚の時刻もここから求める。結果の決まり方は変わらない。
     func rotate(by delta: Double) {
         guard !spinning, delta != 0 else { return }
+        currentMotion = nil
         rotation += delta
     }
 
@@ -173,7 +180,9 @@ final class RouletteModel {
         guard !spinning, !reducedMotion, let coast = FlickCoast.coast(angularVelocity: angularVelocity) else { return nil }
         spinEasing = coast.easing
         rotationDuration = coast.duration
-        coasting = Coasting(from: rotation, start: now(), coast: coast)
+        let start = now()
+        coasting = Coasting(from: rotation, start: start, coast: coast)
+        currentMotion = TimedSpinMotion(motion: coast.motion(from: rotation), start: start)
         let next = rotation + coast.distance
 
         clickTimes = SpinTicks.boundaryCrossings(
@@ -204,6 +213,7 @@ final class RouletteModel {
     func stopCoast() -> Double? {
         guard let coasting else { return nil }
         self.coasting = nil
+        currentMotion = nil
         tickTask?.cancel()
         tickTask = nil
         let elapsed = now() - coasting.start
@@ -263,6 +273,10 @@ final class RouletteModel {
         outcome = nil
         spinning = true
         spinCount += 1
+        currentMotion = reducedMotion ? nil : TimedSpinMotion(
+            motion: SpinMotion(from: rotation, to: next, duration: Config.spinDuration, easing: spinEasing),
+            start: now()
+        )
 
         // 補間中の角度は observable でないので、境目を越える時刻を先に求めておく。
         // 動きを減らす設定では盤面が回らないので鳴らさない
@@ -305,10 +319,17 @@ final class RouletteModel {
         tickTask?.cancel()
         tickTask = nil
         spinning = false
+        currentMotion = nil
         guard let pendingOutcome else { return }
         outcome = pendingOutcome
         self.pendingOutcome = nil
     }
+}
+
+/// 盤面が自分で回る動きと、その開始時刻（`RouletteModel.now()` の時計の秒）。
+struct TimedSpinMotion: Equatable {
+    let motion: SpinMotion
+    let start: TimeInterval
 }
 
 /// 惰性で回り始めた角度・時刻と、その動き。
