@@ -130,7 +130,7 @@ struct SpinTeaseTests {
 
     // MARK: 入り方ごとの形
 
-    @Test func ためらいは戻らず境目の手前で止まりかける() {
+    @Test func ためらいは戻らず境目か止まる角度の手前で止まりかける() {
         for spin in Self.cases() {
             let path = SpinPath.teased(.hesitate, from: spin.from, to: spin.to, count: spin.count)
             let angles = forwardAngles(path, sign: spin.sign)
@@ -181,7 +181,7 @@ struct SpinTeaseTests {
         #expect(abs(plain.fallback - Config.spinFallback) < 1e-9)
     }
 
-    @Test func 戻りかけは境目の手前で戻ってから越える() {
+    @Test func 戻りかけは境目か止まる角度の手前で戻ってから止まる() {
         for spin in Self.cases() {
             let path = SpinPath.teased(.rollBack, from: spin.from, to: spin.to, count: spin.count)
             #expect(path.segments.count == 3)
