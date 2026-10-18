@@ -41,6 +41,13 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   テストと同じ条件の値を出して確かめられる（`Config.swift` の `import SwiftUI` は macOS でも通る。`WheelLabel` は `ItemAppearance` に依るので、
   `referenceDiameter` だけの stub を置く）。作業ツリーの外の一時ディレクトリで行い、コミットしない（2026-10-18）
 
+## 効果音
+
+- スピンの動きに合わせた音（うなり）を 5.7 秒分 1 本の波形に焼く（0.12 秒の 1 打ちを約 40〜50 回、線形補間で伸び縮みさせて足す）のは、
+  macOS の `-O` で 3〜9ms。Debug ビルドではこれより桁で遅くなりうるので、スピン開始時はメインスレッドの外（`Task.detached`）で焼き、待った分の頭を切り落とす（2026-10-18）
+- `Core/` を `swiftc` でまとめてビルドするとき、`SpinPath.swift` は `HapticSchedule.swift`（→ `RevealTiming.swift`）を、`SpinTease.swift` の
+  `FlickSpin.swift` は `WheelDrag.swift` を引き込む。`cannot find '…' in scope` の名前のファイルを足していけば通る（2026-10-18）
+
 ## スピンの演出（パーティクル）
 
 - 粒子は前のフレームの状態を積み上げず、生まれた時刻からの経過の閉じた式（抵抗のある放物運動は `(1 - e^{-kt}) / k`）で位置を出し、粒ごとの乱数は
