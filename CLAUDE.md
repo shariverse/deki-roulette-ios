@@ -332,8 +332,9 @@ SceneKit は線形の色空間で重ねるので、電球は不透明度では�
 
 背景の光の脈動（「スピンの演出」の電飾が ON）は、`WheelBackGlowTimeline` を `WheelParticlesTimeline` の内側（`WheelStopEffectsTimeline` の外）で `Wheel3DSurface` を包むように置いて
 毎フレーム引き（2D と同じ `now()`・`WheelEffectMotion`・`WheelBackGlow.opacity`）、`Wheel3DScene.backGlow(_:dark:)` が `tiltNode` の板（2D と同じ環を外観に合わせた色で焼いた一辺 = 直径の板）の
-不透明度に写す。SceneKit は線形の色空間で重ねてから sRGB に戻すので、透明な地に重ねた半透明の色は 2D より明るく出る。焼く環の各点の不透明度とノードの不透明度に
-冪 2.2（`linearAlpha`）を掛けて打ち消す（`Wheel3DSceneTests` が 2D と同じ合成値に近いことを画素で確かめる）。板は盤の表面から `backGlowDepth`（0.5pt）奥に置いて遠近の縮みを広げて打ち消し、深度は読むが書かない（傾けると盤の側面・縁に隠れる）。外観は焼いたときのもの（`backGlowBakedDark`）と比べ、光っていない待機中に変えても次に光らせるときに焼き直す。
+不透明度（シェーダの引数）に写す。SceneKit は線形の色空間で重ねてから sRGB に戻し、`SCNView`（背景は透明）はその色とアルファ値でページの地に重ねられるので、
+そのままでは 2D より明るく出る。板の材質の fragment のシェーダ（`backGlowShader`）で、アルファ値は「焼いた環の不透明度 × `WheelBackGlow.opacity`」のまま、
+乗算済みの色を「sRGB の色 × アルファ値」の冪 2.2 にして打ち消す（アルファ値まで下げると明るい地で光が消える）。`Wheel3DSceneTests` がダーク・ライトの地に重ねた色を 2D と画素で比べる。板は盤の表面から `backGlowDepth`（0.5pt）奥に置いて遠近の縮みを広げて打ち消し、深度は読むが書かない（傾けると盤の側面・縁に隠れる）。外観は焼いたときのもの（`backGlowBakedDark`）と比べ、光っていない待機中に変えても次に光らせるときに焼き直す。
 電飾が OFF なら板を作らない（初めて光らせるときに作り、組み直したら作り直す）。
 
 光の尾・残像（「スピンの演出」の光の尾・残像が ON）は、`WheelTrailsTimeline` を `WheelLightsTimeline` の内側で `Wheel3DSurface` を包むように置いて毎フレーム引き
