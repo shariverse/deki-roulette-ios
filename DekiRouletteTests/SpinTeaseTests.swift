@@ -361,12 +361,16 @@ struct SpinTeaseTests {
                 let path = SpinPath.teased(tease, from: sign * 0.5, to: sign * stop, count: count)
                 #expect(path.tease == tease)
                 // 主の区間の終わりから止まるまで、手前の隣のスライスの始まり（B − スライス幅）より先、
-                // 先の隣のスライスの終わり（B + 2 × スライス幅）より手前にいる
+                // 先の隣のスライスの終わり（B + 2 × スライス幅）より手前にいる。1 ミリ秒ごとの角度の最小・最大を集めてから確かめる
+                var lowest = Double.infinity
+                var highest = -Double.infinity
                 for step in 0...Int(Config.spinTeaseDuration * 1000) {
                     let angle = sign * path.angle(at: Config.spinDuration + Double(step) / 1000)
-                    #expect(angle > boundary - slice)
-                    #expect(angle < boundary + 2 * slice)
+                    lowest = min(lowest, angle)
+                    highest = max(highest, angle)
                 }
+                #expect(lowest > boundary - slice)
+                #expect(highest < boundary + 2 * slice)
             }
         }
     }
@@ -536,7 +540,7 @@ struct SpinTeaseTests {
     }
 
     @Test(arguments: SpinEffectsFixtures.withCommon)
-    func なし以外のスタイルでは毎回入れる(effects: SpinEffects) {
+    func 焦らしがONの組み合わせでは毎回入れる(effects: SpinEffects) {
         for spin in Self.cases() {
             var rng = SeededGenerator(seed: 5)
             let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: effects, using: &rng)
