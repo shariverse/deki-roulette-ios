@@ -274,7 +274,7 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 上限は `Config.wheelSparkMaxCount`（60）/ `wheelConfettiMaxCount`（80）で、低電力モード（`LowPowerModeMonitor` を光の尾と同じく `onAppear` で 1 つだけ作る）では
 `wheelParticleLowPowerDivisor` で 1/3。`TimelineView` は `WheelParticles.animates` が偽（火花も紙吹雪も出ていない・動きを減らす設定）の間は止める。指定・印・止まったスライスは受け取らず、共有画像には載せない。
 
-指で動かしている間の速さに連動する演出（電飾の流れ・光の尾・残像・火花）は、`RouletteWheelView` と `Wheel3DView` が `WheelDragArea` に `tracksMotion`（`SpinEffects.tracksDragMotion`。電飾・光の尾・火花の
+指で動かしている間の速さに連動する演出（電飾の流れ・背景の光の脈動・光の尾・残像・火花）は、`RouletteWheelView` と `Wheel3DView` が `WheelDragArea` に `tracksMotion`（`SpinEffects.tracksDragMotion`。電飾・光の尾・火花の
 どれかを出すとき。どれも出さないときは記録しない）と `now` を渡し、`WheelDragArea` が `follow` のたびに `WheelDragMotion` へ記録して `content` の 3 つ目の引数で渡す
 （2D・3D とも電飾と光の尾・残像と火花に渡す）。演出中（`interactive == false`）に始まったドラッグは記録しない。記録は次のドラッグを始めるまで残し、指を離したあとの残り
 （強さの落ち方・飛んでいる火花）は `Config.dragEffectSettleTime`（0.5 秒）まで描く。スピン・惰性に移ったら `WheelEffectMotion.current` がそちらを選ぶ。
@@ -329,6 +329,11 @@ SceneKit は線形の色空間で重ねるので、電球は不透明度では�
 描き直しを止める条件（待機中・止まり切った・動きを減らす設定）と点滅の終わりで間隔を落とすのは 2D と同じ。電飾が OFF なら `WheelLightsTimeline` を止めたまま nil を渡し、
 電球のノードは作らない（初めて場面を渡されたときに作り、組み直したら作り直す。見た目は今のまま）。電飾を出していない間は `Flow` を進めないので、
 `WheelLightsTimeline` は `enabled` が false になったら `Flow` を作り直し、出し直したときに溜まった角度の差を流さない。演出に指定・印は渡さない。
+
+背景の光の脈動（「スピンの演出」の電飾が ON）は、`WheelBackGlowTimeline` を `WheelParticlesTimeline` の内側（`WheelStopEffectsTimeline` の外）で `Wheel3DSurface` を包むように置いて
+毎フレーム引き（2D と同じ `now()`・`WheelEffectMotion`・`WheelBackGlow.opacity`）、`Wheel3DScene.backGlow(_:dark:)` が `tiltNode` の板（2D と同じ環を外観に合わせた色で焼いた一辺 = 直径の板）の
+不透明度に写す。板は盤の表面から `backGlowDepth`（0.5pt）奥に置いて遠近の縮みを広げて打ち消し、深度は読むが書かない（傾けると盤の側面・縁に隠れる）。外観が変わったら焼き直す。
+電飾が OFF なら板を作らない（初めて光らせるときに作り、組み直したら作り直す）。
 
 光の尾・残像（「スピンの演出」の光の尾・残像が ON）は、`WheelTrailsTimeline` を `WheelLightsTimeline` の内側で `Wheel3DSurface` を包むように置いて毎フレーム引き
 （2D と同じ `now()`・`WheelEffectMotion`・`WheelTrails.frame`。指の動きも `WheelDragArea` の記録から引く）、`Wheel3DSceneView.updateUIView` が
