@@ -132,7 +132,9 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 以前の 5 択の保存値（`spinEffectStyle`）は読まない（移行しない）。`UserDefaults` との読み書きは `SpinEffectsSetting`（`Features/Shared/`。`DynamicProperty` で 7 つの `@AppStorage` を持つ）にまとめ、
 設定画面と `RouletteScreen` が同じキー・同じ既定値で持つ。全体が OFF なら `SpinEffects.effective(enabled:selected:)` が `.none` を返し（個別の選択は残す。設定画面では個別のトグルを無効の見た目にする）、
 演出・焦らし・効果音はどれもこのフラグだけを見る。
-指定は渡さない（SPEC の背景の光の脈動と針を大きく弾く動きは未実装。針の沈みはどの組み合わせでも `Theme.pointerBounceOffset`）。`RouletteScreen` は 2D の `RouletteWheelView` と
+指定は渡さない（SPEC の背景の光の脈動は未実装）。停止の瞬間の針の沈みは `PointerBounce.at(stopEffects:reduceMotion:)`（`Core/`）が決め、停止の演出が ON なら
+`Theme.pointerBounceOffset(.big)`（4pt の `pointerBigBounceFactor` 倍 = 8pt）、OFF なら `.normal`（4pt）、動きを減らす設定では `.none`（沈めない）。2D の `WheelPointerView` の `offset` と
+3D の `Wheel3DScene.highlight(_:reduceMotion:afterglow:pointerBounce:)` が同じ値を使い、行きの曲線と戻りのばねは変えない。`RouletteScreen` は 2D の `RouletteWheelView` と
 3D の `Wheel3DView` に同じ `effects`（`SpinEffects`）を渡し、どちらの盤面も同じ関数（`effects.tracksDragMotion`・`WheelStopMoment.cues`・共有の `…Timeline`）から演出の値を引く。
 止まり際の焦らし（SPEC §5.5「焦らし」）は `SpinPath.spin(from:to:count:effects:releaseVelocity:using:)`（`Core/SpinTease.swift`）が作る。
 `effects.tease` が偽なら今の `SpinMotion` と同じ区間 1 つ（乱数は引かない）で、真なら `SpinTease.random(using:)` で

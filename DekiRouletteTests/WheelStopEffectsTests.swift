@@ -191,7 +191,7 @@ struct WheelStopEffectsTests {
         ))
     }
 
-    @Test func スタイルに含まない演出には時刻を渡さない() {
+    @Test func 組み合わせに含まない演出には時刻を渡さない() {
         let none = stopped().cues(effects: .none, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(none == WheelStopCues(highlight: 2))
         let lights = stopped().cues(effects: SpinEffectsFixtures.lights, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
@@ -246,3 +246,23 @@ struct WheelStopEffectsTests {
         #expect(stop.cues(effects: .all, reduceMotion: false, highlightedIndex: nil, displacedByDrag: false) == WheelStopCues())
     }
 }
+
+struct PointerBounceTests {
+    @Test func 停止の演出がONなら大きく弾く() {
+        #expect(PointerBounce.at(stopEffects: true, reduceMotion: false) == .big)
+        #expect(PointerBounce.at(stopEffects: false, reduceMotion: false) == .normal)
+    }
+
+    @Test func 動きを減らす設定では沈めない() {
+        #expect(PointerBounce.at(stopEffects: true, reduceMotion: true) == PointerBounce.none)
+        #expect(PointerBounce.at(stopEffects: false, reduceMotion: true) == PointerBounce.none)
+    }
+
+    /// 停止の演出が ON なら 4pt の 2 倍（8pt）、OFF なら今までどおり 4pt。
+    @Test func 沈む量は4ptと8pt() {
+        #expect(abs(Double(Theme.pointerBounceOffset(.normal)) - 4) < 1e-9)
+        #expect(abs(Double(Theme.pointerBounceOffset(.big)) - 8) < 1e-9)
+        #expect(abs(Double(Theme.pointerBounceOffset(PointerBounce.none))) < 1e-9)
+    }
+}
+

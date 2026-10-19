@@ -1210,7 +1210,20 @@ struct Wheel3DSceneTests {
         #expect(none.stoppedImagePlaneCount == 1)
     }
 
-    @Test func 結果の帯はなし以外のとき新しい結果でだけ登場演出を重ねる() {
+    /// 止まった瞬間の針の沈みは 2D と同じ量（停止の演出が ON なら 8pt、OFF なら 4pt）。動きを減らす設定では沈めない。
+    @Test func 針は停止の演出がONなら2倍沈む() {
+        let cases: [(PointerBounce, Double)] = [(.big, 8), (.normal, 4)]
+        for (bounce, depth) in cases {
+            let scene = makeScene(count: 4, rotation: 0)
+            scene.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, pointerBounce: bounce)
+            #expect(abs(scene.pointerBounceDepth - depth) < 1e-9, "\(bounce)")
+        }
+        let still = makeScene(count: 4, rotation: 0)
+        still.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: true, pointerBounce: .big)
+        #expect(still.pointerBounceDepth == 0)
+    }
+
+    @Test func 結果の帯は停止の演出がONのとき新しい結果でだけ登場演出を重ねる() {
         let scene = makeScene(count: 4, rotation: 0)
         let result = { (id: String) in Wheel3DResult(id: id, label: "\u{3000}", accent: Theme.sliceColor(at: 1, count: 4)) }
         scene.show(result: result("a1"), reduceMotion: false, popIn: true)
