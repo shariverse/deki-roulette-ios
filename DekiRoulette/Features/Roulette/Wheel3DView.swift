@@ -269,7 +269,7 @@ final class Wheel3DScene {
     /// 止まったスライスを余韻で脈打たせられる形（光彩の板と光彩の無い面の板の 2 枚）で出しているか。
     private var shownAfterglow = false
     private let postNode = SCNNode()
-    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は初めて出すときに作り（「なし」では作らない）、
+    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は初めて出すときに作り（電飾が OFF なら作らない）、
     /// 組み直したら作り直し、出さない間は隠す。
     private let lightsNode = SCNNode()
     private var bulbNodes: [SCNNode] = []
@@ -282,7 +282,7 @@ final class Wheel3DScene {
     /// 作った電球の数（テストで、電飾を出さない間は作らないことを見る）。
     var bulbCount: Int { bulbNodes.count }
     /// 残像（`tiltNode` に載せ、盤と一緒に傾くが回らない）。遅れた角度のスライスの塗り（ハブの内側は抜く）の 1 つの形を、
-    /// 残像の枚数分のノードで共有し、毎フレーム角度と不透明度だけを変える。初めて描くときに作り（「なし」では作らない）、組み直したら作り直す。
+    /// 残像の枚数分のノードで共有し、毎フレーム角度と不透明度だけを変える。初めて描くときに作り（光の尾・残像が OFF なら作らない）、組み直したら作り直す。
     private let ghostsNode = SCNNode()
     private var ghostNodes: [SCNNode] = []
     /// 光の尾（`tiltNode` に載せ、回らない）。同じ形の弧の切れ端（芯とにじみ）を 12 時から並べ、毎フレーム濃さだけを変える。
@@ -300,7 +300,7 @@ final class Wheel3DScene {
     private(set) var trailOpacityWriteCount = 0
     /// 電球を縁の上面から浮かせる高さ（pt）。テストで差し替えて、浮かせないと止まったスライスに隠れることを確かめる。
     var lightLift = Theme.Wheel3D.lightLift
-    /// 火花と紙吹雪（`tiltNode` に載せ、盤と一緒に傾くが回らない）。粒のノードは初めて描くときに上限の数だけ作り（「なし」では作らない）、
+    /// 火花と紙吹雪（`tiltNode` に載せ、盤と一緒に傾くが回らない）。粒のノードは初めて描くときに上限の数だけ作り（火花・紙吹雪が OFF なら作らない）、
     /// 毎フレーム位置・大きさ・濃さだけを変えて使い回す。紙吹雪は盤面の枠に収まるよう、浮かせた分の遠近の広がりを `confettiNode` の縮みで打ち消す。
     private let particlesNode = SCNNode()
     private let confettiNode = SCNNode()
@@ -315,19 +315,19 @@ final class Wheel3DScene {
     /// 出している火花・紙吹雪の数（テストで、2D と同じ数を出すことを見る）。
     var visibleSparkCount: Int { particlesNode.isHidden ? 0 : sparkNodes.filter { !$0.isHidden }.count }
     var visibleConfettiCount: Int { particlesNode.isHidden ? 0 : confettiNodes.filter { !$0.isHidden }.count }
-    /// 停止の瞬間のフラッシュ（`tiltNode` に載せる、盤面の枠の丸い光の板）。初めて光らせるときに作る（「なし」では作らない）。
+    /// 停止の瞬間のフラッシュ（`tiltNode` に載せる、盤面の枠の丸い光の板）。初めて光らせるときに作る（停止の演出が OFF なら作らない）。
     private var flashNode: SCNNode?
     /// 止まったスライスの光彩の板（余韻で不透明度を脈打たせる）。強調を出している間だけ。
     private var stoppedGlowNode: SCNNode?
     private var shownStopEffects = WheelStopEffects.Frame.none
-    /// フラッシュの板を作ったか（テストで、「なし」では作らないことを見る）。
+    /// フラッシュの板を作ったか（テストで、停止の演出が OFF なら作らないことを見る）。
     var hasFlashNode: Bool { flashNode != nil }
     /// フラッシュの板の一辺・縮め・盤の表面からの高さ（テストで、正面から見た半径が盤面の枠の半径になることを確かめる）。
     var flashPlacement: (side: Double, scale: Double, z: Double)? {
         guard let node = flashNode, let plane = node.geometry as? SCNPlane else { return nil }
         return (Double(plane.width), Double(node.scale.x), Double(node.position.z))
     }
-    /// 止まったスライスに貼った画像の板の数（テストで、「なし」は 1 枚・余韻を出すときは 2 枚であることを見る）。
+    /// 止まったスライスに貼った画像の板の数（テストで、余韻を出さないときは 1 枚・余韻を出すときは 2 枚であることを見る）。
     var stoppedImagePlaneCount: Int {
         stoppedNode?.childNodes.filter { $0.geometry is SCNPlane }.count ?? 0
     }
@@ -415,7 +415,7 @@ final class Wheel3DScene {
     }
 
     /// 結果の帯を出す・消す。`id` が変わったときだけ焼き直し、2D の `revealOnAppear` と同じ動きで現れる
-    /// （動きを減らす設定では即座に出す）。`popIn` のとき（「スピンの演出」が「なし」以外）は、2D の `ResultBandPopIn` と同じく
+    /// （動きを減らす設定では即座に出す）。`popIn` のとき（停止の演出が ON）は、2D の `ResultBandPopIn` と同じく
     /// 帯の中心を軸に `ResultBand.popInStartScale` からばね（`popInDuration` / `popInBounce`）で 1 倍に収める動きを重ねる。
     /// 消すときは 2D と同じく即座に消す。
     /// 同じ結果のまま文字や枠の色が変わった（結果を出したまま項目の見た目を変えた）ときは、動かさずに焼き直す。
@@ -1238,9 +1238,9 @@ final class Wheel3DScene {
     }
 
     /// 前に出した止まったスライス。側面の付いた板（塗りの色）の上に、2D と同じ塗り・ラベル・縁取り・光彩を焼いた画像を貼る。
-    /// `afterglow`（「なし」以外で余韻を出すとき）は光彩を脈打たせるので、光彩ごと焼いた画像の板（返す `glow`。不透明度を余韻の倍率にする）の上に、
+    /// `afterglow`（停止の演出が ON で余韻を出すとき）は光彩を脈打たせるので、光彩ごと焼いた画像の板（返す `glow`。不透明度を余韻の倍率にする）の上に、
     /// 光彩の無い同じ面の画像の板を重ねる（スライスの中は不透明な塗りなので、外側にはみ出した光彩だけが倍率で薄くなる。倍率 1 なら 1 枚と同じ見た目）。
-    /// 「なし」・動きを減らす設定では光彩ごと焼いた 1 枚だけにする（`glow` は nil。消すときに半透明の塗りが 2 枚重なって濃く残らない）。
+    /// 停止の演出が OFF・動きを減らす設定では光彩ごと焼いた 1 枚だけにする（`glow` は nil。消すときに半透明の塗りが 2 枚重なって濃く残らない）。
     /// 盤の中心を原点に置くので、`scale` は 2D の `scaleEffect` と同じく盤の中心から広がる。
     private func makeStopped(
         _ highlight: Wheel3DHighlight, shape: Shape, lifted: Bool, afterglow: Bool
@@ -1634,7 +1634,7 @@ private enum WheelLabelImage {
 
 #Preview("Trails") {
     Wheel3DView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffectStyle.trails.effects,
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffects(lights: false, trails: true, particles: false, tease: true, stopEffects: true, sounds: true),
         motion: TimedSpinMotion(
             motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
             start: ProcessInfo.processInfo.systemUptime

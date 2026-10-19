@@ -24,8 +24,8 @@ struct SpinHumTests {
     }
 
     @Test func 演出があれば付ける() {
-        for style in SpinEffectStyle.allCases where style != .none {
-            #expect(SpinHum.plays(effects: style.effects, reducedMotion: false))
+        for effects in SpinEffectsFixtures.withCommon {
+            #expect(SpinHum.plays(effects: effects, reducedMotion: false))
         }
     }
 
@@ -40,8 +40,8 @@ struct SpinHumTests {
     }
 
     @Test func 動きを減らす設定では付けない() {
-        for style in SpinEffectStyle.allCases {
-            #expect(!SpinHum.plays(effects: style.effects, reducedMotion: true))
+        for effects in SpinEffectsFixtures.combinations {
+            #expect(!SpinHum.plays(effects: effects, reducedMotion: true))
         }
     }
 
@@ -168,11 +168,11 @@ struct SpinHumTests {
 
     // MARK: モデル
 
-    @Test(arguments: [SpinEffectStyle.lights, .trails, .confetti, .all])
-    func 演出ありのスピンでうなりの打ちを用意する(style: SpinEffectStyle) throws {
+    @Test(arguments: SpinEffectsFixtures.withCommon)
+    func 演出ありのスピンでうなりの打ちを用意する(effects: SpinEffects) throws {
         let model = makeModel()
         model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 9))
-        _ = try #require(model.beginSpin(reducedMotion: false, effects: style.effects))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: effects))
         #expect(!model.humStrokes.isEmpty)
         #expect(model.humStrokes == SpinHum.strokes(along: model.rotationPath))
     }

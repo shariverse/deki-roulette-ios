@@ -11,8 +11,8 @@ struct StopChimeTests {
     }
 
     @Test func 演出があって効果音がONならスピンの停止で鳴らす() {
-        for style in SpinEffectStyle.allCases where style != .none {
-            #expect(StopChime.plays(effects: style.effects, soundEnabled: true, stop: .spin))
+        for effects in SpinEffectsFixtures.withCommon {
+            #expect(StopChime.plays(effects: effects, soundEnabled: true, stop: .spin))
         }
     }
 
@@ -28,14 +28,14 @@ struct StopChimeTests {
     }
 
     @Test func 効果音がOFFなら鳴らさない() {
-        for style in SpinEffectStyle.allCases {
-            #expect(!StopChime.plays(effects: style.effects, soundEnabled: false, stop: .spin))
+        for effects in SpinEffectsFixtures.combinations {
+            #expect(!StopChime.plays(effects: effects, soundEnabled: false, stop: .spin))
         }
     }
 
     @Test func 惰性では鳴らさない() {
-        for style in SpinEffectStyle.allCases {
-            #expect(!StopChime.plays(effects: style.effects, soundEnabled: true, stop: .coast))
+        for effects in SpinEffectsFixtures.combinations {
+            #expect(!StopChime.plays(effects: effects, soundEnabled: true, stop: .coast))
         }
     }
 
@@ -50,10 +50,10 @@ struct StopChimeTests {
             model.finishSpin()
             #expect(model.outcome != nil)
         }
-        for style in SpinEffectStyle.allCases {
+        for effects in SpinEffectsFixtures.combinations {
             for soundEnabled in [true, false] {
-                let plays = StopChime.plays(effects: style.effects, soundEnabled: soundEnabled, stop: .spin)
-                #expect(plays == (style.effects.sounds && soundEnabled))
+                let plays = StopChime.plays(effects: effects, soundEnabled: soundEnabled, stop: .spin)
+                #expect(plays == (effects.sounds && soundEnabled))
             }
         }
     }

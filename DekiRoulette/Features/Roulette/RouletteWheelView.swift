@@ -394,7 +394,7 @@ private struct Triangle: Shape {
 
 #Preview("Lights") {
     RouletteWheelView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffectStyle.lights.effects
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffects(lights: true, trails: false, particles: false, tease: true, stopEffects: true, sounds: true)
     )
     .padding(40)
     .background(Theme.ink900)
@@ -402,7 +402,7 @@ private struct Triangle: Shape {
 
 #Preview("Trails") {
     RouletteWheelView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffectStyle.trails.effects,
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffects(lights: false, trails: true, particles: false, tease: true, stopEffects: true, sounds: true),
         motion: TimedSpinMotion(
             motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
             start: ProcessInfo.processInfo.systemUptime
@@ -414,7 +414,7 @@ private struct Triangle: Shape {
 
 #Preview("Particles") {
     RouletteWheelView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffectStyle.confetti.effects,
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffects(lights: false, trails: false, particles: true, tease: true, stopEffects: true, sounds: true),
         motion: TimedSpinMotion(
             motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
             start: ProcessInfo.processInfo.systemUptime

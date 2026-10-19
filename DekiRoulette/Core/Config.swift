@@ -216,8 +216,14 @@ enum Config {
 
     // MARK: スピンの演出
 
-    /// スピンに付ける演出（`SpinEffectStyle.rawValue`）を保存する `UserDefaults` のキー。未設定なら `SpinEffectStyle.default`（なし）。
-    static let spinEffectStyleKey = "spinEffectStyle"
+    /// 「スピンの演出」全体の ON / OFF を保存する `UserDefaults` のキー。未設定なら ON。
+    /// 以前の 5 択の保存値（`spinEffectStyle`）は読まない（移行しない。全員が全部入りから始まる）。
+    static let spinEffectsEnabledKey = "spinEffects.enabled"
+
+    /// 「スピンの演出」の個別のトグル（`SpinEffectItem`）の ON / OFF を保存する `UserDefaults` のキー。未設定なら `SpinEffects.default`（ON）。
+    static func spinEffectKey(_ item: SpinEffectItem) -> String {
+        "spinEffects.\(item.rawValue)"
+    }
 
     // MARK: 3D 表示
 

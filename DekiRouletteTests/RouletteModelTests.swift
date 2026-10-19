@@ -779,7 +779,7 @@ struct RouletteModelTests {
 
     @Test func 演出なしのスピンは今の曲線と長さと音と触覚の時刻のまま() throws {
         for (seed, release) in [(UInt64(1), nil), (2, 1500), (3, -900)] as [(UInt64, Double?)] {
-            // 「なし」を渡したときと、省いたとき（既定）
+            // 何も付けない（`.none`）を渡したときと、省いたとき（既定）
             for passesStyle in [true, false] {
                 let model = makeModel()
                 model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
@@ -818,15 +818,15 @@ struct RouletteModelTests {
         }
     }
 
-    @Test(arguments: [SpinEffectStyle.lights, .trails, .confetti, .all])
-    func 演出ありのスピンは焦らしを入れても止まる位置と結果は変わらない(style: SpinEffectStyle) throws {
+    @Test(arguments: SpinEffectsFixtures.withCommon)
+    func 演出ありのスピンは焦らしを入れても止まる位置と結果は変わらない(effects: SpinEffects) throws {
         let model = makeModel()
         model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 11))
         model.toggleTarget(id: model.items[2].id)
         for round in 0..<30 {
             let from = model.rotation
             let direction: SpinDirection = round.isMultiple(of: 2) ? .clockwise : .counterclockwise
-            let next = try #require(model.beginSpin(reducedMotion: false, effects: style.effects, direction: direction))
+            let next = try #require(model.beginSpin(reducedMotion: false, effects: effects, direction: direction))
             let path = model.rotationPath
             #expect(path.tease != nil)
             #expect(path.from == from)
@@ -846,8 +846,8 @@ struct RouletteModelTests {
         }
     }
 
-    @Test(arguments: [SpinEffectStyle.lights, .trails, .confetti, .all])
-    func 焦らしの動きは指定の有無で変わらない(style: SpinEffectStyle) throws {
+    @Test(arguments: SpinEffectsFixtures.withCommon)
+    func 焦らしの動きは指定の有無で変わらない(effects: SpinEffects) throws {
         for seed in UInt64(1)...20 {
             for release: Double? in [nil, 1800, -2400] {
                 let direction: SpinDirection? = release.map { $0 < 0 ? .counterclockwise : .clockwise }
@@ -857,7 +857,7 @@ struct RouletteModelTests {
                 free.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
                 free.rotation = 25
                 let freeNext = try #require(free.beginSpin(
-                    reducedMotion: false, effects: style.effects, fullSpins: fullSpins, direction: direction, releaseVelocity: release
+                    reducedMotion: false, effects: effects, fullSpins: fullSpins, direction: direction, releaseVelocity: release
                 ))
                 free.rotation = freeNext
                 free.finishSpin()
@@ -869,7 +869,7 @@ struct RouletteModelTests {
                 aimed.rotation = 25
                 aimed.toggleTarget(id: aimed.items[index].id)
                 let aimedNext = try #require(aimed.beginSpin(
-                    reducedMotion: false, effects: style.effects, fullSpins: fullSpins, direction: direction, releaseVelocity: release
+                    reducedMotion: false, effects: effects, fullSpins: fullSpins, direction: direction, releaseVelocity: release
                 ))
                 #expect(aimedNext == freeNext)
                 #expect(aimed.rotationPath == free.rotationPath)
@@ -919,7 +919,7 @@ struct RouletteModelTests {
     @Test func 焦らしのスピンは焦らしを含めた長さまで止めず境目ごとに刻む() async throws {
         let model = makeModel()
         model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 9))
-        _ = try #require(model.beginSpin(reducedMotion: false, effects: SpinEffectStyle.lights.effects))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: SpinEffectsFixtures.lights))
         let expected = HapticSchedule.boundaryCrossings(along: model.rotationPath, count: 4, minInterval: Config.hapticMinInterval)
         #expect(!expected.isEmpty)
         // 焦らし無しの保険の時刻を過ぎてもまだ止めない
