@@ -284,6 +284,70 @@ struct SpinTeaseTests {
         }
     }
 
+    // MARK: 減衰する往復
+
+    @Test(arguments: SpinTease.allCases)
+    func 止まる角度のまわりで往復しながら振れ幅を縮めて止まる(tease: SpinTease) {
+        for spin in Self.cases() {
+            let path = SpinPath.teased(tease, from: spin.from, to: spin.to, count: spin.count)
+            let stop = spin.sign * spin.to
+            let tail = Array(path.segments.dropFirst())
+            #expect(tail.count == 3)
+            // 焦らしの区間の折り返し（終わりの角度）は止まる角度の前後に交互に振れ、振れるたびに `spinTeaseSwingDecay` 倍に縮む
+            // （行き過ぎは主の区間の終わりから数える。ためらい・戻りかけの止まりかけ・戻りの底は止まる角度の手前の入り方なので数えない）
+            let swings = path.segments.map { spin.sign * $0.to - stop }
+                .dropLast()
+                .drop { tease != .overshoot && $0 < 0 }
+            let expectedSwings = tease == .rollBack ? 1 : (tease == .hesitate ? 2 : 3)
+            #expect(swings.count == expectedSwings)
+            for (a, b) in zip(swings, swings.dropFirst()) {
+                #expect(a * b < 0)
+                #expect(abs(abs(b) - abs(a) * Config.spinTeaseSwingDecay) < 1e-9)
+            }
+            // 焦らしの区間で止まる角度をまたぐ回数。行き過ぎ（主の区間で越えたあと）は戻り過ぎ・少し行き過ぎの 2 回、
+            // ためらいは行き過ぎ・戻り過ぎの 2 回、戻りかけは進み直して少し行き過ぎる 1 回（最後はどれも止まる角度でちょうど止まる）
+            let crossesStop = zip(path.segments, path.segments.dropFirst()).filter { previous, next in
+                (spin.sign * previous.to - stop) * (spin.sign * next.to - stop) < 0
+            }.count
+            #expect(crossesStop == (tease == .rollBack ? 1 : 2))
+            // 振れが小さくなるほど区間を短くする（戻りかけは、距離のいちばん長い進み直しの区間を除いて最後がいちばん短い）
+            let durations = tail.map(\.duration)
+            #expect(abs(durations.reduce(0, +) - Config.spinTeaseDuration) < 1e-9)
+            if tease == .rollBack {
+                #expect(durations[2] < durations[0])
+                #expect(durations[1] > durations[0])
+            } else {
+                #expect(durations[0] > durations[1])
+                #expect(durations[1] > durations[2])
+            }
+            // 折り返すたびに向きが変わる（ためらいの主の区間の終わりだけは、同じ向きに進み直す）
+            let directions = path.segments.map { $0.to > $0.from }
+            let reversals = zip(directions, directions.dropFirst()).filter { $0 != $1 }.count
+            #expect(reversals == (tease == .hesitate ? 2 : 3))
+        }
+    }
+
+    @Test(arguments: SpinTease.allCases, [2, 8, 24, 36])
+    func 焦らしの区間の速さはいちばん速くなる条件でもうなりの下限に届かない(tease: SpinTease, count: Int) {
+        // 振れ幅が上限に掛かる広いスライス・狭いスライス、境目の直後・中ほど・奥で止まる、両方向、フリックの初速あり・なし
+        let slice = 360 / Double(count)
+        var peak = 0.0
+        for sign in [1.0, -1.0] {
+            for offset in [1e-9, 0.01, 0.25, 0.5, 0.75, 0.99].map({ $0 * slice }) {
+                for release: Double? in [nil, sign * 900, sign * 3000] {
+                    let stop = 1440 + 5 * slice + offset
+                    let path = SpinPath.teased(tease, from: sign * 0.5, to: sign * stop, count: count, releaseVelocity: release)
+                    #expect(path.tease == tease)
+                    for step in 0...Int(Config.spinTeaseDuration * 1000) {
+                        peak = max(peak, path.intensity(at: Config.spinDuration + Double(step) / 1000))
+                    }
+                }
+            }
+        }
+        #expect(peak < Config.humMinIntensity)
+        #expect(peak > 0)
+    }
+
     // MARK: 隣のスライスまでの振れ幅
 
     @Test(arguments: SpinTease.allCases, [2, 3, 5, 8, 12, 24, 36])
