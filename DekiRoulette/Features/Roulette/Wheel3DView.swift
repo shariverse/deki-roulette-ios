@@ -351,7 +351,7 @@ final class Wheel3DScene {
     var hasBackGlowNode: Bool { backGlowNode != nil }
     var backGlowOpacity: Double? {
         guard let node = backGlowNode, !node.isHidden else { return nil }
-        return Double(node.opacity)
+        return node.geometry?.firstMaterial?.value(forKey: Self.backGlowOpacityKey) as? Double
     }
     /// 背景の光の板を焼いたときの外観（テストで、外観を変えたら焼き直すことを見る）。
     var backGlowBakedAppearanceIsDark: Bool? { backGlowBakedDark }
@@ -1198,17 +1198,25 @@ final class Wheel3DScene {
         guard let node = backGlowNode else { return }
         let opacity = shownBackGlow.opacity
         node.isHidden = opacity <= 0
-        if opacity > 0 { node.opacity = CGFloat(Self.linearAlpha(opacity)) }
+        if opacity > 0 { node.geometry?.firstMaterial?.setValue(opacity, forKey: Self.backGlowOpacityKey) }
     }
 
-    /// 2D と同じ見た目の不透明度 `alpha` を、SceneKit で重ねるときの不透明度に直す。SceneKit は線形の色空間で重ねてから sRGB に戻すので、
-    /// 透明な地（`SCNView` の背景は透明）に重ねた半透明の色はそのままだと 2D より明るく出る（不透明度 0.24 が 0.5 前後に見える）。
-    /// sRGB の明るさを冪 `backGlowGamma` で近似し、不透明度にも同じ冪を掛けて打ち消す（色 × 不透明度 の冪は、色の冪 × 不透明度の冪に分かれる）。
-    private static func linearAlpha(_ alpha: Double) -> Double {
-        pow(min(max(alpha, 0), 1), backGlowGamma)
-    }
+    /// 背景の光の不透明度・色を渡すシェーダの引数の名前。
+    private static let backGlowOpacityKey = "backGlowOpacity"
+    private static let backGlowColorKey = "backGlowColor"
 
-    private static let backGlowGamma = 2.2
+    /// 背景の光の色の出し方。SceneKit は線形の色空間で重ねてから sRGB に戻し、`SCNView`（背景は透明）はその色とアルファ値で
+    /// ページの地の上に重ねられる。2D と同じ見え方（地の上に sRGB の色 c を不透明度 a で重ねる = c·a + 地·(1 − a)）にするため、
+    /// アルファ値は a のまま、乗算済みの色は sRGB に戻したときに c·a になる値（冪 2.2 で近似した線形の値）を書く。
+    /// a は焼いた環の不透明度（2D と同じ、内側の 1 から外側の 0 への線形）× `WheelBackGlow.opacity`。
+    private static let backGlowShader = """
+    #pragma arguments
+    float backGlowOpacity;
+    float3 backGlowColor;
+    #pragma body
+    float coverage = clamp(_output.color.a * backGlowOpacity, 0.0, 1.0);
+    _output.color = float4(pow(backGlowColor * coverage, float3(2.2)), coverage);
+    """
 
     /// 背景の光の板。2D の `WheelBackGlowView` と同じく、外周の縁の外周（`Theme.BackGlow.innerRadius`）でいちばん明るく、
     /// 盤面の枠（`outerRadius` = 直径 ÷ 2）で 0 になる環を焼いた一辺 = 直径の板を、盤の表面のわずかに奥（`backGlowDepth`）に置く。
@@ -1218,8 +1226,14 @@ final class Wheel3DScene {
         let diameter = Double(shape.diameter)
         let plane = SCNPlane(width: diameter, height: diameter)
         let material = Self.material(.white, lit: false)
-        material.diffuse.contents = Self.backGlowImage(diameter: diameter, dark: shownBackGlow.dark)
+        material.diffuse.contents = Self.backGlowImage(diameter: diameter)
         material.writesToDepthBuffer = false
+        material.shaderModifiers = [.fragment: Self.backGlowShader]
+        let color = UIColor(Theme.wheelBackGlow).resolvedColor(with: UITraitCollection(userInterfaceStyle: shownBackGlow.dark ? .dark : .light))
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        material.setValue(NSValue(scnVector3: SCNVector3(Float(r), Float(g), Float(b))), forKey: Self.backGlowColorKey)
+        material.setValue(0.0, forKey: Self.backGlowOpacityKey)
         plane.materials = [material]
         let node = SCNNode(geometry: plane)
         let z = -Self.backGlowDepth
@@ -1242,8 +1256,8 @@ final class Wheel3DScene {
     /// 背景の光の板を盤の表面から奥へ置く距離（pt）。表面と同じ高さだと、傾けたときに盤の縁と重なってちらつくため。
     private static let backGlowDepth = 0.5
 
-    /// 背景の光の環。不透明度 1 で焼き、ノードの不透明度で `WheelBackGlow.opacity` を掛ける。色は外観で解決する。
-    private static func backGlowImage(diameter: Double, dark: Bool) -> UIImage {
+    /// 背景の光の環の不透明度（白で焼く。色と `WheelBackGlow.opacity` はシェーダ `backGlowShader` で掛ける）。
+    private static func backGlowImage(diameter: Double) -> UIImage {
         let side: CGFloat = 512
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -1251,14 +1265,10 @@ final class Wheel3DScene {
         let ratio = side / CGFloat(diameter)
         let inner = Theme.BackGlow.innerRadius(diameter: CGFloat(diameter)) * ratio
         let outer = Theme.BackGlow.outerRadius(diameter: CGFloat(diameter)) * ratio
-        let color = UIColor(Theme.wheelBackGlow).resolvedColor(with: UITraitCollection(userInterfaceStyle: dark ? .dark : .light))
         return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { renderer in
-            // 2D は内側の 1 から外側の 0 へ不透明度を線形に落とす。3D では重ねるときの明るさに合わせて、各点の不透明度を
-            // `linearAlpha` で直した値にする（間は細かく区切って線形に補う）
-            let steps = 16
-            let locations = (0...steps).map { CGFloat($0) / CGFloat(steps) }
-            let colors = locations.map { color.withAlphaComponent(CGFloat(linearAlpha(1 - Double($0)))).cgColor } as CFArray
-            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: locations)
+            // 2D と同じく、内側の 1 から外側の 0 へ不透明度を線形に落とす
+            let colors = [UIColor.white.cgColor, UIColor.white.withAlphaComponent(0).cgColor] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: [0, 1])
             else { return }
             let center = CGPoint(x: side / 2, y: side / 2)
             // 始まりの円の内側は塗らない（盤の面には重ねない）
