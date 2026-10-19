@@ -19,6 +19,7 @@ import SwiftUI
 /// 同じ時計（`now`）・同じ規則（`WheelLights`）で毎フレーム引き、盤の角度と同じく SceneKit のノードに写す。
 /// `trails` のときは 2D と同じ光の尾と残像を盤と同じ面に出す（回らない）。2D と共有の `WheelTrailsTimeline` が同じ時計・同じ規則
 /// （`WheelTrails`）で毎フレーム引き、`Wheel3DScene.trail(_:)` が残像の角度・濃さと光の尾の切れ端の濃さだけをノードに写す。
+/// 背景の光の脈動（`lights`）も 2D と共有の `WheelBackGlowTimeline` が引き、`Wheel3DScene.backGlow(_:dark:)` が盤の後ろの板の不透明度に写す。
 /// 火花・紙吹雪（`particles`）と、停止の瞬間のフラッシュ・結果表示中の光彩の余韻・結果の帯の登場演出（`stopEffects`）も 2D と同じ規則で出す。
 /// 火花・紙吹雪は 2D と共有の `WheelParticlesTimeline`、フラッシュと余韻は `WheelStopEffectsTimeline` が同じ時計で引き、
 /// `Wheel3DScene.particles(_:)` / `stopEffects(_:)` が盤と同じ面のノードに写す。停止の時刻は 2D と同じ `WheelStopMoment` で持つ。
@@ -46,6 +47,7 @@ struct Wheel3DView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Config.tiltReferenceKey) private var tiltReference = TiltReference.default
     /// 姿勢の購読。`CMMotionManager` は使い回したいので、ビューを作り直すたびには作らず、最初に画面に出たときに作る。
@@ -94,6 +96,10 @@ struct Wheel3DView: View {
                             enabled: effects.particles, side: side, motion: motion, drag: dragMotion,
                             burstAt: cues.confettiStart, now: now
                         ) { particles in
+                            // 背景の光の脈動も 2D と同じ時計・同じ規則で毎フレーム引く。電飾が OFF なら止めたまま 0 を渡す
+                            WheelBackGlowTimeline(
+                                enabled: effects.lights, motion: motion, drag: dragMotion, now: now
+                            ) { backGlow in
                             // フラッシュと光彩の余韻も 2D と同じ時計で引く。停止の演出が OFF なら止めたまま `.none` を渡す
                             WheelStopEffectsTimeline(
                                 enabled: effects.stopEffects, flashStart: cues.flashStart,
@@ -108,8 +114,9 @@ struct Wheel3DView: View {
                                     highlight: cues.highlight.map { Wheel3DHighlight(index: $0, glowStyle: glowStyle) },
                                     result: result, showsStopEffects: effects.stopEffects,
                                     lights: lights, trails: trails, particles: particles, stopEffects: stopEffects,
-                                    reduceMotion: reduceMotion
+                                    backGlow: backGlow, colorScheme: colorScheme, reduceMotion: reduceMotion
                                 )
+                            }
                             }
                         }
                     }
@@ -187,6 +194,10 @@ private struct Wheel3DSurface: View, Animatable {
     let particles: WheelParticles.Frame
     /// フラッシュの不透明度と光彩の余韻の倍率。出さないときは `.none`。
     let stopEffects: WheelStopEffects.Frame
+    /// 背景の光の脈動の不透明度（`WheelBackGlow.opacity`）。出さないとき・止まっている間は 0。
+    let backGlow: Double
+    /// 外観。背景の光の色（`Theme.wheelBackGlow`）は 2D と同じく外観に合わせる。
+    let colorScheme: ColorScheme
     let reduceMotion: Bool
 
     nonisolated var animatableData: Double {
@@ -198,7 +209,8 @@ private struct Wheel3DSurface: View, Animatable {
         Wheel3DSceneView(
             items: items, rotation: rotation, tilt: tilt, diameter: diameter, displayScale: displayScale,
             highlight: highlight, result: result, showsStopEffects: showsStopEffects, lights: lights, trails: trails,
-            particles: particles, stopEffects: stopEffects, reduceMotion: reduceMotion
+            particles: particles, stopEffects: stopEffects, backGlow: backGlow, colorScheme: colorScheme,
+            reduceMotion: reduceMotion
         )
     }
 }
@@ -216,6 +228,8 @@ private struct Wheel3DSceneView: UIViewRepresentable {
     let trails: WheelTrails.Frame
     let particles: WheelParticles.Frame
     let stopEffects: WheelStopEffects.Frame
+    let backGlow: Double
+    let colorScheme: ColorScheme
     let reduceMotion: Bool
 
     func makeCoordinator() -> Wheel3DScene {
@@ -247,6 +261,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
         context.coordinator.trail(trails)
         context.coordinator.stopEffects(stopEffects)
         context.coordinator.particles(particles)
+        context.coordinator.backGlow(backGlow, dark: colorScheme == .dark)
     }
 }
 
@@ -323,6 +338,23 @@ final class Wheel3DScene {
     /// 止まったスライスの光彩の板（余韻で不透明度を脈打たせる）。強調を出している間だけ。
     private var stoppedGlowNode: SCNNode?
     private var shownStopEffects = WheelStopEffects.Frame.none
+    /// 背景の光の脈動の板（`tiltNode` に載せ、盤と一緒に傾くが回らない）。初めて光らせるときに作る（電飾が OFF なら作らない）。
+    private var backGlowNode: SCNNode?
+    private struct BackGlowState: Equatable {
+        var opacity: Double
+        var dark: Bool
+    }
+    private var shownBackGlow = BackGlowState(opacity: 0, dark: true)
+    /// 背景の光の板を焼いたときの外観（板が無ければ nil）。
+    private var backGlowBakedDark: Bool?
+    /// 背景の光の板を作ったか・今の不透明度（テストで、電飾が OFF なら作らないこと・2D と同じ不透明度を写すことを見る）。
+    var hasBackGlowNode: Bool { backGlowNode != nil }
+    var backGlowOpacity: Double? {
+        guard let node = backGlowNode, !node.isHidden else { return nil }
+        return node.geometry?.firstMaterial?.value(forKey: Self.backGlowOpacityKey) as? Double
+    }
+    /// 背景の光の板を焼いたときの外観（テストで、外観を変えたら焼き直すことを見る）。
+    var backGlowBakedAppearanceIsDark: Bool? { backGlowBakedDark }
     /// フラッシュの板を作ったか（テストで、停止の演出が OFF なら作らないことを見る）。
     var hasFlashNode: Bool { flashNode != nil }
     /// フラッシュの板の一辺・縮め・盤の表面からの高さ（テストで、正面から見た半径が盤面の枠の半径になることを確かめる）。
@@ -581,8 +613,11 @@ final class Wheel3DScene {
         if shownStopEffects.flashOpacity > 0 { addFlash(shape) }
         removeParticles()
         if !shownParticles.isEmpty { addParticles(shape) }
+        removeBackGlow()
+        if shownBackGlow.opacity > 0 { addBackGlow(shape) }
         applyStopEffects()
         applyParticles()
+        applyBackGlow()
     }
 
     // MARK: 光の尾・残像
@@ -597,6 +632,9 @@ final class Wheel3DScene {
     /// 光の尾のにじみと芯。残像より後、電飾のにじみ（10）と電球（11）より前に描き、電球の奥にする。
     private static let trailGlowRenderingOrder = 8
     private static let trailCoreRenderingOrder = 9
+    /// 背景の光の脈動。盤・縁と同じ 0 で、SceneKit が半透明のものを不透明な盤・縁より後に描くのに任せる。強調の層（1）・残像より前
+    /// （縁の外の環だけで、盤の面には重ならない。深度を書かないので、後に描く半透明のノードはどれも上に重なる）。
+    private static let backGlowRenderingOrder = 0
     /// 停止の瞬間のフラッシュ。電飾（10・11）より後に描いて電球の上に重ね、深度は読むので手前の針には隠れる。
     private static let flashRenderingOrder = 15
     /// 紙吹雪、火花の尾、火花の順（2D の `WheelParticlesView` と同じく紙吹雪の上に火花）。深度を読まずにフラッシュより後に描き、
@@ -1142,6 +1180,101 @@ final class Wheel3DScene {
             renderer.cgContext.drawRadialGradient(gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: side / 2, options: [])
         }
     }()
+
+    // MARK: 背景の光の脈動
+
+    /// 背景の光の脈動を出す・消す。`opacity` は 2D と同じ `WheelBackGlow.opacity`（0 なら隠す）、`dark` は外観（色を 2D と同じく外観に合わせる）。
+    /// 板は初めて光らせるときに作り（電飾が OFF なら作らない）、大きさが変わって組み直したら作り直す。毎フレームは不透明度だけを書く。
+    func backGlow(_ opacity: Double, dark: Bool) {
+        let next = BackGlowState(opacity: opacity, dark: dark)
+        guard next != shownBackGlow else { return }
+        shownBackGlow = next
+        // 外観は板を焼いたときのものと比べる（光っていない待機中に外観を変えても、次に光らせるときに焼き直す）
+        if let shape = built, opacity > 0, backGlowNode == nil || backGlowBakedDark != dark { addBackGlow(shape) }
+        applyBackGlow()
+    }
+
+    private func applyBackGlow() {
+        guard let node = backGlowNode else { return }
+        let opacity = shownBackGlow.opacity
+        node.isHidden = opacity <= 0
+        if opacity > 0 { node.geometry?.firstMaterial?.setValue(opacity, forKey: Self.backGlowOpacityKey) }
+    }
+
+    /// 背景の光の不透明度・色を渡すシェーダの引数の名前。
+    private static let backGlowOpacityKey = "backGlowOpacity"
+    private static let backGlowColorKey = "backGlowColor"
+
+    /// 背景の光の色の出し方。SceneKit は線形の色空間で重ねてから sRGB に戻し、`SCNView`（背景は透明）はその色とアルファ値で
+    /// ページの地の上に重ねられる。2D と同じ見え方（地の上に sRGB の色 c を不透明度 a で重ねる = c·a + 地·(1 − a)）にするため、
+    /// アルファ値は a のまま、乗算済みの色は sRGB に戻したときに c·a になる値（冪 2.2 で近似した線形の値）を書く。
+    /// a は焼いた環の不透明度（2D と同じ、内側の 1 から外側の 0 への線形）× `WheelBackGlow.opacity`。
+    private static let backGlowShader = """
+    #pragma arguments
+    float backGlowOpacity;
+    float3 backGlowColor;
+    #pragma body
+    float coverage = clamp(_output.color.a * backGlowOpacity, 0.0, 1.0);
+    _output.color = float4(pow(backGlowColor * coverage, float3(2.2)), coverage);
+    """
+
+    /// 背景の光の板。2D の `WheelBackGlowView` と同じく、外周の縁の外周（`Theme.BackGlow.innerRadius`）でいちばん明るく、
+    /// 盤面の枠（`outerRadius` = 直径 ÷ 2）で 0 になる環を焼いた一辺 = 直径の板を、盤の表面のわずかに奥（`backGlowDepth`）に置く。
+    /// 深度は読むが書かないので、盤を傾けると盤の側面・縁に隠れる（盤の後ろの光に見える）。奥へ置いた分の遠近の縮みは広げて打ち消す。
+    private func addBackGlow(_ shape: Shape) {
+        removeBackGlow()
+        let diameter = Double(shape.diameter)
+        let plane = SCNPlane(width: diameter, height: diameter)
+        let material = Self.material(.white, lit: false)
+        material.diffuse.contents = Self.backGlowImage(diameter: diameter)
+        material.writesToDepthBuffer = false
+        material.shaderModifiers = [.fragment: Self.backGlowShader]
+        let color = UIColor(Theme.wheelBackGlow).resolvedColor(with: UITraitCollection(userInterfaceStyle: shownBackGlow.dark ? .dark : .light))
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        material.setValue(NSValue(scnVector3: SCNVector3(Float(r), Float(g), Float(b))), forKey: Self.backGlowColorKey)
+        material.setValue(0.0, forKey: Self.backGlowOpacityKey)
+        plane.materials = [material]
+        let node = SCNNode(geometry: plane)
+        let z = -Self.backGlowDepth
+        node.position.z = Float(z)
+        let grow = Float(Self.perspectiveShrink(z: z, diameter: diameter))
+        node.scale = SCNVector3(grow, grow, 1)
+        node.renderingOrder = Self.backGlowRenderingOrder
+        node.isHidden = true
+        tiltNode.addChildNode(node)
+        backGlowNode = node
+        backGlowBakedDark = shownBackGlow.dark
+    }
+
+    private func removeBackGlow() {
+        backGlowNode?.removeFromParentNode()
+        backGlowNode = nil
+        backGlowBakedDark = nil
+    }
+
+    /// 背景の光の板を盤の表面から奥へ置く距離（pt）。表面と同じ高さだと、傾けたときに盤の縁と重なってちらつくため。
+    private static let backGlowDepth = 0.5
+
+    /// 背景の光の環の不透明度（白で焼く。色と `WheelBackGlow.opacity` はシェーダ `backGlowShader` で掛ける）。
+    private static func backGlowImage(diameter: Double) -> UIImage {
+        let side: CGFloat = 512
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let ratio = side / CGFloat(diameter)
+        let inner = Theme.BackGlow.innerRadius(diameter: CGFloat(diameter)) * ratio
+        let outer = Theme.BackGlow.outerRadius(diameter: CGFloat(diameter)) * ratio
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { renderer in
+            // 2D と同じく、内側の 1 から外側の 0 へ不透明度を線形に落とす
+            let colors = [UIColor.white.cgColor, UIColor.white.withAlphaComponent(0).cgColor] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: [0, 1])
+            else { return }
+            let center = CGPoint(x: side / 2, y: side / 2)
+            // 始まりの円の内側は塗らない（盤の面には重ねない）
+            renderer.cgContext.drawRadialGradient(gradient, startCenter: center, startRadius: inner, endCenter: center, endRadius: outer, options: [])
+        }
+    }
 
     /// 盤の表面から `z` だけ浮かせた面を正面から見たとき、表面と同じ大きさに見せる縮み（カメラまでの距離の比）。
     private static func perspectiveShrink(z: Double, diameter: Double) -> Double {

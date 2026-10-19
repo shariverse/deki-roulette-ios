@@ -20,11 +20,11 @@ struct RouletteWheelView: View {
     var rotationPath = SpinPath.idle
     /// 止まったスライスの光彩の色（設定の「ルーレットの詳細設定」）。
     var glowStyle = GlowStyle.default
-    /// 「スピンの演出」。電飾（`lights`）・光の尾と残像（`trails`）・針の先の火花と停止の瞬間の紙吹雪（`particles`）・
-    /// 停止の瞬間のフラッシュと結果表示中の光彩の余韻（`stopEffects`）を、ON のものだけ出す。3D の盤面（`Wheel3DView`）と同じ値を受け取る。
+    /// 「スピンの演出」。電飾と背景の光の脈動（`lights`）・光の尾と残像（`trails`）・針の先の火花と停止の瞬間の紙吹雪（`particles`）・
+    /// 停止の瞬間のフラッシュ・針を大きく弾く動き・結果表示中の光彩の余韻（`stopEffects`）を、ON のものだけ出す。3D の盤面（`Wheel3DView`）と同じ値を受け取る。
     /// すべて OFF（`.none`）なら今の盤面のまま何も足さない。
     var effects = SpinEffects.none
-    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れ・光の尾・残像・火花を毎フレームここから引く。
+    /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れ・背景の光・光の尾・残像・火花を毎フレームここから引く。
     /// 指で動かしている間は、`WheelDragArea` が記録した指の動き（`WheelDragMotion`）から引く。
     var motion: TimedSpinMotion? = nil
     /// `motion` の開始時刻と同じ時計（`RouletteModel.now`）。

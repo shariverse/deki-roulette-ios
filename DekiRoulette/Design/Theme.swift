@@ -259,7 +259,6 @@ enum Theme {
     /// 暖かい白系、ライトは淡い地に溶けないよう琥珀色にする。`gold` / `flare` は使わない。
     static let wheelBackGlow = Color(light: 0xE8892A, dark: 0xFFF1D6)
 
-    /// 電飾の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）。
     /// 背景の光の脈動の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。直径に比例させる）。
     /// 光は外周の縁の外周（スライスの円の外 11pt。`Wheel3D.rimWidth` と同じ）から盤面の枠（外 `outerOffset`）までの環に置き、
     /// 縁の外周でいちばん明るく枠で 0 になるよう放射状にぼかす。盤面の面には重ねない（盤面の後ろから漏れる光に見せる）。
@@ -284,6 +283,7 @@ enum Theme {
         }
     }
 
+    /// 電飾の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）。
     enum LightRing {
         /// 電球の環の半径の、スライスの円の半径からの出幅。縁の外周線（+3.5〜5pt）と縁の外周（+11pt）の間の中央。
         static let ringOffset: CGFloat = 8

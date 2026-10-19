@@ -24,6 +24,13 @@ struct Wheel3DSceneTests {
             let offset = (y * width + x) * 4
             return SIMD3(Double(bytes[offset]), Double(bytes[offset + 1]), Double(bytes[offset + 2])) / 255
         }
+
+        /// アルファ値（乗算済み）。
+        func alpha(at point: CGPoint) -> Double {
+            let x = min(max(Int(point.x), 0), width - 1)
+            let y = min(max(Int(point.y), 0), height - 1)
+            return Double(bytes[(y * width + x) * 4 + 3]) / 255
+        }
     }
 
     /// 場面を描く。`time` は描く時刻（システムの時計の秒）。0 では、`SCNTransaction` で動かし始めた値は動きの始まり（変える前の値）で描かれる。
@@ -1208,6 +1215,73 @@ struct Wheel3DSceneTests {
         #expect(none.stoppedImagePlaneCount == 2)
         none.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: false, afterglow: false)
         #expect(none.stoppedImagePlaneCount == 1)
+    }
+
+    // MARK: 背景の光の脈動
+
+    /// 背景の光は 2D と同じく、外周の縁の外周から盤面の枠までの環だけを明るくし、盤の面と枠の外は変えない。
+    @Test(arguments: [true, false])
+    func 背景の光は縁の外の環だけを2Dと同じ見え方で明るくする(dark: Bool) throws {
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.backGlow(Config.wheelBackGlowMaxOpacity, dark: dark)
+        let glowing = try render(scene)
+        let inner = Double(Theme.BackGlow.innerRadius(diameter: size))
+        let outer = Double(Theme.BackGlow.outerRadius(diameter: size))
+        let traits = UITraitCollection(userInterfaceStyle: dark ? .dark : .light)
+        let resolve = { (color: Color) -> SIMD3<Double> in
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            UIColor(color).resolvedColor(with: traits).getRed(&r, green: &g, blue: &b, alpha: &a)
+            return SIMD3(Double(r), Double(g), Double(b))
+        }
+        // 9 時の向き（針と重ならない）で、環・盤の面・枠の外を見る。縁は表面より浮いているので遠近で少し大きく見え、
+        // 環の内側寄りは縁に隠れる。見えている外側寄りで確かめる
+        let ring = location(x: -(inner + (outer - inner) * 0.6), y: 0, pixels: plain)
+        // アルファ値は「最大の不透明度 × グラデーションの位置の不透明度」に近い（画素の位置の丸めで環の中の位置が 0.5pt ほどずれる分を許す）
+        let measured = glowing.alpha(at: ring)
+        #expect(abs(measured - Config.wheelBackGlowMaxOpacity * (1 - 0.6)) < 0.1, "\(measured)")
+        // 画面ではページの地（`ink900`）の上に、描いた色（乗算済み）とアルファ値で重ねられる。2D と同じく、
+        // 地の上に光の色をそのアルファ値で重ねた色に近いこと（線形の色空間で重ねた分を打ち消せていること）
+        let ground = resolve(Theme.ink900)
+        let expected = resolve(Theme.wheelBackGlow) * measured + ground * (1 - measured)
+        let shown = glowing.color(at: ring) + ground * (1 - measured)
+        let diff = shown - expected
+        #expect(max(abs(diff.x), abs(diff.y), abs(diff.z)) < 0.04, "\(shown) / \(expected)")
+        let face = location(x: -(inner - 20), y: 0, pixels: plain)
+        #expect(isClose(glowing.color(at: face), plain.color(at: face)))
+        let beyond = location(x: -(outer + 3), y: 0, pixels: plain)
+        #expect(isClose(glowing.color(at: beyond), plain.color(at: beyond)))
+        #expect(glowing.alpha(at: beyond) == 0)
+    }
+
+    /// 2D と同じ不透明度を写し、0 なら隠す。電飾が OFF（ずっと 0）なら板を作らない。
+    @Test func 背景の光は不透明度を写し電飾がOFFなら作らない() {
+        let off = makeScene(count: 4, rotation: 0)
+        off.backGlow(0, dark: true)
+        #expect(!off.hasBackGlowNode)
+
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.backGlow(0.3, dark: true)
+        #expect(scene.hasBackGlowNode)
+        #expect(abs((scene.backGlowOpacity ?? 0) - 0.3) < 1e-6)
+        scene.backGlow(0, dark: true)
+        #expect(scene.backGlowOpacity == nil)
+        // 組み直しても出し直す
+        scene.backGlow(0.5, dark: false)
+        scene.update(labels: ["", "", ""], diameter: size)
+        #expect(abs((scene.backGlowOpacity ?? 0) - 0.5) < 1e-6)
+    }
+
+    /// 光っていない待機中に外観を変えても、次に光らせるときに今の外観の色で焼き直す。
+    @Test func 背景の光は外観を変えたら次に光らせるときに焼き直す() {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.backGlow(0.4, dark: true)
+        #expect(scene.backGlowBakedAppearanceIsDark == true)
+        scene.backGlow(0, dark: true)
+        scene.backGlow(0, dark: false)
+        #expect(scene.backGlowBakedAppearanceIsDark == true)
+        scene.backGlow(0.4, dark: false)
+        #expect(scene.backGlowBakedAppearanceIsDark == false)
     }
 
     /// 止まった瞬間の針の沈みは 2D と同じ量（停止の演出が ON なら 8pt、OFF なら 4pt）。動きを減らす設定では沈めない。
