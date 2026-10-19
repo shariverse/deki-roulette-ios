@@ -1210,6 +1210,44 @@ struct Wheel3DSceneTests {
         #expect(none.stoppedImagePlaneCount == 1)
     }
 
+    // MARK: 背景の光の脈動
+
+    /// 背景の光は 2D と同じく、外周の縁の外周から盤面の枠までの環だけを明るくし、盤の面と枠の外は変えない。
+    @Test func 背景の光は縁の外の環だけを明るくする() throws {
+        let plain = try render(makeScene(count: 4, rotation: 0))
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.backGlow(Config.wheelBackGlowMaxOpacity, dark: true)
+        let glowing = try render(scene)
+        let inner = Double(Theme.BackGlow.innerRadius(diameter: size))
+        let outer = Double(Theme.BackGlow.outerRadius(diameter: size))
+        // 9 時の向き（針と重ならない）で、環・盤の面・枠の外を見る。縁は表面より浮いているので遠近で少し大きく見え、
+        // 環の内側寄りは縁に隠れる。見えている外側寄りで確かめる
+        let ring = location(x: -(inner + (outer - inner) * 0.6), y: 0, pixels: plain)
+        #expect(glowing.color(at: ring).x - plain.color(at: ring).x > 0.15, "\(glowing.color(at: ring)) / \(plain.color(at: ring))")
+        let face = location(x: -(inner - 20), y: 0, pixels: plain)
+        #expect(isClose(glowing.color(at: face), plain.color(at: face)))
+        let beyond = location(x: -(outer + 3), y: 0, pixels: plain)
+        #expect(isClose(glowing.color(at: beyond), plain.color(at: beyond)))
+    }
+
+    /// 2D と同じ不透明度を写し、0 なら隠す。電飾が OFF（ずっと 0）なら板を作らない。
+    @Test func 背景の光は不透明度を写し電飾がOFFなら作らない() {
+        let off = makeScene(count: 4, rotation: 0)
+        off.backGlow(0, dark: true)
+        #expect(!off.hasBackGlowNode)
+
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.backGlow(0.3, dark: true)
+        #expect(scene.hasBackGlowNode)
+        #expect(abs((scene.backGlowOpacity ?? 0) - 0.3) < 1e-6)
+        scene.backGlow(0, dark: true)
+        #expect(scene.backGlowOpacity == nil)
+        // 組み直しても出し直す
+        scene.backGlow(0.5, dark: false)
+        scene.update(labels: ["", "", ""], diameter: size)
+        #expect(abs((scene.backGlowOpacity ?? 0) - 0.5) < 1e-6)
+    }
+
     /// 止まった瞬間の針の沈みは 2D と同じ量（停止の演出が ON なら 8pt、OFF なら 4pt）。動きを減らす設定では沈めない。
     @Test func 針は停止の演出がONなら2倍沈む() {
         let cases: [(PointerBounce, Double)] = [(.big, 8), (.normal, 4)]
