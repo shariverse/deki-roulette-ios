@@ -130,22 +130,26 @@ struct SpinTeaseTests {
 
     // MARK: 入り方ごとの形
 
-    @Test func ためらいは戻らず境目か止まる角度の手前で止まりかける() {
+    @Test func ためらいは境目か止まる角度の手前で止まりかけてから行き過ぎ戻り過ぎて止まる() {
         for spin in Self.cases() {
             let path = SpinPath.teased(.hesitate, from: spin.from, to: spin.to, count: spin.count)
-            let angles = forwardAngles(path, sign: spin.sign)
-            for (a, b) in zip(angles, angles.dropFirst()) {
-                #expect(b >= a - 1e-9)
-            }
-            #expect(path.segments.count == 2)
+            #expect(path.segments.count == 4)
             let stop = spin.sign * spin.to
             let boundary = (stop / spin.slice).rounded(.down) * spin.slice
             let approach = min(spin.slice * Config.spinTeaseApproachFraction, Config.spinTeaseApproachMax)
-            let hesitation = spin.sign * path.segments[0].to
+            let swing = min(spin.slice * Config.spinTeaseSwingFraction, Config.spinTeaseSwingMax)
+            let turns = path.segments.map { spin.sign * $0.to }
             // 境目の手前 a か、止まる角度の `spinTeaseCreepMax` 手前の、止まる角度に近い方で止まりかける
-            #expect(abs(hesitation - max(boundary - approach, stop - Config.spinTeaseCreepMax)) < 1e-9)
-            #expect(hesitation < stop)
-            #expect(stop - hesitation <= Config.spinTeaseCreepMax + 1e-9)
+            #expect(abs(turns[0] - max(boundary - approach, stop - Config.spinTeaseCreepMax)) < 1e-9)
+            #expect(turns[0] < stop)
+            #expect(stop - turns[0] <= Config.spinTeaseCreepMax + 1e-9)
+            // そこから w だけ行き過ぎ、k·w だけ戻り過ぎてから止まる
+            #expect(abs(turns[1] - (stop + swing)) < 1e-9)
+            #expect(abs(turns[2] - (stop - swing * Config.spinTeaseSwingDecay)) < 1e-9)
+            #expect(abs(turns[3] - stop) < 1e-9)
+            // 止まりかけるまでは戻らない
+            let main = forwardAngles(path, sign: spin.sign).prefix(Int(Config.spinDuration * 1000))
+            #expect(zip(main, main.dropFirst()).allSatisfy { $1 >= $0 - 1e-9 })
         }
     }
 
@@ -163,9 +167,16 @@ struct SpinTeaseTests {
         let path = SpinPath.teased(tease, from: 0, to: to, count: count)
         let peak = stride(from: Config.spinDuration, through: path.duration, by: 0.001)
             .map { abs(path.angularVelocity(at: $0)) }.max() ?? 0
-        // ease-in-out の最大の傾きは 1.5 倍ほど。戻りかけは 0.8 秒で c + r を進む
-        let distance = Config.spinTeaseCreepMax + Config.spinTeaseRollBackMax
-        let shortest = Config.spinTeaseDuration * (1 - Config.spinTeaseRollBackShare)
+        // ease-in-out の最大の傾きは 1.6 倍ほど。いちばん速い区間は、ためらいでは最初の区間（1 秒）で c + w を、
+        // 戻りかけでは進み直す区間（1.2 秒）で c + r + k·w を進む
+        let swing = Config.spinTeaseSwingMax
+        let (distance, shortest) = switch tease {
+        case .rollBack:
+            (Config.spinTeaseCreepMax + Config.spinTeaseRollBackMax + swing * Config.spinTeaseSwingDecay,
+             Config.spinTeaseDuration * Config.spinTeaseRollBackShares[1])
+        default:
+            (Config.spinTeaseCreepMax + swing, Config.spinTeaseDuration * Config.spinTeaseSwingShares[0])
+        }
         #expect(peak < 2 * distance / shortest)
         #expect(abs(path.to - to) < 1e-9)
     }
@@ -206,39 +217,46 @@ struct SpinTeaseTests {
         }
     }
 
-    @Test func 戻りかけは境目か止まる角度の手前で戻ってから止まる() {
+    @Test func 戻りかけは境目か止まる角度の手前で戻ってから進み直し少し行き過ぎて止まる() {
         for spin in Self.cases() {
             let path = SpinPath.teased(.rollBack, from: spin.from, to: spin.to, count: spin.count)
-            #expect(path.segments.count == 3)
+            #expect(path.segments.count == 4)
             let stop = spin.sign * spin.to
             let boundary = (stop / spin.slice).rounded(.down) * spin.slice
-            let turn = spin.sign * path.segments[0].to
-            let bottom = spin.sign * path.segments[1].to
-            // 止まる角度の手前で止まりかけ、隣（1 つ前）のスライスの手前の境目は越えずに戻り、最後に止まる角度まで進んで止まる
-            #expect(turn < stop)
-            #expect(stop - turn <= Config.spinTeaseCreepMax + 1e-9)
-            #expect(bottom < turn)
-            #expect(bottom > boundary - spin.slice)
-            #expect(turn - bottom <= Config.spinTeaseRollBackMax + 1e-9)
+            let swing = min(spin.slice * Config.spinTeaseSwingFraction, Config.spinTeaseSwingMax)
+            let turns = path.segments.map { spin.sign * $0.to }
+            // 止まる角度の手前で止まりかけ、隣（1 つ前）のスライスの手前の境目は越えずに戻り、
+            // 進み直して k·w だけ行き過ぎてから止まる
+            #expect(turns[0] < stop)
+            #expect(stop - turns[0] <= Config.spinTeaseCreepMax + 1e-9)
+            #expect(turns[1] < turns[0])
+            #expect(turns[1] > boundary - spin.slice)
+            #expect(turns[0] - turns[1] <= Config.spinTeaseRollBackMax + 1e-9)
+            #expect(abs(turns[2] - (stop + swing * Config.spinTeaseSwingDecay)) < 1e-9)
+            #expect(abs(turns[3] - stop) < 1e-9)
             let angles = forwardAngles(path, sign: spin.sign)
-            #expect(zip(angles, angles.dropFirst()).contains { $1 < $0 - 1e-9 })
-            #expect((angles.max() ?? 0) <= stop + 1e-9)
+            #expect(abs((angles.max() ?? 0) - turns[2]) < 1e-6)
             #expect(spin.sign * path.angularVelocity(at: Config.spinDuration + 0.2) < 0)
         }
     }
 
-    @Test func 行き過ぎは止まる角度を越えてから戻る() {
+    @Test func 行き過ぎは行き過ぎ戻り過ぎ少し行き過ぎて止まる() {
         for spin in Self.cases() {
             let path = SpinPath.teased(.overshoot, from: spin.from, to: spin.to, count: spin.count)
-            #expect(path.segments.count == 2)
+            #expect(path.segments.count == 4)
             let stop = spin.sign * spin.to
-            let peak = spin.sign * path.segments[0].to
-            #expect(peak > stop)
+            let overshoot = min(spin.slice * Config.spinTeaseOvershootFraction, Config.spinTeaseOvershootMax)
+            let decay = Config.spinTeaseSwingDecay
+            let turns = path.segments.map { spin.sign * $0.to }
+            #expect(turns[0] > stop)
             // 隣のスライスには入ってもよいが、その次には入らない
-            #expect(peak - stop < spin.slice)
-            #expect(peak - stop <= Config.spinTeaseOvershootMax + 1e-9)
+            #expect(turns[0] - stop < spin.slice)
+            #expect(abs(turns[0] - stop - overshoot) < 1e-9)
+            #expect(abs(turns[1] - (stop - overshoot * decay)) < 1e-9)
+            #expect(abs(turns[2] - (stop + overshoot * decay * decay)) < 1e-9)
+            #expect(abs(turns[3] - stop) < 1e-9)
             let angles = forwardAngles(path, sign: spin.sign)
-            #expect(abs((angles.max() ?? 0) - peak) < 1e-6)
+            #expect(abs((angles.max() ?? 0) - turns[0]) < 1e-6)
             #expect(spin.sign * path.angularVelocity(at: Config.spinDuration + 0.6) < 0)
         }
     }
@@ -249,9 +267,11 @@ struct SpinTeaseTests {
         let approach = min(slice * Config.spinTeaseApproachFraction, Config.spinTeaseApproachMax)
         let back = min(slice * Config.spinTeaseRollBackFraction, Config.spinTeaseRollBackMax)
         let overshoot = min(slice * Config.spinTeaseOvershootFraction, Config.spinTeaseOvershootMax)
+        let swing = min(slice * Config.spinTeaseSwingFraction, Config.spinTeaseSwingMax)
         // 戻りは隣（1 つ前）のスライスの中に収まり、行き過ぎは隣（1 つ先）のスライスの中に収まる
         #expect(approach + back < slice)
         #expect(overshoot < slice)
+        #expect(swing < slice)
         // 境目すれすれ（直後・直前・ちょうど）でも最終角は変わらず、区間はそれぞれの向きに単調に進む
         for offset in [0, 1e-9, slice / 2, slice - 1e-9] {
             let to = 1440 + 5 * slice + offset
@@ -292,13 +312,13 @@ struct SpinTeaseTests {
         let sign: Double = direction == .clockwise ? 1 : -1
         let count = 2
         let slice = 180.0
-        // 境目の 20° 先に止まる。止まりかける角度は止まる角度の `spinTeaseCreepMax` 手前（境目の 5° 先）で、
-        // そこから `spinTeaseRollBackMax`（10°）戻るので、境目を越えて手前の隣のスライスに入ってから戻る
+        // 境目の 12° 先に止まる。止まりかける角度は止まる角度の `spinTeaseCreepMax`（10°）手前（境目の 2° 先）で、
+        // そこから `spinTeaseRollBackMax`（7°）戻るので、境目を越えて手前の隣のスライスに入ってから戻る
         let boundary = 1440 + slice
-        let path = SpinPath.teased(.rollBack, from: sign * 0.5, to: sign * (boundary + 20), count: count)
+        let path = SpinPath.teased(.rollBack, from: sign * 0.5, to: sign * (boundary + 12), count: count)
         let turn = sign * path.segments[0].to
         let bottom = sign * path.segments[1].to
-        #expect(abs(turn - (boundary + 20 - Config.spinTeaseCreepMax)) < 1e-9)
+        #expect(abs(turn - (boundary + 12 - Config.spinTeaseCreepMax)) < 1e-9)
         #expect(abs(turn - bottom - Config.spinTeaseRollBackMax) < 1e-9)
         #expect(bottom < boundary)
         // 境目は主の区間で越え、戻りで越え、進み直して越える（往復とも数える）
@@ -314,12 +334,13 @@ struct SpinTeaseTests {
         let sign: Double = direction == .clockwise ? 1 : -1
         let count = 8
         let slice = 45.0
-        // 境目の 30° 先（次の境目の 15° 手前）に止まる。行き過ぎは上限の `spinTeaseOvershootMax`（20°）で、次の境目を越えて戻る
+        // 境目の 35° 先（次の境目の 10° 手前）に止まる。行き過ぎは上限の `spinTeaseOvershootMax`（14°）で、次の境目を越えて戻る
+        // （戻り過ぎ・少し行き過ぎは止まる角度のまわり 5.6°・2.24° で、境目には届かない）
         let next = 1440 + 2 * slice
-        let to = sign * (next - 15)
+        let to = sign * (next - 10)
         let path = SpinPath.teased(.overshoot, from: sign * 0.5, to: to, count: count)
         let peak = sign * path.segments[0].to
-        #expect(abs(peak - (next - 15 + Config.spinTeaseOvershootMax)) < 1e-9)
+        #expect(abs(peak - (next - 10 + Config.spinTeaseOvershootMax)) < 1e-9)
         #expect(peak > next)
         #expect(peak < next + slice)
         let crossings = path.boundaryCrossings(count: count, minInterval: 0)
@@ -328,13 +349,13 @@ struct SpinTeaseTests {
         #expect(crossings.count == sampledCrossings(path, count: count))
     }
 
-    @Test(arguments: [(2, false), (8, false), (24, true), (36, true)])
+    @Test(arguments: [(2, false), (8, false), (30, true), (36, true)])
     func 狭いスライスでは振れ幅をスライス幅の割合で抑える(count: Int, narrow: Bool) {
         let slice = 360 / Double(count)
         let back = min(slice * Config.spinTeaseRollBackFraction, Config.spinTeaseRollBackMax)
         let overshoot = min(slice * Config.spinTeaseOvershootFraction, Config.spinTeaseOvershootMax)
         if narrow {
-            // 24 件（15°）・36 件（10°）では上限より割合の方が小さい
+            // 30 件（12°）・36 件（10°）では上限より割合の方が小さい
             #expect(back < Config.spinTeaseRollBackMax)
             #expect(overshoot < Config.spinTeaseOvershootMax)
         } else {
@@ -347,6 +368,10 @@ struct SpinTeaseTests {
         #expect(abs(rollBack.segments[0].to - rollBack.segments[1].to - back) < 1e-9)
         let overshot = SpinPath.teased(.overshoot, from: 0.5, to: to, count: count)
         #expect(abs(overshot.segments[0].to - to - overshoot) < 1e-9)
+        let swing = min(slice * Config.spinTeaseSwingFraction, Config.spinTeaseSwingMax)
+        #expect(narrow == (swing < Config.spinTeaseSwingMax))
+        let hesitated = SpinPath.teased(.hesitate, from: 0.5, to: to, count: count)
+        #expect(abs(hesitated.segments[1].to - to - swing) < 1e-9)
     }
 
     // MARK: 境目を越える時刻
@@ -369,20 +394,21 @@ struct SpinTeaseTests {
     }
 
     @Test(arguments: [SpinDirection.clockwise, .counterclockwise])
-    func 行き過ぎで隣のスライスに入ると往復で2回数える(direction: SpinDirection) {
+    func 行き過ぎで隣のスライスに出入りすると往復のたびに数える(direction: SpinDirection) {
         let sign: Double = direction == .clockwise ? 1 : -1
         let count = 24
         let slice = 15.0
-        // 止まる角度が境目の 1 度手前なので、9 度（スライス幅の 60%）の行き過ぎで次の境目を越えて戻る
+        // 止まる角度が境目の 1 度手前なので、9 度（スライス幅の 60%）の行き過ぎで次の境目を越えて戻り、
+        // 3.6 度戻り過ぎたあと 1.44 度の少し行き過ぎでもう一度越えて戻る
         let to = sign * (1440 + 7 * slice + slice - 1)
         // 始点はどの境目にも置かない（境目ちょうどから回り出すと、数え方の端の扱いが向きで違う）
         let path = SpinPath.teased(.overshoot, from: sign * 0.5, to: to, count: count)
         let crossings = path.boundaryCrossings(count: count, minInterval: 0)
         let next = sign * (1440 + 8 * slice)
         let atNext = crossings.filter { abs(path.angle(at: $0) - next) < 1e-6 }
-        #expect(atNext.count == 2)
+        #expect(atNext.count == 4)
         #expect(atNext.filter { $0 < Config.spinDuration }.count == 1)
-        #expect(atNext.filter { $0 > Config.spinDuration }.count == 1)
+        #expect(atNext.filter { $0 > Config.spinDuration }.count == 3)
         #expect(crossings.count == sampledCrossings(path, count: count))
     }
 
@@ -500,10 +526,12 @@ struct SpinTeaseTests {
     @Test func 区間の始まる時刻と範囲外() {
         let path = SpinPath.teased(.rollBack, from: 0, to: 1500, count: 8)
         let starts = path.startTimes
-        #expect(starts.count == 3)
+        #expect(starts.count == 4)
         #expect(abs(starts[0]) < 1e-12)
         #expect(abs(starts[1] - Config.spinDuration) < 1e-9)
-        #expect(abs(starts[2] - (Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseRollBackShare)) < 1e-9)
+        let shares = Config.spinTeaseRollBackShares
+        #expect(abs(starts[2] - (Config.spinDuration + Config.spinTeaseDuration * shares[0])) < 1e-9)
+        #expect(abs(starts[3] - (Config.spinDuration + Config.spinTeaseDuration * (shares[0] + shares[1]))) < 1e-9)
         #expect(abs(path.angle(at: -1)) < 1e-12)
         #expect(abs(path.angularVelocity(at: -1)) < 1e-12)
         #expect(abs(path.angularVelocity(at: path.duration + 1)) < 1e-12)

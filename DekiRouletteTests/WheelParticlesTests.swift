@@ -159,10 +159,10 @@ struct WheelParticlesTests {
 
     @Test(arguments: [2, 8, 24])
     func 焦らしで戻る区間の火花は逆向きに飛ぶ(count: Int) {
-        // 時計回りのスピンの、戻りかけの戻る区間（主の区間のあと 0.4 秒）と、行き過ぎの戻る区間（焦らしの区間すべて）
+        // 時計回りのスピンの、戻りかけの戻る区間（主の区間のあとの 0.5 秒）の終わりと、行き過ぎの戻り過ぎる区間（主の区間のあとの 1 秒）の中ほど
         let probes: [(SpinTease, TimeInterval)] = [
-            (.rollBack, Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseRollBackShare),
-            (.overshoot, Config.spinDuration + 0.8),
+            (.rollBack, Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseRollBackShares[0]),
+            (.overshoot, Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseSwingShares[0] * 0.8),
         ]
         for (tease, now) in probes {
             let path = SpinPath.teased(tease, from: 30, to: 30 + 360 * 5 + 200, count: count)
