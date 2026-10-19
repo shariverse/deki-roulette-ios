@@ -23,6 +23,7 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 | Build | 全ブランチへの push と Fork からの PR | iOS と visionOS のシミュレータでビルドしてユニットテストを実行 |
 | Archive | `main` への push、手動実行 | iOS と visionOS を Release 構成でアーカイブし、App Store Connect API キーで署名して IPA を書き出す |
 | Upload | `develop` と `release/**` への push、手動実行 | Archive に加えて iOS と visionOS を TestFlight へアップロードし、IPA を Artifacts に残す |
+| App Store Metadata | 手動実行 | 掲載文（`docs/app-store/`）とスクリーンショットを App Store Connect のバージョンに登録（iOS と visionOS） |
 
 ドキュメントだけの変更（`**/*.md`、`docs/**`）では Build を実行しない（Upload / Archive は実行する）。
 
@@ -46,6 +47,33 @@ visionOS の 2 つを上げるので、その分だけ枠を使う）。
 サイドバーの「Add Platform」でプラットフォームを追加しておく（追加前は altool が
 `Cannot determine the Apple ID from Bundle ID ... and platform 'VISION_OS'` で止まる。ロールは
 Account Holder / Admin / App Manager が必要）。
+
+## App Store の掲載文とスクリーンショット
+
+App Store に載せる文面の下書きと、スクリーンショットの設定は `docs/app-store/` に置く（詳細は
+[`docs/app-store/README.md`](docs/app-store/README.md)）。掲載文は
+`docs/app-store/metadata/<言語>.md`（`listing.md` の決まりに沿って書く）と
+`docs/app-store/review-notes.md`（審査用メモ）で、[`languages.json`](docs/app-store/languages.json) の
+言語ごとに登録する。
+
+スクリーンショットは [`screenshots.json`](docs/app-store/screenshots.json)（6.9 / 6.5 インチの iPhone、
+13 インチの iPad、Apple Vision Pro）に沿って `scripts/app-store-screenshots.sh` が UI テスト
+（`DekiRouletteUITests`）を流して撮る。手元で撮るとき:
+
+```bash
+scripts/app-store-screenshots.sh APP_IPHONE_67           # languages.json の全言語（ja, en）
+scripts/app-store-screenshots.sh APP_APPLE_VISION_PRO ja
+```
+
+出力先は `build/app-store-screenshots/<表示サイズ>/<言語>/`（画像。iOS は `manifest.json` も）。画像はリポジトリに置かない。
+iOS はテストが付けた添付（XCTest）を書き出し、visionOS は XCTest の手動スクリーンショットが使えない（1×1 の絵になる）ため、
+テストの合図に合わせて `xcrun simctl io ... screenshot` でホスト側から撮る。
+
+登録はワークフロー「App Store Metadata」を手動実行する。表示サイズごとに GitHub のランナーで並行して撮り、
+撮れたぶんを App Store Connect のバージョン（`project.yml` の `MARKETING_VERSION`、iOS と visionOS の両方）に登録する。
+`screenshots` / `upload` の入力を外せば、撮るだけ・先に中身だけ確かめることもできる。登録の前に
+App Store Connect で言語（主要言語）と、サポート URL・プライバシーポリシー URL・カテゴリ・年齢制限を入れておく
+（これらはワークフローでは扱わない）。
 
 ## 環境
 
@@ -155,6 +183,8 @@ DekiRoulette/
   Localization/   Localizable.xcstrings（日英）, InfoPlist.xcstrings, L10n
   Resources/      Assets.xcassets
 DekiRouletteTests/  Swift Testing によるユニットテスト
+DekiRouletteUITests/  App Store 用スクリーンショットを撮る UI テスト（スキーム DekiRouletteScreenshots だけで使う）
+docs/app-store/     App Store の掲載文の下書き（metadata/）と、スクリーンショットの表示サイズ・言語の設定
 ```
 
 Web 版との対応:
