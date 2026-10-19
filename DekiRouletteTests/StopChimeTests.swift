@@ -16,6 +16,17 @@ struct StopChimeTests {
         }
     }
 
+    /// 決まり音は演出の効果音（`sounds`）のフラグだけで決まり、ほかの演出のフラグには依らない。
+    @Test func 演出の効果音のフラグだけで鳴らすか決まる() {
+        var soundsOnly = SpinEffects.none
+        soundsOnly.sounds = true
+        var allButSounds = SpinEffects.all
+        allButSounds.sounds = false
+        #expect(StopChime.plays(effects: soundsOnly, soundEnabled: true, stop: .spin))
+        #expect(!StopChime.plays(effects: allButSounds, soundEnabled: true, stop: .spin))
+        #expect(!StopChime.plays(effects: soundsOnly, soundEnabled: false, stop: .spin))
+    }
+
     @Test func 効果音がOFFなら鳴らさない() {
         for style in SpinEffectStyle.allCases {
             #expect(!StopChime.plays(effects: style.effects, soundEnabled: false, stop: .spin))

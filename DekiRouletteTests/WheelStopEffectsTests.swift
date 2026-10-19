@@ -202,6 +202,25 @@ struct WheelStopEffectsTests {
         #expect(confetti == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10, confettiStart: 10))
     }
 
+    /// 演出ごとの ON / OFF は、そのフラグが受け持つ演出の時刻だけを変える。
+    @Test func 演出ごとのフラグはその演出の時刻だけを渡す() {
+        func cues(_ effects: SpinEffects) -> WheelStopCues {
+            stopped().cues(effects: effects, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        }
+        var lights = SpinEffects.none
+        lights.lights = true
+        #expect(cues(lights) == WheelStopCues(highlight: 2, lightsStoppedAt: 10))
+        var particles = SpinEffects.none
+        particles.particles = true
+        #expect(cues(particles) == WheelStopCues(highlight: 2, confettiStart: 10))
+        var stopEffects = SpinEffects.none
+        stopEffects.stopEffects = true
+        #expect(cues(stopEffects) == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10))
+        // 光の尾・焦らし・演出の効果音は停止の時刻を使わない
+        let others = SpinEffects(lights: false, trails: true, particles: false, tease: true, stopEffects: false, sounds: true)
+        #expect(cues(others) == WheelStopCues(highlight: 2))
+    }
+
     @Test func 動きを減らす設定ではフラッシュ_紙吹雪_余韻を渡さない() {
         let cues = stopped().cues(effects: .all, reduceMotion: true, highlightedIndex: 2, displacedByDrag: false)
         // 電飾は点けたまま動かさない（`WheelLights` が動きを減らす設定の明るさにする）ので、時刻はそのまま渡す

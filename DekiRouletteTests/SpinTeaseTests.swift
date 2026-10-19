@@ -181,6 +181,31 @@ struct SpinTeaseTests {
         #expect(abs(plain.fallback - Config.spinFallback) < 1e-9)
     }
 
+    /// 焦らしを入れるかは `tease` だけで決まり、ほかの演出のフラグには依らない（乱数の引き方も同じ）。
+    @Test func 焦らしはteaseのフラグだけで入れる() {
+        var teaseOnly = SpinEffects.none
+        teaseOnly.tease = true
+        var allButTease = SpinEffects.all
+        allButTease.tease = false
+        for spin in Self.cases() {
+            var first = SeededGenerator(seed: 7)
+            var second = SeededGenerator(seed: 7)
+            let teased = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: teaseOnly, using: &first)
+            let all = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: .all, using: &second)
+            #expect(teased.tease != nil)
+            #expect(teased == all)
+
+            var third = SeededGenerator(seed: 7)
+            var fourth = SeededGenerator(seed: 7)
+            let plain = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: allButTease, using: &third)
+            #expect(plain.tease == nil)
+            #expect(plain == SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: .none, using: &fourth))
+            // 焦らしを入れないときは乱数を引かない
+            var untouched = SeededGenerator(seed: 7)
+            #expect(third.next() == untouched.next())
+        }
+    }
+
     @Test func 戻りかけは境目か止まる角度の手前で戻ってから止まる() {
         for spin in Self.cases() {
             let path = SpinPath.teased(.rollBack, from: spin.from, to: spin.to, count: spin.count)

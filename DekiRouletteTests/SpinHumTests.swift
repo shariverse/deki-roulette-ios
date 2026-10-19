@@ -29,6 +29,16 @@ struct SpinHumTests {
         }
     }
 
+    /// うなりは演出の効果音（`sounds`）のフラグだけで決まり、ほかの演出のフラグには依らない。
+    @Test func 演出の効果音のフラグだけで付けるか決まる() {
+        var soundsOnly = SpinEffects.none
+        soundsOnly.sounds = true
+        var allButSounds = SpinEffects.all
+        allButSounds.sounds = false
+        #expect(SpinHum.plays(effects: soundsOnly, reducedMotion: false))
+        #expect(!SpinHum.plays(effects: allButSounds, reducedMotion: false))
+    }
+
     @Test func 動きを減らす設定では付けない() {
         for style in SpinEffectStyle.allCases {
             #expect(!SpinHum.plays(effects: style.effects, reducedMotion: true))
