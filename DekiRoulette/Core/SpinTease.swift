@@ -19,16 +19,16 @@ enum SpinTease: String, CaseIterable, Sendable {
 
 extension SpinPath {
     /// スピン（ボタン・フリック）の動き。累積角 `from` から `to`（`RouletteMath.nextRotation` が決めたもの）へ回す。
-    /// `style.showsCommonEffects` が偽（「なし」）なら焦らしを入れず、今の `SpinMotion`（`Config.spinDuration`・`spinEasing`。
+    /// `effects.tease` が偽なら焦らしを入れず、今の `SpinMotion`（`Config.spinDuration`・`spinEasing`。
     /// フリックでは `FlickSpin.easing`）と同じ区間 1 つで、乱数は引かない。
     /// 真なら `SpinTease.random(using:)` で入り方を選んで `teased(_:from:to:count:releaseVelocity:)` にする（長さは入り方に依らず
     /// `Config.spinDuration + Config.spinTeaseDuration`）。`accessibilityReduceMotion` では回さないので、呼び出し側が使わない。
     /// `releaseVelocity` はフリックの指を離した瞬間の角速度（度/秒）。主の区間の初速をそれに合わせる。
     static func spin<G: RandomNumberGenerator>(
-        from: Double, to: Double, count: Int, style: SpinEffectStyle,
+        from: Double, to: Double, count: Int, effects: SpinEffects,
         releaseVelocity: Double? = nil, using rng: inout G
     ) -> SpinPath {
-        guard style.showsCommonEffects else {
+        guard effects.tease else {
             return plain(from: from, to: to, duration: Config.spinDuration, releaseVelocity: releaseVelocity)
         }
         let tease = SpinTease.random(using: &rng)
@@ -36,10 +36,10 @@ extension SpinPath {
     }
 
     static func spin(
-        from: Double, to: Double, count: Int, style: SpinEffectStyle, releaseVelocity: Double? = nil
+        from: Double, to: Double, count: Int, effects: SpinEffects, releaseVelocity: Double? = nil
     ) -> SpinPath {
         var rng = SystemRandomNumberGenerator()
-        return spin(from: from, to: to, count: count, style: style, releaseVelocity: releaseVelocity, using: &rng)
+        return spin(from: from, to: to, count: count, effects: effects, releaseVelocity: releaseVelocity, using: &rng)
     }
 
     /// 入り方 `tease` の焦らしを入れたスピン。区間は次のとおりで、全体は `Config.spinDuration + Config.spinTeaseDuration`。

@@ -787,7 +787,7 @@ struct RouletteModelTests {
                 let direction: SpinDirection? = release.map { $0 < 0 ? .counterclockwise : .clockwise }
                 let started = if passesStyle {
                     model.beginSpin(
-                        reducedMotion: false, style: SpinEffectStyle.none, fullSpins: 5, direction: direction, releaseVelocity: release
+                        reducedMotion: false, effects: .none, fullSpins: 5, direction: direction, releaseVelocity: release
                     )
                 } else {
                     model.beginSpin(reducedMotion: false, fullSpins: 5, direction: direction, releaseVelocity: release)
@@ -826,7 +826,7 @@ struct RouletteModelTests {
         for round in 0..<30 {
             let from = model.rotation
             let direction: SpinDirection = round.isMultiple(of: 2) ? .clockwise : .counterclockwise
-            let next = try #require(model.beginSpin(reducedMotion: false, style: style, direction: direction))
+            let next = try #require(model.beginSpin(reducedMotion: false, effects: style.effects, direction: direction))
             let path = model.rotationPath
             #expect(path.tease != nil)
             #expect(path.from == from)
@@ -857,7 +857,7 @@ struct RouletteModelTests {
                 free.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
                 free.rotation = 25
                 let freeNext = try #require(free.beginSpin(
-                    reducedMotion: false, style: style, fullSpins: fullSpins, direction: direction, releaseVelocity: release
+                    reducedMotion: false, effects: style.effects, fullSpins: fullSpins, direction: direction, releaseVelocity: release
                 ))
                 free.rotation = freeNext
                 free.finishSpin()
@@ -869,7 +869,7 @@ struct RouletteModelTests {
                 aimed.rotation = 25
                 aimed.toggleTarget(id: aimed.items[index].id)
                 let aimedNext = try #require(aimed.beginSpin(
-                    reducedMotion: false, style: style, fullSpins: fullSpins, direction: direction, releaseVelocity: release
+                    reducedMotion: false, effects: style.effects, fullSpins: fullSpins, direction: direction, releaseVelocity: release
                 ))
                 #expect(aimedNext == freeNext)
                 #expect(aimed.rotationPath == free.rotationPath)
@@ -888,7 +888,7 @@ struct RouletteModelTests {
             model.now = { 30 }
             let direction: SpinDirection = release < 0 ? .counterclockwise : .clockwise
             let next = try #require(model.beginSpin(
-                reducedMotion: false, style: .all, fullSpins: 5, direction: direction, releaseVelocity: release
+                reducedMotion: false, effects: .all, fullSpins: 5, direction: direction, releaseVelocity: release
             ))
             let path = model.rotationPath
             let tease = try #require(path.tease)
@@ -900,7 +900,7 @@ struct RouletteModelTests {
 
     @Test func 動きを減らす設定では焦らしを入れない() throws {
         let model = makeModel()
-        let next = try #require(model.beginSpin(reducedMotion: true, style: .all))
+        let next = try #require(model.beginSpin(reducedMotion: true, effects: .all))
         #expect(model.rotationPath.tease == nil)
         #expect(model.rotationPath.segments.count == 1)
         #expect(model.rotationPath.to == next)
@@ -910,7 +910,7 @@ struct RouletteModelTests {
 
     @Test func 演出なしの保険は今の長さで止める() async throws {
         let model = makeModel()
-        _ = try #require(model.beginSpin(reducedMotion: false, style: .none))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: .none))
         try await Task.sleep(for: .seconds(Config.spinFallback + 0.4))
         #expect(!model.spinning)
         #expect(model.result != nil)
@@ -919,7 +919,7 @@ struct RouletteModelTests {
     @Test func 焦らしのスピンは焦らしを含めた長さまで止めず境目ごとに刻む() async throws {
         let model = makeModel()
         model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 9))
-        _ = try #require(model.beginSpin(reducedMotion: false, style: .lights))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: SpinEffectStyle.lights.effects))
         let expected = HapticSchedule.boundaryCrossings(along: model.rotationPath, count: 4, minInterval: Config.hapticMinInterval)
         #expect(!expected.isEmpty)
         // 焦らし無しの保険の時刻を過ぎてもまだ止めない

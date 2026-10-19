@@ -1,7 +1,7 @@
 import Foundation
 
 /// 2D の盤面の停止の瞬間のフラッシュと、結果表示中の止まったスライスの光彩の余韻（`docs/SPEC.md` の §5.5）の、
-/// 停止からの経過時間 → 強さ。「スピンの演出」が「なし」以外（`SpinEffectStyle.showsCommonEffects`）のときだけ使う。
+/// 停止からの経過時間 → 強さ。停止の演出（`SpinEffects.stopEffects`）が ON のときだけ使う。
 /// 入力は停止からの経過時間・演出を出すか・動きを減らす設定だけで、項目・指定（`targetId`）・印・止まったスライスは受け取らない
 /// （余韻を付けるスライスは描く側が止まったスライス（`SpinOutcome`）から決め、強さはどのスライスでも同じ）。
 enum WheelStopEffects {
@@ -18,7 +18,7 @@ enum WheelStopEffects {
         return flashPeakOpacity * remaining * remaining
     }
 
-    /// フラッシュを描くか。演出が「なし」・動きを減らす設定・結果が無いときは描かない。
+    /// フラッシュを描くか。停止の演出が OFF・動きを減らす設定・結果が無いときは描かない。
     static func flashes(enabled: Bool, reduceMotion: Bool, elapsed: TimeInterval?) -> Bool {
         guard enabled, !reduceMotion, let elapsed else { return false }
         return flashOpacity(at: elapsed) > 0
@@ -41,7 +41,7 @@ enum WheelStopEffects {
         afterglowLowLevel + (1 - afterglowLowLevel) * afterglowWave(at: elapsed)
     }
 
-    /// 光彩を脈打たせるか。演出が「なし」・動きを減らす設定・結果が無い（指で動かして強調を解いた・次のスピン・結果が消えた）ときは
+    /// 光彩を脈打たせるか。停止の演出が OFF・動きを減らす設定・結果が無い（指で動かして強調を解いた・次のスピン・結果が消えた）ときは
     /// 脈打たせない（光彩は今のまま）。
     static func pulses(enabled: Bool, reduceMotion: Bool, showingResult: Bool) -> Bool {
         enabled && !reduceMotion && showingResult
@@ -65,12 +65,12 @@ extension WheelStopEffects {
         /// 止まったスライスの光彩の倍率（1 なら今の光彩のまま）。
         var glowLevel = 1.0
 
-        /// 何も足さない（「なし」・動きを減らす設定・結果が無いとき）。
+        /// 何も足さない（停止の演出が OFF・動きを減らす設定・結果が無いとき）。
         static let none = Frame()
     }
 
     /// 時刻 `now` の 1 フレーム。`flashStart` はフラッシュを始めた時刻（停止の瞬間を見たときだけ。指で強調を解いても止めない）、
-    /// `afterglowStart` は余韻の基準の時刻（結果を出していて強調している間だけ）。演出が「なし」・動きを減らす設定では `none`。
+    /// `afterglowStart` は余韻の基準の時刻（結果を出していて強調している間だけ）。停止の演出が OFF・動きを減らす設定では `none`。
     static func frame(
         enabled: Bool, reduceMotion: Bool, flashStart: TimeInterval?, afterglowStart: TimeInterval?, now: TimeInterval
     ) -> Frame {
@@ -118,7 +118,7 @@ struct WheelStopMoment: Equatable, Sendable {
     ///   - highlightedIndex: 止まったスライスの添字（`model.outcome?.index`）。
     ///   - displacedByDrag: 結果が出たあとに指で盤面を動かした（強調を解く）。
     func cues(
-        style: SpinEffectStyle, reduceMotion: Bool, highlightedIndex: Int?, displacedByDrag: Bool
+        effects: SpinEffects, reduceMotion: Bool, highlightedIndex: Int?, displacedByDrag: Bool
     ) -> WheelStopCues {
         let highlight = displacedByDrag ? nil : highlightedIndex
         // 電飾の点滅と脈動・光彩の余韻は、指で動かして強調を解いたら止める
@@ -127,12 +127,12 @@ struct WheelStopMoment: Equatable, Sendable {
         let burst = highlightedIndex != nil && witnessed && !reduceMotion ? start : nil
         return WheelStopCues(
             highlight: highlight,
-            lightsStoppedAt: style.showsLights ? emphasized : nil,
+            lightsStoppedAt: effects.lights ? emphasized : nil,
             afterglowStart: WheelStopEffects.pulses(
-                enabled: style.showsCommonEffects, reduceMotion: reduceMotion, showingResult: highlight != nil
+                enabled: effects.stopEffects, reduceMotion: reduceMotion, showingResult: highlight != nil
             ) ? emphasized : nil,
-            flashStart: style.showsCommonEffects ? burst : nil,
-            confettiStart: style.showsParticles ? burst : nil
+            flashStart: effects.stopEffects ? burst : nil,
+            confettiStart: effects.particles ? burst : nil
         )
     }
 }
@@ -143,10 +143,10 @@ struct WheelStopCues: Equatable, Sendable {
     var highlight: Int?
     /// 電飾の点滅と脈動の基準（`WheelLightsTimeline` の `stoppedAt`）。電飾を出さない・強調を解いたら nil。
     var lightsStoppedAt: TimeInterval?
-    /// 光彩の余韻の基準。脈打たせないとき（「なし」・動きを減らす設定・強調を解いた）は nil。
+    /// 光彩の余韻の基準。脈打たせないとき（停止の演出が OFF・動きを減らす設定・強調を解いた）は nil。
     var afterglowStart: TimeInterval?
-    /// フラッシュを始めた時刻。「なし」・動きを減らす設定・見ていない停止では nil。
+    /// フラッシュを始めた時刻。停止の演出が OFF・動きを減らす設定・見ていない停止では nil。
     var flashStart: TimeInterval?
-    /// 紙吹雪がはじけた時刻。紙吹雪を出さないスタイル・動きを減らす設定・見ていない停止では nil。
+    /// 紙吹雪がはじけた時刻。紙吹雪を出さない設定・動きを減らす設定・見ていない停止では nil。
     var confettiStart: TimeInterval?
 }

@@ -19,19 +19,19 @@ struct SpinHumTests {
     // MARK: 鳴らす条件
 
     @Test func なしでは付けない() {
-        #expect(!SpinHum.plays(style: .none, reducedMotion: false))
-        #expect(!SpinHum.plays(style: .none, reducedMotion: true))
+        #expect(!SpinHum.plays(effects: .none, reducedMotion: false))
+        #expect(!SpinHum.plays(effects: .none, reducedMotion: true))
     }
 
     @Test func 演出があれば付ける() {
         for style in SpinEffectStyle.allCases where style != .none {
-            #expect(SpinHum.plays(style: style, reducedMotion: false))
+            #expect(SpinHum.plays(effects: style.effects, reducedMotion: false))
         }
     }
 
     @Test func 動きを減らす設定では付けない() {
         for style in SpinEffectStyle.allCases {
-            #expect(!SpinHum.plays(style: style, reducedMotion: true))
+            #expect(!SpinHum.plays(effects: style.effects, reducedMotion: true))
         }
     }
 
@@ -162,14 +162,14 @@ struct SpinHumTests {
     func 演出ありのスピンでうなりの打ちを用意する(style: SpinEffectStyle) throws {
         let model = makeModel()
         model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 9))
-        _ = try #require(model.beginSpin(reducedMotion: false, style: style))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: style.effects))
         #expect(!model.humStrokes.isEmpty)
         #expect(model.humStrokes == SpinHum.strokes(along: model.rotationPath))
     }
 
     @Test func なしのスピンではうなりを付けない() throws {
         let model = makeModel()
-        _ = try #require(model.beginSpin(reducedMotion: false, style: SpinEffectStyle.none))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: .none))
         #expect(model.humStrokes.isEmpty)
         // 回転音は今のまま
         #expect(!model.clickTimes.isEmpty)
@@ -177,13 +177,13 @@ struct SpinHumTests {
 
     @Test func 動きを減らす設定のスピンではうなりを付けない() throws {
         let model = makeModel()
-        _ = try #require(model.beginSpin(reducedMotion: true, style: .all))
+        _ = try #require(model.beginSpin(reducedMotion: true, effects: .all))
         #expect(model.humStrokes.isEmpty)
     }
 
     @Test func 惰性ではうなりを付けず前のスピンの打ちも捨てる() throws {
         let model = makeModel()
-        _ = try #require(model.beginSpin(reducedMotion: false, style: .all))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: .all))
         #expect(!model.humStrokes.isEmpty)
         model.finishSpin()
         _ = try #require(model.beginCoast(angularVelocity: 300, reducedMotion: false))
@@ -195,14 +195,14 @@ struct SpinHumTests {
         for seed: UInt64 in [1, 7, 42] {
             let free = makeModel()
             free.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
-            _ = try #require(free.beginSpin(reducedMotion: false, style: .all))
+            _ = try #require(free.beginSpin(reducedMotion: false, effects: .all))
             free.finishSpin()
             let index = try #require(free.outcome?.index)
 
             let aimed = makeModel()
             aimed.toggleTarget(id: aimed.items[index].id)
             aimed.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
-            _ = try #require(aimed.beginSpin(reducedMotion: false, style: .all))
+            _ = try #require(aimed.beginSpin(reducedMotion: false, effects: .all))
 
             #expect(aimed.rotationPath == free.rotationPath)
             #expect(aimed.humStrokes == free.humStrokes)

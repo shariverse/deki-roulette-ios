@@ -226,7 +226,8 @@ final class RouletteModel {
     /// スピンを開始し、盤面が止まるべき累積回転角を返す。回せないときは nil。
     /// 呼び出し側はこの値を `rotation` に `Theme.spinAnimation(path: rotationPath)` で反映し、
     /// アニメーション完了時に `finishSpin()` を呼ぶ。
-    /// `style` は「スピンの演出」。「なし」以外なら止まり際の焦らし（`SpinTease`）を入れる（動きを減らす設定では入れない）。
+    /// `effects` は「スピンの演出」。焦らし（`tease`）が ON なら止まり際の焦らし（`SpinTease`）を入れ（動きを減らす設定では入れない）、
+    /// 演出の効果音（`sounds`）が ON ならうなりの打ちを用意する。
     /// 焦らしは止まる位置を変えず、入り方は演出の設定・乱数・止まる累積角と件数だけで決める（指定は渡さない）。
     /// `fullSpins` を渡すと周回数だけをその値にする（フリックの強さの反映）。止まる位置の決め方は変わらない。
     /// `direction` を渡すとその向きに回し、以後のボタンのスピンもその向きを引き継ぐ（フリックの向きの反映）。
@@ -234,7 +235,7 @@ final class RouletteModel {
     /// `releaseVelocity` に指を離した瞬間の角速度（度/秒）を渡すと、盤面の初速をそれに合わせる（`SpinPath.spin` が主の区間の曲線を決める）。
     /// 長さと止まる位置は変わらない。省くと `Config.spinEasing` で回す（ボタンには初速が無い）。
     func beginSpin(
-        reducedMotion: Bool, style: SpinEffectStyle = SpinEffectStyle.none, fullSpins: Int? = nil,
+        reducedMotion: Bool, effects: SpinEffects = .none, fullSpins: Int? = nil,
         direction: SpinDirection? = nil, releaseVelocity: Double? = nil
     ) -> Double? {
         guard canSpin else { return nil }
@@ -262,7 +263,7 @@ final class RouletteModel {
         }
         // 動きを減らす設定では回さないので、焦らしを入れない（乱数も引かない）
         let path = SpinPath.spin(
-            from: rotation, to: next, count: items.count, style: reducedMotion ? SpinEffectStyle.none : style,
+            from: rotation, to: next, count: items.count, effects: reducedMotion ? .none : effects,
             releaseVelocity: releaseVelocity, using: &randomSource
         )
         rotationPath = path
@@ -278,7 +279,7 @@ final class RouletteModel {
             along: path, count: items.count, minInterval: Config.clickMinInterval
         )
         // うなりも同じ動きから打つ時刻と強さを先に求める。「なし」と動きを減らす設定では付けない
-        humStrokes = SpinHum.plays(style: style, reducedMotion: reducedMotion) ? SpinHum.strokes(along: path) : []
+        humStrokes = SpinHum.plays(effects: effects, reducedMotion: reducedMotion) ? SpinHum.strokes(along: path) : []
 
         // 完了コールバックが来ない環境（バックグラウンド等）向けの保険。長さ（焦らしを含む）の 0.6 秒後
         fallbackTask?.cancel()
