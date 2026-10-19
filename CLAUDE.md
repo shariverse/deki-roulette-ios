@@ -276,7 +276,7 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 
 指で動かしている間の速さに連動する演出（電飾の流れ・背景の光の脈動・光の尾・残像・火花）は、`RouletteWheelView` と `Wheel3DView` が `WheelDragArea` に `tracksMotion`（`SpinEffects.tracksDragMotion`。電飾・光の尾・火花の
 どれかを出すとき。どれも出さないときは記録しない）と `now` を渡し、`WheelDragArea` が `follow` のたびに `WheelDragMotion` へ記録して `content` の 3 つ目の引数で渡す
-（2D・3D とも電飾と光の尾・残像と火花に渡す）。演出中（`interactive == false`）に始まったドラッグは記録しない。記録は次のドラッグを始めるまで残し、指を離したあとの残り
+（2D・3D とも電飾・背景の光と光の尾・残像と火花に渡す）。演出中（`interactive == false`）に始まったドラッグは記録しない。記録は次のドラッグを始めるまで残し、指を離したあとの残り
 （強さの落ち方・飛んでいる火花）は `Config.dragEffectSettleTime`（0.5 秒）まで描く。スピン・惰性に移ったら `WheelEffectMotion.current` がそちらを選ぶ。
 抽選しないので停止の演出・焦らし・うなり・決まり音は出さず（回転音・触覚は今のまま）、`RouletteModel` は変えない。惰性は `currentMotion` に入るので
 スピンと同じ経路で出る（強さ約 0.33 未満なので光の尾・残像は閾値に届かない）。
@@ -332,7 +332,8 @@ SceneKit は線形の色空間で重ねるので、電球は不透明度では�
 
 背景の光の脈動（「スピンの演出」の電飾が ON）は、`WheelBackGlowTimeline` を `WheelParticlesTimeline` の内側（`WheelStopEffectsTimeline` の外）で `Wheel3DSurface` を包むように置いて
 毎フレーム引き（2D と同じ `now()`・`WheelEffectMotion`・`WheelBackGlow.opacity`）、`Wheel3DScene.backGlow(_:dark:)` が `tiltNode` の板（2D と同じ環を外観に合わせた色で焼いた一辺 = 直径の板）の
-不透明度に写す。板は盤の表面から `backGlowDepth`（0.5pt）奥に置いて遠近の縮みを広げて打ち消し、深度は読むが書かない（傾けると盤の側面・縁に隠れる）。外観が変わったら焼き直す。
+不透明度に写す。SceneKit は線形の色空間で重ねてから sRGB に戻すので、透明な地に重ねた半透明の色は 2D より明るく出る。焼く環の各点の不透明度とノードの不透明度に
+冪 2.2（`linearAlpha`）を掛けて打ち消す（`Wheel3DSceneTests` が 2D と同じ合成値に近いことを画素で確かめる）。板は盤の表面から `backGlowDepth`（0.5pt）奥に置いて遠近の縮みを広げて打ち消し、深度は読むが書かない（傾けると盤の側面・縁に隠れる）。外観は焼いたときのもの（`backGlowBakedDark`）と比べ、光っていない待機中に変えても次に光らせるときに焼き直す。
 電飾が OFF なら板を作らない（初めて光らせるときに作り、組み直したら作り直す）。
 
 光の尾・残像（「スピンの演出」の光の尾・残像が ON）は、`WheelTrailsTimeline` を `WheelLightsTimeline` の内側で `Wheel3DSurface` を包むように置いて毎フレーム引き
@@ -342,7 +343,7 @@ SceneKit は線形の色空間で重ねるので、電球は不透明度では�
 光の尾は `trailNode` に、`Theme.TrailRing` と同じ半径・太さの芯とにじみの切れ端（`Theme.Wheel3D.trailPieceAngle` 度の同じ形）を最長の長さ分並べ、
 縁の上面から `trailLift` 浮かせる（電飾のにじみ・電球より奥、針の下）。毎フレームは残像の角度（1 周に畳む）・不透明度と、切れ端ごとの
 `WheelTrails.Trail.opacity(atDistance:segments:)`（切れ端の中央の頭からの距離）を不透明度に写すだけで、メッシュや画像は作り直さない（向きが変わったときだけ切れ端を並べ直す）。
-どちらも照明に依らない塗りで深度は書かず、`renderingOrder` で残像 → 光の尾 → 電飾 → フラッシュ → 火花・紙吹雪 → 結果の帯の順に描く（帯の画像の透明な余白が深度で残像を隠さないよう、帯を最後にする）。
+どちらも照明に依らない塗りで深度は書かず、`renderingOrder` で背景の光（盤・縁と同じ 0。半透明なので不透明な盤・縁より後）→ 残像 → 光の尾 → 電飾 → フラッシュ → 火花・紙吹雪 → 結果の帯の順に描く（帯の画像の透明な余白が深度で残像を隠さないよう、帯を最後にする）。
 光の尾の切れ端は最後に写した濃さを覚え、濃さが変わらない切れ端（残像だけが変わったフレーム・尾の外のまま）の不透明度は書かない。にじみの外径は
 `Theme.Wheel3D.trailGlowBounds` で外周の縁（スライスの円の外 `rimWidth`）までに止める（2D の 12pt のにじみは縁の外の地にも重なるが、3D の縁の外は盤の無い宙で、傾けると浮いて見えるため）。
 強調の画像の板（暗くする層・止まったスライスの画像。`imagePlane`）も深度を書かずに残像より前（1〜3）に描き、消している途中の強調（`clearHighlight`）は
