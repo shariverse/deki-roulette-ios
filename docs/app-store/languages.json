@@ -1,0 +1,14 @@
+{
+  "_comment": [
+    "App Store に載せる言語。スクリーンショットの撮影と、掲載文の登録の両方で使う。",
+    "language:      このリポジトリでの言語コード。docs/app-store/metadata/<language>.md と、撮ったスクリーンショットのフォルダ名に使う",
+    "appleLanguage: 撮るときにアプリへ渡す -AppleLanguages の値（String Catalog の言語コード）",
+    "appleLocale:   撮るときにアプリへ渡す -AppleLocale の値（日付や数字の書き方）",
+    "storeLocale:   App Store Connect のロケール（アプリの言語コードとは別物）",
+    "先頭の言語を App Store Connect の主要言語にそろえる（主要言語はアプリの作成時に決まり、画面で変える）。アプリは日本語が既定（CFBundleDevelopmentRegion が ja）なので ja を先頭にする。"
+  ],
+  "languages": [
+    { "language": "ja", "appleLanguage": "ja", "appleLocale": "ja_JP", "storeLocale": "ja" },
+    { "language": "en", "appleLanguage": "en", "appleLocale": "en_US", "storeLocale": "en-US" }
+  ]
+}
