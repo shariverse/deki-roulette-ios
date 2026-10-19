@@ -1248,6 +1248,18 @@ struct Wheel3DSceneTests {
         #expect(abs((scene.backGlowOpacity ?? 0) - 0.5) < 1e-6)
     }
 
+    /// 光っていない待機中に外観を変えても、次に光らせるときに今の外観の色で焼き直す。
+    @Test func 背景の光は外観を変えたら次に光らせるときに焼き直す() {
+        let scene = makeScene(count: 4, rotation: 0)
+        scene.backGlow(0.4, dark: true)
+        #expect(scene.backGlowBakedAppearanceIsDark == true)
+        scene.backGlow(0, dark: true)
+        scene.backGlow(0, dark: false)
+        #expect(scene.backGlowBakedAppearanceIsDark == true)
+        scene.backGlow(0.4, dark: false)
+        #expect(scene.backGlowBakedAppearanceIsDark == false)
+    }
+
     /// 止まった瞬間の針の沈みは 2D と同じ量（停止の演出が ON なら 8pt、OFF なら 4pt）。動きを減らす設定では沈めない。
     @Test func 針は停止の演出がONなら2倍沈む() {
         let cases: [(PointerBounce, Double)] = [(.big, 8), (.normal, 4)]

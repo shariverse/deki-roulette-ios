@@ -345,12 +345,16 @@ final class Wheel3DScene {
         var dark: Bool
     }
     private var shownBackGlow = BackGlowState(opacity: 0, dark: true)
+    /// 背景の光の板を焼いたときの外観（板が無ければ nil）。
+    private var backGlowBakedDark: Bool?
     /// 背景の光の板を作ったか・今の不透明度（テストで、電飾が OFF なら作らないこと・2D と同じ不透明度を写すことを見る）。
     var hasBackGlowNode: Bool { backGlowNode != nil }
     var backGlowOpacity: Double? {
         guard let node = backGlowNode, !node.isHidden else { return nil }
         return Double(node.opacity)
     }
+    /// 背景の光の板を焼いたときの外観（テストで、外観を変えたら焼き直すことを見る）。
+    var backGlowBakedAppearanceIsDark: Bool? { backGlowBakedDark }
     /// フラッシュの板を作ったか（テストで、停止の演出が OFF なら作らないことを見る）。
     var hasFlashNode: Bool { flashNode != nil }
     /// フラッシュの板の一辺・縮め・盤の表面からの高さ（テストで、正面から見た半径が盤面の枠の半径になることを確かめる）。
@@ -1183,9 +1187,9 @@ final class Wheel3DScene {
     func backGlow(_ opacity: Double, dark: Bool) {
         let next = BackGlowState(opacity: opacity, dark: dark)
         guard next != shownBackGlow else { return }
-        let darkChanged = next.dark != shownBackGlow.dark
         shownBackGlow = next
-        if let shape = built, opacity > 0, backGlowNode == nil || darkChanged { addBackGlow(shape) }
+        // 外観は板を焼いたときのものと比べる（光っていない待機中に外観を変えても、次に光らせるときに焼き直す）
+        if let shape = built, opacity > 0, backGlowNode == nil || backGlowBakedDark != dark { addBackGlow(shape) }
         applyBackGlow()
     }
 
@@ -1216,11 +1220,13 @@ final class Wheel3DScene {
         node.isHidden = true
         tiltNode.addChildNode(node)
         backGlowNode = node
+        backGlowBakedDark = shownBackGlow.dark
     }
 
     private func removeBackGlow() {
         backGlowNode?.removeFromParentNode()
         backGlowNode = nil
+        backGlowBakedDark = nil
     }
 
     /// 背景の光の板を盤の表面から奥へ置く距離（pt）。表面と同じ高さだと、傾けたときに盤の縁と重なってちらつくため。
