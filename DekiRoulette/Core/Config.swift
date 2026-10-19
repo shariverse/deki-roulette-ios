@@ -153,6 +153,9 @@ enum Config {
     static let spinTeaseOvershootFraction: Double = 0.6
     static let spinTeaseOvershootMax: Double = 20
 
+    /// 背景の光の脈動（`WheelBackGlow`）の、演出の強さが 1 のときの不透明度。強さに比例して 0 からここまで明るくする。
+    static let wheelBackGlowMaxOpacity = 0.6
+
     /// 光の尾・残像（`WheelTrails`）を出し始める演出の強さ（0...1）。これ未満では出さず、ここから 1 まで比例して濃くする。
     static let wheelTrailThreshold = 0.35
 

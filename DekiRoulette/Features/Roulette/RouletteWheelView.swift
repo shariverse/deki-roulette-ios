@@ -81,6 +81,20 @@ struct RouletteWheelView: View {
                 .animation(reduceMotion ? nil : Theme.spinAnimation(path: rotationPath), value: rotation)
                 .shadow(color: Theme.wheelShadow, radius: 15, y: 10)
 
+                // 背景の光の脈動は電飾と同じ単位で出す。回らない層に置き、外周の縁の外側の環だけを塗る（盤面の面には重ねず、
+                // 盤面の後ろから漏れる光に見せる。盤面の影より手前に置くので、影で暗くならない）
+                if effects.lights {
+                    GeometryReader { proxy in
+                        WheelBackGlowView(
+                            side: min(proxy.size.width, proxy.size.height),
+                            motion: motion,
+                            drag: dragMotion,
+                            now: now
+                        )
+                        .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                    }
+                }
+
                 // 光の尾と残像は回らない層に置き、盤面の上に薄く重ねる（残像は遅れた角度の塗りだけで、停止の強調は載せない）。
                 // 縁の上の光の尾は電飾の電球より奥
                 if effects.trails {
