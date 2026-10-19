@@ -101,7 +101,7 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 指の時刻に足してから記録する（`WheelDragArea` の `now` に `RouletteWheelView` が `model.now` を渡す）。2 つの時計の値を直接比べたり引いたりしない。
 
 盤面の `rotationEffect` には `.animation(Theme.spinAnimation(path: rotationPath), value: rotation)` を付けてある（`reduceMotion` では `nil`。
-`rotationPath` は `withAnimation` と同じ `model.rotationPath` を渡す。長さはスピンでは `Config.spinDuration`（焦らしありは 5.7 秒）、惰性では `FlickCoast` が決める）。
+`rotationPath` は `withAnimation` と同じ `model.rotationPath` を渡す。長さはスピンでは `Config.spinDuration`（焦らしありは 6.5 秒）、惰性では `FlickCoast` が決める）。
 キーボードが出た状態でスピンを始めると、演出開始で入力欄が無効になってキーボードが閉じ、その安全領域の変化が
 `withAnimation` の更新に重なって補間が落ちる（盤面が最終角度へ飛び、音だけが鳴る）ため、回転の値の変化だけは
 外側のトランザクションに依らずスピンの動き（焦らしの区間の列も同じ `SpinPathAnimation`）で補間させる。回り始めとキーボードの閉じ始めは同時で、音・触覚の時刻は変えない。
@@ -139,7 +139,7 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 ためらい / 戻りかけ / 行き過ぎを等確率に選び、`teased(_:from:to:count:releaseVelocity:)` が主の区間（`Config.spinDuration`・`Config.spinEasing`。
 フリックでは主の区間の距離で求めた `FlickSpin.easing`）と焦らしの区間（`Config.spinTeaseEasing`、合わせて `Config.spinTeaseDuration`）を
 つないだ `SpinPath`（`Core/SpinPath.swift`。`segments: [SpinMotion]`・`angle(at:)`・`angularVelocity(at:)`・`duration`）を返す。最終角 `to` は変えず、
-長さは入り方に依らず 5.7 秒、保険は `SpinPath.fallback`（長さ + 0.6 秒。焦らしありは `Config.spinTeaseFallback`）。ためらい・戻りかけで止まりかける角度は、境目の手前 a と止まる角度の `Config.spinTeaseCreepMax` 手前の大きい方（広いスライスの奥で止まっても大きく回り直さない）。振れ幅は件数と最終角の幾何だけで決め（`Config.spinTease…`）、指定・止まるスライスの添字は受け取らない。
+長さは入り方に依らず 6.5 秒（焦らしの区間は `Config.spinTeaseDuration` = 2 秒）、保険は `SpinPath.fallback`（長さ + 0.6 秒。焦らしありは `Config.spinTeaseFallback` = 7.1 秒）。ためらい・戻りかけで止まりかける角度は、境目の手前 a と止まる角度の `Config.spinTeaseCreepMax` 手前の大きい方（広いスライスの奥で止まっても大きく回り直さない）。振れ幅は件数と最終角の幾何だけで決め（`Config.spinTease…` の割合と上限の小さい方。狭いスライスでは割合で縮む）、指定・止まるスライスの添字は受け取らない。戻りかけは境目を越えて手前の隣のスライスまで、行き過ぎは先の隣のスライスまで出入りしてよいが、隣の 1 つ先には入らない（a + r < スライス幅、o < スライス幅。`SpinTeaseTests` で確かめる）。
 境目を越える時刻は `boundaryCrossings(count:minInterval:)`（`SpinTicks` / `HapticSchedule` の `boundaryCrossings(along:count:minInterval:)` も同じ）が
 区間ごとに今の逆算で数えてつなぎ、戻る向きの境目も数え、間引きは全体で掛ける。焦らしは惰性と `reducedMotion` には入れない（`beginSpin` が `reducedMotion` では `SpinEffects.none` として呼ぶ。惰性は `SpinPath.spin` を通らない）。
 `RouletteModel.beginSpin(reducedMotion:effects:…)` は `RouletteScreen` の `SpinEffectsSetting.effects` を受け取り、作った動きを `rotationPath`・`currentMotion`・回転音（`clickTimes`）・
@@ -255,7 +255,7 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 粒ごとの乱数は種（`WheelParticles.seed(using:)`。View は `SystemRandomNumberGenerator`、テストは固定の種）と粒の番号から作る `ParticleRandom`（SplitMix64）で引くので、同じ種なら毎フレーム同じ粒になる。
 番号は `ParticleRandom.mix`（SplitMix64 の仕上げの式）に一度通してから種と混ぜる（掛けて足すだけだと、種 0 で粒 i + 1 の列が粒 i の列を 1 つずらしたものになる）。
 火花（`sparks`）は `currentMotion` の生まれうる時刻（`sparkSlotInterval` = `Config.wheelSparkLifetime` ÷ 上限）ごとにその時刻の強さの確率で生まれ、
-針の先（`ShareImageLayout.basePointerHeight - 6`）から回転の向きへ飛ぶ。生まれうる時刻は区間の列の長さ（焦らしを含めて 5.7 秒）まで。
+針の先（`ShareImageLayout.basePointerHeight - 6`）から回転の向きへ飛ぶ。生まれうる時刻は区間の列の長さ（焦らしを含めて 6.5 秒）まで。
 指で動かしている間は `sparks(drag:…)` がドラッグを始めた時刻から同じ間隔で区切り、最後に指が動いた時刻まで生まれる（その時刻までの点だけで決まるので、
 後から点が増えても前に生まれた粒は変わらない）。`WheelParticlesView` は両方を `sparks(motion:drag:…)` で集め（指の動きの粒が先、合わせて上限まで。上限は毎フレーム `prefix` で切るので、溢れて描かれなかったスピンの粒が、
 指の動きの粒が消えたあとに飛んでいる途中から現れることがある）、
