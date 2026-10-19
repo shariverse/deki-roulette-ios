@@ -4,7 +4,7 @@ import Foundation
 /// このフラグだけを見て出し分ける。どのフラグも指定（`targetId`）の有無では変えない。
 /// 設定の「ルーレットの詳細設定」の「スピンの演出」で、全体の ON / OFF と演出ごとのトグル（`SpinEffectItem`）から選ぶ。
 struct SpinEffects: Hashable, Sendable {
-    /// 外周の電飾。
+    /// 外周の電飾と背景の光の脈動。
     var lights: Bool
     /// 光の尾と盤面の残像。
     var trails: Bool
@@ -12,7 +12,7 @@ struct SpinEffects: Hashable, Sendable {
     var particles: Bool
     /// 止まり際の焦らし。
     var tease: Bool
-    /// 停止の演出（停止の瞬間のフラッシュ・結果の帯の登場演出・結果表示中の光彩の余韻）。
+    /// 停止の演出（停止の瞬間のフラッシュ・針を大きく弾く・結果の帯の登場演出・結果表示中の光彩の余韻）。
     var stopEffects: Bool
     /// 演出の効果音（スピン中のうなり・停止時の決まり音）。設定の「効果音」が ON のときだけ鳴る。
     var sounds: Bool

@@ -167,6 +167,9 @@ enum Config {
     /// 距離 + 戻る角度 + 揺れ）がいちばん長いので、いちばん長くする（0.5 → 1.2 → 0.3 秒）。
     static let spinTeaseRollBackShares: [Double] = [0.25, 0.6, 0.15]
 
+    /// 背景の光の脈動（`WheelBackGlow`）の、演出の強さが 1 のときの不透明度。強さに比例して 0 からここまで明るくする。
+    static let wheelBackGlowMaxOpacity = 0.6
+
     /// 光の尾・残像（`WheelTrails`）を出し始める演出の強さ（0...1）。これ未満では出さず、ここから 1 まで比例して濃くする。
     static let wheelTrailThreshold = 0.35
 

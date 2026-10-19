@@ -132,7 +132,7 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 以前の 5 択の保存値（`spinEffectStyle`）は読まない（移行しない）。`UserDefaults` との読み書きは `SpinEffectsSetting`（`Features/Shared/`。`DynamicProperty` で 7 つの `@AppStorage` を持つ）にまとめ、
 設定画面と `RouletteScreen` が同じキー・同じ既定値で持つ。全体が OFF なら `SpinEffects.effective(enabled:selected:)` が `.none` を返し（個別の選択は残す。設定画面では個別のトグルを無効の見た目にする）、
 演出・焦らし・効果音はどれもこのフラグだけを見る。
-指定は渡さない（SPEC の背景の光の脈動は未実装）。停止の瞬間の針の沈みは `PointerBounce.at(stopEffects:reduceMotion:)`（`Core/`）が決め、停止の演出が ON なら
+指定は渡さない。停止の瞬間の針の沈みは `PointerBounce.at(stopEffects:reduceMotion:)`（`Core/`）が決め、停止の演出が ON なら
 `Theme.pointerBounceOffset(.big)`（4pt の `pointerBigBounceFactor` 倍 = 8pt）、OFF なら `.normal`（4pt）、動きを減らす設定では `.none`（沈めない）。2D の `WheelPointerView` の `offset` と
 3D の `Wheel3DScene.highlight(_:reduceMotion:afterglow:pointerBounce:)` が同じ値を使い、行きの曲線と戻りのばねは変えない。`RouletteScreen` は 2D の `RouletteWheelView` と
 3D の `Wheel3DView` に同じ `effects`（`SpinEffects`）を渡し、どちらの盤面も同じ関数（`effects.tracksDragMotion`・`WheelStopMoment.cues`・共有の `…Timeline`）から演出の値を引く。
@@ -234,6 +234,11 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 `Config.effectPulseFrameInterval`（1/20 秒）ごとに落とす（点滅の終わりは `.task(id: stoppedAt)` が待って `@State` を書き、描き直させる）。止まり切った惰性・指の動きは親が描き直さないので、
 `WheelLightsView` が `.task(id: 選んだ動き)` で残り時間だけ待って `@State` を書き、描き直させて止める。演出は指定・印を受け取らず、`accessibilityHidden`・`allowsHitTesting(false)`。
 
+背景の光の脈動（`SpinEffects.lights`。電飾と同じ単位、SPEC §5.5）は、2D では `WheelBackGlowView` が盤面の枠の中、外周の縁の外周から枠までの環（`Theme.BackGlow`）を
+放射状のグラデーション（色は `Theme.wheelBackGlow`）で塗る。不透明度は `WheelBackGlow.opacity(intensity:reduceMotion:)`（`Core/`。強さ × `Config.wheelBackGlowMaxOpacity`）で、
+毎フレームの値は 2D・3D で共有する `WheelBackGlowTimeline`（`WheelBackGlowView.swift`）が電飾と同じ `WheelEffectMotion` の選び方・同じ時計で引く（動いている間だけ `TimelineView` を回し、
+止まり切った惰性・指の動きは `.task(id: 選んだ動き)` で描き直させて止める）。2D は `rotationEffect` の外で盤面の面（影付き）の上・光の尾の奥に重ね、面には重ねない。演出は指定・印を受け取らない。
+
 光の尾・残像（`SpinEffects.trails`）は 2D の `RouletteWheelView` と 3D の `Wheel3DView` の両方に出す（3D は下の「3D 表示の仕組み」）。
 `RouletteScreen` が `effects`（`trails`）を渡す。毎フレームの 1 枚（`WheelTrails.Frame`）は 2D・3D で共有の `WheelTrailsTimeline`（`WheelTrailsView.swift`）が同じ時計・同じ規則で引いて
 `content` に渡し、2D は `WheelTrailsView` が `Canvas` に描き、3D は `Wheel3DScene.trail(_:)` がノードに写す。2D は `WheelTrailsView` を
@@ -276,7 +281,7 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 抽選しないので停止の演出・焦らし・うなり・決まり音は出さず（回転音・触覚は今のまま）、`RouletteModel` は変えない。惰性は `currentMotion` に入るので
 スピンと同じ経路で出る（強さ約 0.33 未満なので光の尾・残像は閾値に届かない）。
 
-停止の瞬間のフラッシュ・結果の帯の登場演出・結果表示中の余韻（`SpinEffects.stopEffects`）は 2D と 3D の両方に出す（3D は下の「3D 表示の仕組み」）。
+停止の瞬間のフラッシュ・針を大きく弾く動き・結果の帯の登場演出・結果表示中の余韻（`SpinEffects.stopEffects`）は 2D と 3D の両方に出す（3D は下の「3D 表示の仕組み」）。
 強さは `WheelStopEffects`（`Core/`）が停止からの経過だけで決める（項目・指定・印・止まったスライスは受け取らない）。毎フレームの値（`WheelStopEffects.Frame`: `flashOpacity`・`glowLevel`。
 `WheelStopEffects.frame(enabled:reduceMotion:flashStart:afterglowStart:now:)`）は 2D・3D で共有の `WheelStopEffectsTimeline`（`WheelStopFlashView.swift`）が引き、
 フラッシュが光っている間は毎フレーム、余韻の脈動だけなら `WheelStopEffects.frameInterval` で `Config.effectPulseFrameInterval` ごとに描き直し、どちらも無ければ止める。
