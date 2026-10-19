@@ -18,20 +18,15 @@ enum SpinEffectStyle: String, CaseIterable, Sendable {
     /// 未設定のときの値。
     static let `default` = SpinEffectStyle.none
 
-    /// 外周の電飾を出すか。
-    var showsLights: Bool { self == .lights || self == .all }
-
-    /// 光の尾と盤面の残像を出すか。
-    var showsTrails: Bool { self == .trails || self == .all }
-
-    /// 針の先の火花と停止の瞬間の紙吹雪を出すか。
-    var showsParticles: Bool { self == .confetti || self == .all }
-
-    /// 「なし」以外のどのスタイルにも付ける演出（背景の光の脈動・止まり際の焦らし・針を大きく弾く・停止の瞬間のフラッシュ・
-    /// 結果の帯の登場演出・結果表示中の余韻・効果音）を出すか。
-    var showsCommonEffects: Bool { self != .none }
-
-    /// 指で盤面を動かしている間の動き（`WheelDragMotion`）を記録するか。速さに連動する演出（電飾・光の尾と残像・火花）の
-    /// どれかを出すときだけで、「なし」では記録しない。2D と 3D の盤面が同じ値を `WheelDragArea` に渡す。
-    var tracksDragMotion: Bool { showsLights || showsTrails || showsParticles }
+    /// 付ける演出。「なし」は何も付けず、それ以外は 3 系統のうち選んだもの（全部入りは 3 つとも）と、どのスタイルにも付ける
+    /// 共通の演出（焦らし・停止の演出・演出の効果音）を付ける。
+    var effects: SpinEffects {
+        guard self != .none else { return .none }
+        return SpinEffects(
+            lights: self == .lights || self == .all,
+            trails: self == .trails || self == .all,
+            particles: self == .confetti || self == .all,
+            tease: true, stopEffects: true, sounds: true
+        )
+    }
 }

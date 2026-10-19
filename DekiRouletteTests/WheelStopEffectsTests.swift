@@ -178,32 +178,51 @@ struct WheelStopEffectsTests {
     }
 
     @Test func 全部入りでは停止の時刻をすべての演出に渡す() {
-        let cues = stopped().cues(style: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let cues = stopped().cues(effects: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(cues == WheelStopCues(
             highlight: 2, lightsStoppedAt: 10, afterglowStart: 10, flashStart: 10, confettiStart: 10
         ))
     }
 
     @Test func 指で強調を解いたら電飾と余韻は止めフラッシュと紙吹雪は止めない() {
-        let cues = stopped().cues(style: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: true)
+        let cues = stopped().cues(effects: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: true)
         #expect(cues == WheelStopCues(
             highlight: nil, lightsStoppedAt: nil, afterglowStart: nil, flashStart: 10, confettiStart: 10
         ))
     }
 
     @Test func スタイルに含まない演出には時刻を渡さない() {
-        let none = stopped().cues(style: .none, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let none = stopped().cues(effects: .none, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(none == WheelStopCues(highlight: 2))
-        let lights = stopped().cues(style: .lights, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let lights = stopped().cues(effects: SpinEffectStyle.lights.effects, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(lights == WheelStopCues(highlight: 2, lightsStoppedAt: 10, afterglowStart: 10, flashStart: 10))
-        let trails = stopped().cues(style: .trails, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let trails = stopped().cues(effects: SpinEffectStyle.trails.effects, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(trails == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10))
-        let confetti = stopped().cues(style: .confetti, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let confetti = stopped().cues(effects: SpinEffectStyle.confetti.effects, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(confetti == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10, confettiStart: 10))
     }
 
+    /// 演出ごとの ON / OFF は、そのフラグが受け持つ演出の時刻だけを変える。
+    @Test func 演出ごとのフラグはその演出の時刻だけを渡す() {
+        func cues(_ effects: SpinEffects) -> WheelStopCues {
+            stopped().cues(effects: effects, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        }
+        var lights = SpinEffects.none
+        lights.lights = true
+        #expect(cues(lights) == WheelStopCues(highlight: 2, lightsStoppedAt: 10))
+        var particles = SpinEffects.none
+        particles.particles = true
+        #expect(cues(particles) == WheelStopCues(highlight: 2, confettiStart: 10))
+        var stopEffects = SpinEffects.none
+        stopEffects.stopEffects = true
+        #expect(cues(stopEffects) == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10))
+        // 光の尾・焦らし・演出の効果音は停止の時刻を使わない
+        let others = SpinEffects(lights: false, trails: true, particles: false, tease: true, stopEffects: false, sounds: true)
+        #expect(cues(others) == WheelStopCues(highlight: 2))
+    }
+
     @Test func 動きを減らす設定ではフラッシュ_紙吹雪_余韻を渡さない() {
-        let cues = stopped().cues(style: .all, reduceMotion: true, highlightedIndex: 2, displacedByDrag: false)
+        let cues = stopped().cues(effects: .all, reduceMotion: true, highlightedIndex: 2, displacedByDrag: false)
         // 電飾は点けたまま動かさない（`WheelLights` が動きを減らす設定の明るさにする）ので、時刻はそのまま渡す
         #expect(cues == WheelStopCues(highlight: 2, lightsStoppedAt: 10))
     }
@@ -211,7 +230,7 @@ struct WheelStopEffectsTests {
     @Test func 見ていない停止ではフラッシュと紙吹雪を出さず脈動から始める() {
         var stop = WheelStopMoment()
         stop.appear(showingResult: true, now: 10)
-        let cues = stop.cues(style: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let cues = stop.cues(effects: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(cues.flashStart == nil)
         #expect(cues.confettiStart == nil)
         #expect(cues.lightsStoppedAt == stop.start)
@@ -219,11 +238,11 @@ struct WheelStopEffectsTests {
     }
 
     @Test func 結果が無ければ何も渡さない() {
-        let cues = WheelStopMoment().cues(style: .all, reduceMotion: false, highlightedIndex: nil, displacedByDrag: false)
+        let cues = WheelStopMoment().cues(effects: .all, reduceMotion: false, highlightedIndex: nil, displacedByDrag: false)
         #expect(cues == WheelStopCues())
         // 結果が消えた直後（添字が nil になった更新）
         var stop = stopped()
         stop.resultChanged(showingResult: false, now: 11)
-        #expect(stop.cues(style: .all, reduceMotion: false, highlightedIndex: nil, displacedByDrag: false) == WheelStopCues())
+        #expect(stop.cues(effects: .all, reduceMotion: false, highlightedIndex: nil, displacedByDrag: false) == WheelStopCues())
     }
 }

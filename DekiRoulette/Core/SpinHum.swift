@@ -12,11 +12,11 @@ enum SpinHum {
         let rate: Double
     }
 
-    /// うなりを付けるスピンか。「スピンの演出」が共通の演出を付けるスタイルで、盤面が回る（動きを減らす設定でない）ときだけ。
+    /// うなりを付けるスピンか。演出の効果音（`SpinEffects.sounds`）が ON で、盤面が回る（動きを減らす設定でない）ときだけ。
     /// 惰性・指で動かしている間は抽選のスピンではないので、呼び出し側はそもそもここを通さない（鳴らさない）。
     /// 設定の「効果音」の ON / OFF は再生する側（`RouletteScreen`）が見る。
-    static func plays(style: SpinEffectStyle, reducedMotion: Bool) -> Bool {
-        style.showsCommonEffects && !reducedMotion
+    static func plays(effects: SpinEffects, reducedMotion: Bool) -> Bool {
+        effects.sounds && !reducedMotion
     }
 
     /// 演出の強さ（0...1）→ 音量（0...1）。`Config.humMinIntensity` 以下では鳴らさず（0）、そこから強さ 1 で 1 まで比例して上げる。

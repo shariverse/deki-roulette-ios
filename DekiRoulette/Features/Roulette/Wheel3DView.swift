@@ -15,11 +15,11 @@ import SwiftUI
 /// 盤は端末の姿勢で傾け、動かした勢いで支点まわりに揺らす（`WheelMotionModel`）。揺れるのは待機中と回転中だけで、
 /// 結果表示中は正面へ戻して止め、姿勢の購読も止める。視差効果を減らす設定では揺らさず正面に置く。
 /// 姿勢を読むのは、この盤面が画面に出ていてアプリが前面にある間だけ。揺れは見た目だけで、回転・結果・音・触覚には影響しない。
-/// 演出は 2D と同じ「スピンの演出」（`effectStyle`）を受け取る。電飾（`showsLights`）のときは 2D と同じ外周の電飾を盤と同じ面の縁の上に出す（回らない）。明るさは 2D と共有の `WheelLightsTimeline` が
+/// 演出は 2D と同じ「スピンの演出」（`effects`）を受け取る。電飾（`lights`）のときは 2D と同じ外周の電飾を盤と同じ面の縁の上に出す（回らない）。明るさは 2D と共有の `WheelLightsTimeline` が
 /// 同じ時計（`now`）・同じ規則（`WheelLights`）で毎フレーム引き、盤の角度と同じく SceneKit のノードに写す。
-/// `showsTrails` のときは 2D と同じ光の尾と残像を盤と同じ面に出す（回らない）。2D と共有の `WheelTrailsTimeline` が同じ時計・同じ規則
+/// `trails` のときは 2D と同じ光の尾と残像を盤と同じ面に出す（回らない）。2D と共有の `WheelTrailsTimeline` が同じ時計・同じ規則
 /// （`WheelTrails`）で毎フレーム引き、`Wheel3DScene.trail(_:)` が残像の角度・濃さと光の尾の切れ端の濃さだけをノードに写す。
-/// 火花・紙吹雪（`showsParticles`）と、停止の瞬間のフラッシュ・結果表示中の光彩の余韻・結果の帯の登場演出（`showsCommonEffects`）も 2D と同じ規則で出す。
+/// 火花・紙吹雪（`particles`）と、停止の瞬間のフラッシュ・結果表示中の光彩の余韻・結果の帯の登場演出（`stopEffects`）も 2D と同じ規則で出す。
 /// 火花・紙吹雪は 2D と共有の `WheelParticlesTimeline`、フラッシュと余韻は `WheelStopEffectsTimeline` が同じ時計で引き、
 /// `Wheel3DScene.particles(_:)` / `stopEffects(_:)` が盤と同じ面のノードに写す。停止の時刻は 2D と同じ `WheelStopMoment` で持つ。
 struct Wheel3DView: View {
@@ -33,8 +33,8 @@ struct Wheel3DView: View {
     var glowStyle = GlowStyle.default
     /// 結果の帯。結果が出ている間だけ渡す。
     var result: Wheel3DResult? = nil
-    /// 「スピンの演出」。2D の盤面（`RouletteWheelView`）と同じ値を受け取り、同じ演出を出す。「なし」なら今の盤面のまま何も足さない。
-    var effectStyle = SpinEffectStyle.none
+    /// 「スピンの演出」。2D の盤面（`RouletteWheelView`）と同じ値を受け取り、同じ演出を出す。すべて OFF（`.none`）なら今の盤面のまま何も足さない。
+    var effects = SpinEffects.none
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れと明るさ、光の尾・残像・火花を毎フレームここから引く。
     /// 指で動かしている間は、`WheelDragArea` が記録した指の動き（`WheelDragMotion`）から引く。
     var motion: TimedSpinMotion? = nil
@@ -67,36 +67,36 @@ struct Wheel3DView: View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
             onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease,
-            // 速さに連動する演出（電飾・光の尾・火花）を出すときだけ、指で動かしている動きを記録する（「なし」では今のまま記録しない）
-            tracksMotion: effectStyle.tracksDragMotion, now: now
+            // 速さに連動する演出（電飾・光の尾・火花）を出すときだけ、指で動かしている動きを記録する（どれも出さないときは今のまま記録しない）
+            tracksMotion: effects.tracksDragMotion, now: now
         ) { dragRotation, displacedByDrag, dragMotion in
             // 強調するスライス（結果が出たあとに指で動かしたら解く。結果の帯は残る）と、停止の演出に渡す時刻。2D と同じ関数で引く
             let cues = stop.cues(
-                style: effectStyle, reduceMotion: reduceMotion, highlightedIndex: highlightedIndex, displacedByDrag: displacedByDrag
+                effects: effects, reduceMotion: reduceMotion, highlightedIndex: highlightedIndex, displacedByDrag: displacedByDrag
             )
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
                 let canvas = side * (1 + 2 * Theme.Wheel3D.overscan)
                 // 電飾の明るさは 2D と同じ時計で毎フレーム引く。電飾を出さないときは止めたまま nil を渡す
                 WheelLightsTimeline(
-                    enabled: effectStyle.showsLights, rotation: rotation, dragRotation: dragRotation, motion: motion, drag: dragMotion,
+                    enabled: effects.lights, rotation: rotation, dragRotation: dragRotation, motion: motion, drag: dragMotion,
                     // 指で動かして強調を解いたら点滅・脈動も止める
                     stoppedAt: cues.lightsStoppedAt,
                     now: now
                 ) { lights in
                     // 光の尾・残像も 2D と同じ時計で毎フレーム引く。出さないときは止めたまま `.none` を渡す
                     WheelTrailsTimeline(
-                        enabled: effectStyle.showsTrails, sliceCount: items.count, rotation: rotation, dragRotation: dragRotation,
+                        enabled: effects.trails, sliceCount: items.count, rotation: rotation, dragRotation: dragRotation,
                         motion: motion, drag: dragMotion, now: now
                     ) { trails in
                         // 火花・紙吹雪も 2D と同じ時計・同じ規則で毎フレーム引く。出さないときは止めたまま `.none` を渡す
                         WheelParticlesTimeline(
-                            enabled: effectStyle.showsParticles, side: side, motion: motion, drag: dragMotion,
+                            enabled: effects.particles, side: side, motion: motion, drag: dragMotion,
                             burstAt: cues.confettiStart, now: now
                         ) { particles in
-                            // フラッシュと光彩の余韻も 2D と同じ時計で引く。「なし」では止めたまま `.none` を渡す
+                            // フラッシュと光彩の余韻も 2D と同じ時計で引く。停止の演出が OFF なら止めたまま `.none` を渡す
                             WheelStopEffectsTimeline(
-                                enabled: effectStyle.showsCommonEffects, flashStart: cues.flashStart,
+                                enabled: effects.stopEffects, flashStart: cues.flashStart,
                                 afterglowStart: cues.afterglowStart, now: now
                             ) { stopEffects in
                                 // 追従の角度は足すだけにする。ドラッグ中は `rotation` が変わらないので下の `.animation` は掛からず、指にそのまま付いてくる。
@@ -106,7 +106,7 @@ struct Wheel3DView: View {
                                     items: items, rotation: rotation + dragRotation, tilt: tilt, diameter: side,
                                     displayScale: displayScale,
                                     highlight: cues.highlight.map { Wheel3DHighlight(index: $0, glowStyle: glowStyle) },
-                                    result: result, showsCommonEffects: effectStyle.showsCommonEffects,
+                                    result: result, showsStopEffects: effects.stopEffects,
                                     lights: lights, trails: trails, particles: particles, stopEffects: stopEffects,
                                     reduceMotion: reduceMotion
                                 )
@@ -177,8 +177,8 @@ private struct Wheel3DSurface: View, Animatable {
     let displayScale: CGFloat
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
-    /// 「スピンの演出」が「なし」以外か。結果の帯に登場演出（小さい大きさからばね）を重ね、止まったスライスの光彩を余韻で脈打たせられる形にする。
-    let showsCommonEffects: Bool
+    /// 停止の演出（`SpinEffects.stopEffects`）が ON か。結果の帯に登場演出（小さい大きさからばね）を重ね、止まったスライスの光彩を余韻で脈打たせられる形にする。
+    let showsStopEffects: Bool
     /// 外周の電飾の場面。電飾を出さないときは nil。
     let lights: WheelLights.Scene?
     /// 光の尾と残像。出さないとき・描かない間は `.none`。
@@ -197,7 +197,7 @@ private struct Wheel3DSurface: View, Animatable {
     var body: some View {
         Wheel3DSceneView(
             items: items, rotation: rotation, tilt: tilt, diameter: diameter, displayScale: displayScale,
-            highlight: highlight, result: result, showsCommonEffects: showsCommonEffects, lights: lights, trails: trails,
+            highlight: highlight, result: result, showsStopEffects: showsStopEffects, lights: lights, trails: trails,
             particles: particles, stopEffects: stopEffects, reduceMotion: reduceMotion
         )
     }
@@ -211,7 +211,7 @@ private struct Wheel3DSceneView: UIViewRepresentable {
     let displayScale: CGFloat
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
-    let showsCommonEffects: Bool
+    let showsStopEffects: Bool
     let lights: WheelLights.Scene?
     let trails: WheelTrails.Frame
     let particles: WheelParticles.Frame
@@ -238,8 +238,8 @@ private struct Wheel3DSceneView: UIViewRepresentable {
         context.coordinator.update(items: items, diameter: diameter, displayScale: displayScale)
         context.coordinator.spin(to: rotation)
         context.coordinator.tilt(to: tilt)
-        context.coordinator.highlight(highlight, reduceMotion: reduceMotion, afterglow: showsCommonEffects)
-        context.coordinator.show(result: result, reduceMotion: reduceMotion, popIn: showsCommonEffects)
+        context.coordinator.highlight(highlight, reduceMotion: reduceMotion, afterglow: showsStopEffects)
+        context.coordinator.show(result: result, reduceMotion: reduceMotion, popIn: showsStopEffects)
         context.coordinator.light(lights)
         context.coordinator.trail(trails)
         context.coordinator.stopEffects(stopEffects)
@@ -1634,7 +1634,7 @@ private enum WheelLabelImage {
 
 #Preview("Trails") {
     Wheel3DView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effectStyle: .trails,
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffectStyle.trails.effects,
         motion: TimedSpinMotion(
             motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
             start: ProcessInfo.processInfo.systemUptime

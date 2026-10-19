@@ -17,55 +17,42 @@ struct SpinEffectStyleTests {
     }
 
     @Test func なしは何も付けない() {
-        let style = SpinEffectStyle.none
-        #expect(!style.showsLights)
-        #expect(!style.showsTrails)
-        #expect(!style.showsParticles)
-        #expect(!style.showsCommonEffects)
+        #expect(SpinEffectStyle.none.effects == .none)
     }
 
-    @Test func 電飾は電飾と共通の演出だけ() {
-        let style = SpinEffectStyle.lights
-        #expect(style.showsLights)
-        #expect(!style.showsTrails)
-        #expect(!style.showsParticles)
-        #expect(style.showsCommonEffects)
+    @Test func 電飾は電飾と共通の演出を付ける() {
+        #expect(SpinEffectStyle.lights.effects == SpinEffects(
+            lights: true, trails: false, particles: false, tease: true, stopEffects: true, sounds: true
+        ))
     }
 
-    @Test func 光の尾は光の尾と共通の演出だけ() {
-        let style = SpinEffectStyle.trails
-        #expect(!style.showsLights)
-        #expect(style.showsTrails)
-        #expect(!style.showsParticles)
-        #expect(style.showsCommonEffects)
+    @Test func 光の尾は光の尾と共通の演出を付ける() {
+        #expect(SpinEffectStyle.trails.effects == SpinEffects(
+            lights: false, trails: true, particles: false, tease: true, stopEffects: true, sounds: true
+        ))
     }
 
-    @Test func 紙吹雪は粒子と共通の演出だけ() {
-        let style = SpinEffectStyle.confetti
-        #expect(!style.showsLights)
-        #expect(!style.showsTrails)
-        #expect(style.showsParticles)
-        #expect(style.showsCommonEffects)
+    @Test func 紙吹雪は火花と紙吹雪と共通の演出を付ける() {
+        #expect(SpinEffectStyle.confetti.effects == SpinEffects(
+            lights: false, trails: false, particles: true, tease: true, stopEffects: true, sounds: true
+        ))
     }
 
-    @Test func 全部入りは3系統すべてと共通の演出() {
-        let style = SpinEffectStyle.all
-        #expect(style.showsLights)
-        #expect(style.showsTrails)
-        #expect(style.showsParticles)
-        #expect(style.showsCommonEffects)
+    @Test func 全部入りはすべて付ける() {
+        #expect(SpinEffectStyle.all.effects == .all)
     }
 
-    @Test func なし以外はどれも共通の演出を付ける() {
+    @Test func なし以外は共通の演出を付ける() {
         for style in SpinEffectStyle.allCases where style != .none {
-            #expect(style.showsCommonEffects)
+            let effects = style.effects
+            #expect(effects.tease && effects.stopEffects && effects.sounds, "\(style)")
         }
     }
 
-    @Test func 指の動きを記録するのは速さに連動する演出を出すときだけ() {
-        #expect(!SpinEffectStyle.none.tracksDragMotion)
+    @Test func 指の動きはなし以外で記録する() {
+        #expect(!SpinEffectStyle.none.effects.tracksDragMotion)
         for style in [SpinEffectStyle.lights, .trails, .confetti, .all] {
-            #expect(style.tracksDragMotion, "\(style)")
+            #expect(style.effects.tracksDragMotion, "\(style)")
         }
     }
 }

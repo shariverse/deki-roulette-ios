@@ -8,7 +8,7 @@ import SwiftUI
 /// nil に戻すと強調も解ける。
 /// ドラッグ追従とフリックは `WheelDragArea`（3D の盤面と共有）が受け、追従で回した角度を盤面に足す。
 /// 結果が出たあとに指で動かしたら強調を解く。`interactive` が false の間（演出中）は追従もフリックもしない。
-/// `rotationPath` は回転の動き（`RouletteModel.rotationPath`）。演出「なし」のスピンと惰性は区間 1 つの `timingCurve`、
+/// `rotationPath` は回転の動き（`RouletteModel.rotationPath`）。焦らしを入れないスピンと惰性は区間 1 つの `timingCurve`、
 /// 焦らしを入れたスピンは区間の列（`SpinPathAnimation`）で補間する。
 /// 盤面の面そのもの（縁・スライス・ラベル・ハブと停止の強調）は `WheelFaceView` で、共有画像（`RouletteShareImageView`）と同じ描画を使う。
 struct RouletteWheelView: View {
@@ -20,10 +20,10 @@ struct RouletteWheelView: View {
     var rotationPath = SpinPath.idle
     /// 止まったスライスの光彩の色（設定の「ルーレットの詳細設定」）。
     var glowStyle = GlowStyle.default
-    /// 「スピンの演出」。電飾（電飾・全部入り）・光の尾と残像（光の尾・全部入り）・針の先の火花と停止の瞬間の紙吹雪（紙吹雪・全部入り）・
-    /// 停止の瞬間のフラッシュと結果表示中の光彩の余韻（「なし」以外）を出す。3D の盤面（`Wheel3DView`）と同じ値を受け取る。
-    /// 「なし」なら今の盤面のまま何も足さない。
-    var effectStyle = SpinEffectStyle.none
+    /// 「スピンの演出」。電飾（`lights`）・光の尾と残像（`trails`）・針の先の火花と停止の瞬間の紙吹雪（`particles`）・
+    /// 停止の瞬間のフラッシュと結果表示中の光彩の余韻（`stopEffects`）を、ON のものだけ出す。3D の盤面（`Wheel3DView`）と同じ値を受け取る。
+    /// すべて OFF（`.none`）なら今の盤面のまま何も足さない。
+    var effects = SpinEffects.none
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れ・光の尾・残像・火花を毎フレームここから引く。
     /// 指で動かしている間は、`WheelDragArea` が記録した指の動き（`WheelDragMotion`）から引く。
     var motion: TimedSpinMotion? = nil
@@ -42,12 +42,12 @@ struct RouletteWheelView: View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
             onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease,
-            // 速さに連動する演出を出すときだけ、指で動かしている動きを記録する（「なし」では今のまま記録しない）
-            tracksMotion: effectStyle.tracksDragMotion, now: now
+            // 速さに連動する演出を出すときだけ、指で動かしている動きを記録する（どれも出さないときは今のまま記録しない）
+            tracksMotion: effects.tracksDragMotion, now: now
         ) { dragRotation, displacedByDrag, dragMotion in
             // 強調するスライス（結果が出たあとに指で動かしたら解く。結果の表示は残る）と、停止の演出に渡す時刻。3D と同じ関数で引く
             let cues = stop.cues(
-                style: effectStyle, reduceMotion: reduceMotion, highlightedIndex: highlightedIndex, displacedByDrag: displacedByDrag
+                effects: effects, reduceMotion: reduceMotion, highlightedIndex: highlightedIndex, displacedByDrag: displacedByDrag
             )
             let highlight = cues.highlight
             // 止まったスライスの光彩の余韻。次のスピン・結果が消えた・指で動かして強調を解いたら止める（光彩は今のまま）
@@ -62,7 +62,7 @@ struct RouletteWheelView: View {
                             items: items, side: side, highlight: highlight, glowStyle: glowStyle,
                             highlightScale: highlightScale, animated: !reduceMotion,
                             glowLevel: WheelStopEffects.glowLevel(
-                                enabled: effectStyle.showsCommonEffects, reduceMotion: reduceMotion,
+                                enabled: effects.stopEffects, reduceMotion: reduceMotion,
                                 stoppedElapsed: afterglowStart.map { now() - $0 }
                             )
                         )
@@ -83,7 +83,7 @@ struct RouletteWheelView: View {
 
                 // 光の尾と残像は回らない層に置き、盤面の上に薄く重ねる（残像は遅れた角度の塗りだけで、停止の強調は載せない）。
                 // 縁の上の光の尾は電飾の電球より奥
-                if effectStyle.showsTrails {
+                if effects.trails {
                     GeometryReader { proxy in
                         WheelTrailsView(
                             items: items,
@@ -99,7 +99,7 @@ struct RouletteWheelView: View {
                 }
 
                 // 電飾は回らない層に置き、縁の上に並べる（盤面の枠と寸法は変えない）。針はその手前
-                if effectStyle.showsLights {
+                if effects.lights {
                     GeometryReader { proxy in
                         WheelLightsView(
                             side: min(proxy.size.width, proxy.size.height),
@@ -117,7 +117,7 @@ struct RouletteWheelView: View {
 
                 // 停止の瞬間のフラッシュは回らない層で盤面の枠の中に重ねる（針はその手前）。結果が出た瞬間に 1 回だけ光るので、
                 // 指で強調を解いても止めない時刻を渡す（結果を出したまま画面に出たときは光らせない）
-                if effectStyle.showsCommonEffects {
+                if effects.stopEffects {
                     GeometryReader { proxy in
                         WheelStopFlashView(
                             side: min(proxy.size.width, proxy.size.height),
@@ -133,7 +133,7 @@ struct RouletteWheelView: View {
 
                 // 火花と紙吹雪は回らない層に置き、針より手前に重ねる。紙吹雪は結果が出た瞬間（強調を指で解いても止めない）に
                 // はじけさせる。止まったスライスがどれかは渡さない
-                if effectStyle.showsParticles {
+                if effects.particles {
                     GeometryReader { proxy in
                         WheelParticlesView(
                             side: min(proxy.size.width, proxy.size.height),
@@ -394,7 +394,7 @@ private struct Triangle: Shape {
 
 #Preview("Lights") {
     RouletteWheelView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effectStyle: .lights
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffectStyle.lights.effects
     )
     .padding(40)
     .background(Theme.ink900)
@@ -402,7 +402,7 @@ private struct Triangle: Shape {
 
 #Preview("Trails") {
     RouletteWheelView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effectStyle: .trails,
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffectStyle.trails.effects,
         motion: TimedSpinMotion(
             motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
             start: ProcessInfo.processInfo.systemUptime
@@ -414,7 +414,7 @@ private struct Triangle: Shape {
 
 #Preview("Particles") {
     RouletteWheelView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effectStyle: .confetti,
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffectStyle.confetti.effects,
         motion: TimedSpinMotion(
             motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
             start: ProcessInfo.processInfo.systemUptime

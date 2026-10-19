@@ -177,8 +177,33 @@ struct SpinTeaseTests {
         let short = SpinPath.teased(.hesitate, from: 0, to: 10, count: 8)
         #expect(short.tease == nil)
         #expect(abs(short.fallback - Config.spinTeaseFallback) < 1e-9)
-        let plain = SpinPath.spin(from: 0, to: 1532, count: 8, style: .none)
+        let plain = SpinPath.spin(from: 0, to: 1532, count: 8, effects: .none)
         #expect(abs(plain.fallback - Config.spinFallback) < 1e-9)
+    }
+
+    /// 焦らしを入れるかは `tease` だけで決まり、ほかの演出のフラグには依らない（乱数の引き方も同じ）。
+    @Test func 焦らしはteaseのフラグだけで入れる() {
+        var teaseOnly = SpinEffects.none
+        teaseOnly.tease = true
+        var allButTease = SpinEffects.all
+        allButTease.tease = false
+        for spin in Self.cases() {
+            var first = SeededGenerator(seed: 7)
+            var second = SeededGenerator(seed: 7)
+            let teased = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: teaseOnly, using: &first)
+            let all = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: .all, using: &second)
+            #expect(teased.tease != nil)
+            #expect(teased == all)
+
+            var third = SeededGenerator(seed: 7)
+            var fourth = SeededGenerator(seed: 7)
+            let plain = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: allButTease, using: &third)
+            #expect(plain.tease == nil)
+            #expect(plain == SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: .none, using: &fourth))
+            // 焦らしを入れないときは乱数を引かない
+            var untouched = SeededGenerator(seed: 7)
+            #expect(third.next() == untouched.next())
+        }
     }
 
     @Test func 戻りかけは境目か止まる角度の手前で戻ってから止まる() {
@@ -301,8 +326,8 @@ struct SpinTeaseTests {
             for seed in Self.seeds {
                 var first = SeededGenerator(seed: seed)
                 var second = SeededGenerator(seed: seed)
-                let a = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, style: .all, using: &first)
-                let b = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, style: .all, using: &second)
+                let a = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: .all, using: &first)
+                let b = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: .all, using: &second)
                 #expect(a == b)
                 #expect(a.tease != nil)
             }
@@ -317,7 +342,7 @@ struct SpinTeaseTests {
             let expected = SpinTease.random(using: &reference)
             for spin in Self.cases() {
                 var rng = SeededGenerator(seed: seed)
-                let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, style: .lights, using: &rng)
+                let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: SpinEffectStyle.lights.effects, using: &rng)
                 #expect(path.tease == expected)
             }
         }
@@ -338,7 +363,7 @@ struct SpinTeaseTests {
     func なし以外のスタイルでは毎回入れる(style: SpinEffectStyle) {
         for spin in Self.cases() {
             var rng = SeededGenerator(seed: 5)
-            let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, style: style, using: &rng)
+            let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: style.effects, using: &rng)
             #expect(path.tease != nil)
             #expect(abs(path.duration - Self.teaseDuration) < 1e-9)
             #expect(abs(path.to - spin.to) < 1e-9)
@@ -352,7 +377,7 @@ struct SpinTeaseTests {
             for release: Double? in [nil, spin.sign * 900] {
                 var rng = SeededGenerator(seed: 3)
                 let path = SpinPath.spin(
-                    from: spin.from, to: spin.to, count: spin.count, style: .none, releaseVelocity: release, using: &rng
+                    from: spin.from, to: spin.to, count: spin.count, effects: .none, releaseVelocity: release, using: &rng
                 )
                 let easing = if let release {
                     FlickSpin.easing(angularVelocity: release, distance: abs(spin.to - spin.from), duration: Config.spinDuration)
