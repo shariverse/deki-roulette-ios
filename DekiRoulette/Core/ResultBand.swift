@@ -23,7 +23,7 @@ enum ResultBand {
     /// 盤面の外枠からスライスの円までの距離（基準の直径での pt）。`RouletteWheelView` と同じ（`WheelGeometry.sliceInset`）。
     static let baseSliceInset: Double = WheelGeometry.sliceInset
 
-    // MARK: 登場演出（「スピンの演出」が「なし」以外のとき）
+    // MARK: 登場演出（停止の演出が ON のとき）
 
     /// 帯が現れ始める大きさ（倍率）。ここからばね（`popInDuration` / `popInBounce`）で少し行き過ぎて 1 に収まる。
     static let popInStartScale: Double = 0.6

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 2D の盤面の停止の瞬間のフラッシュ（「スピンの演出」が「なし」以外のとき。`docs/SPEC.md` の §5.5）。
+/// 2D の盤面の停止の瞬間のフラッシュ（「スピンの演出」の停止の演出が ON のとき。`docs/SPEC.md` の §5.5）。
 /// 結果が出た瞬間に盤面の枠の中へ白系の光（`Theme.stopFlash`）を 1 回だけ重ね、`Config.stopFlashDuration` で消す。
 /// 不透明度は `WheelStopEffects.flashOpacity`（`Core/`）が停止からの経過で決め、毎フレームの値は 3D の盤面と共有の
 /// `WheelStopEffectsTimeline` が `now()`（`RouletteModel.now` と同じ時計）から引く。光っている間だけ描き直し、消えたら止める。
@@ -41,7 +41,7 @@ struct WheelStopFlashView: View {
 /// 停止の演出の 1 フレーム（`WheelStopEffects.Frame`: フラッシュの不透明度と光彩の余韻の倍率）を引いて `content` に渡す時計。
 /// 2D の `WheelStopFlashView` と 3D の `Wheel3DView` が同じ規則・同じ時刻（`now()` = `RouletteModel.now`）で引くよう共有する
 /// （電飾の `WheelLightsTimeline` と同じ作り）。フラッシュが光っている間は毎フレーム、余韻の脈動だけなら `Config.effectPulseFrameInterval` ごとに描き直し、
-/// どちらも無い・動きを減らす設定では止める。`enabled` が false なら止めたまま `.none` を渡す（「なし」）。
+/// どちらも無い・動きを減らす設定では止める。`enabled` が false なら止めたまま `.none` を渡す（停止の演出が OFF）。
 /// 入力は停止の時刻と時計だけで、項目・指定（`targetId`）・印・止まったスライスは受け取らない。
 struct WheelStopEffectsTimeline<Content: View>: View {
     var enabled = true

@@ -215,7 +215,7 @@ struct Wheel3DSceneTests {
         #expect(near.x + near.y + near.z > plain.x + plain.y + plain.z + 0.1, "near: \(near) plain: \(plain)")
     }
 
-    /// `afterglow` が true（「なし」以外）のときは、止まったスライスを光彩ごと焼いた板と光彩の無い板の 2 枚にするが、見た目は同じ。
+    /// `afterglow` が true（停止の演出が ON）のときは、止まったスライスを光彩ごと焼いた板と光彩の無い板の 2 枚にするが、見た目は同じ。
     @Test(arguments: [false, true])
     func 押し出しが終わったあとも止まったスライスは前に出した大きさで残る(afterglow: Bool) throws {
         let scene = makeScene(count: 4, rotation: 0)
@@ -1142,7 +1142,7 @@ struct Wheel3DSceneTests {
         #expect(isClose(plain.color(at: location(x: 0, y: y, pixels: plain)), srgb(Theme.flare)))
     }
 
-    /// 止まったスライス 2 を強調した盤。`afterglow` は「スピンの演出」が「なし」以外（余韻を出せる形）か。
+    /// 止まったスライス 2 を強調した盤。`afterglow` は停止の演出が ON（余韻を出せる形）か。
     /// 動きを減らす設定では余韻を出さないので、どちらも押し出す側（`reduceMotion: false`）で比べる。
     private func glowingScene(afterglow: Bool, level: Double? = nil) -> Wheel3DScene {
         let scene = makeScene(count: 4, rotation: 0)
@@ -1196,7 +1196,7 @@ struct Wheel3DSceneTests {
         let reduced = makeScene(count: 4, rotation: 0)
         reduced.highlight(Wheel3DHighlight(index: 2, glowStyle: .white), reduceMotion: true, afterglow: true)
         #expect(reduced.stoppedImagePlaneCount == 1)
-        // 倍率 1 の 2 枚は「なし」の 1 枚と同じ見た目
+        // 倍率 1 の 2 枚は余韻を出さない 1 枚と同じ見た目
         let single = try render(none)
         let double = try render(glowingScene(afterglow: true, level: 1))
         for point in [glowLocation(pixels: single), location(angle: 225, fraction: 0.6, pixels: single),
@@ -1216,7 +1216,7 @@ struct Wheel3DSceneTests {
         scene.show(result: result("a1"), reduceMotion: false, popIn: true)
         #expect(scene.bandPopCount == 1)
         #expect(scene.bandRevealCount == 1)
-        // 「なし」・動きを減らす設定では重ねない
+        // 停止の演出が OFF・動きを減らす設定では重ねない
         scene.show(result: nil, reduceMotion: false, popIn: true)
         scene.show(result: result("a2"), reduceMotion: false, popIn: false)
         scene.show(result: nil, reduceMotion: false, popIn: true)

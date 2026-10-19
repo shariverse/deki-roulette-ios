@@ -114,7 +114,7 @@ enum Theme {
         .timingCurve(easing.x1, easing.y1, easing.x2, easing.y2, duration: duration)
     }
 
-    /// 盤面の動き（`RouletteModel.rotationPath`）の補間。区間 1 つ（演出「なし」のスピン・惰性）は今までどおり
+    /// 盤面の動き（`RouletteModel.rotationPath`）の補間。区間 1 つ（焦らしを入れないスピン・惰性）は今までどおり
     /// `spinAnimation(easing:duration:)` の `timingCurve` で、焦らしを入れた区間の列は `SpinPathAnimation` で補間する。
     static func spinAnimation(path: SpinPath) -> Animation {
         guard path.segments.count > 1 else {
@@ -356,7 +356,7 @@ enum Theme {
     static let resultBandInk = onSlice
     /// 帯の影。止まったスライスと沈めた盤面から浮かせる。
     static let resultBandShadow = pointerShadow
-    /// 「スピンの演出」が「なし」以外のときの帯の登場（小さい大きさから少し行き過ぎて収まる。`ResultBand.popIn*`）。
+    /// 停止の演出（`SpinEffects.stopEffects`）が ON のときの帯の登場（小さい大きさから少し行き過ぎて収まる。`ResultBand.popIn*`）。
     static let resultBandPopAnimation = Animation.spring(duration: ResultBand.popInDuration, bounce: ResultBand.popInBounce)
 
     /// 削除を元に戻すトーストの出入り。
