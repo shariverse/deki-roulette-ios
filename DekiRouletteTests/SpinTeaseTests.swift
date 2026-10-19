@@ -150,9 +150,9 @@ struct SpinTeaseTests {
     }
 
     @Test func 止まる角度が境目の近くならためらいは境目の手前で止まりかける() {
-        // 8 件（45°）で境目の 2° 先に止まる。手前の距離は 5°
+        // 8 件（45°）で境目の 2° 先に止まる。手前の距離は上限（スライス幅の 25% = 11.25° より小さい `spinTeaseApproachMax`）
         let path = SpinPath.teased(.hesitate, from: 0, to: 1440 + 92, count: 8)
-        #expect(abs(path.segments[0].to - (1440 + 90 - 5)) < 1e-9)
+        #expect(abs(path.segments[0].to - (1440 + 90 - Config.spinTeaseApproachMax)) < 1e-9)
     }
 
     @Test(arguments: [SpinTease.hesitate, .rollBack], [2, 3])
@@ -214,7 +214,7 @@ struct SpinTeaseTests {
             let boundary = (stop / spin.slice).rounded(.down) * spin.slice
             let turn = spin.sign * path.segments[0].to
             let bottom = spin.sign * path.segments[1].to
-            // 止まる角度の手前で止まりかけ、1 つ前の境目は越えずに戻り、最後に止まる角度まで進んで止まる
+            // 止まる角度の手前で止まりかけ、隣（1 つ前）のスライスの手前の境目は越えずに戻り、最後に止まる角度まで進んで止まる
             #expect(turn < stop)
             #expect(stop - turn <= Config.spinTeaseCreepMax + 1e-9)
             #expect(bottom < turn)
@@ -249,7 +249,8 @@ struct SpinTeaseTests {
         let approach = min(slice * Config.spinTeaseApproachFraction, Config.spinTeaseApproachMax)
         let back = min(slice * Config.spinTeaseRollBackFraction, Config.spinTeaseRollBackMax)
         let overshoot = min(slice * Config.spinTeaseOvershootFraction, Config.spinTeaseOvershootMax)
-        #expect(approach + back < slice / 2)
+        // 戻りは隣（1 つ前）のスライスの中に収まり、行き過ぎは隣（1 つ先）のスライスの中に収まる
+        #expect(approach + back < slice)
         #expect(overshoot < slice)
         // 境目すれすれ（直後・直前・ちょうど）でも最終角は変わらず、区間はそれぞれの向きに単調に進む
         for offset in [0, 1e-9, slice / 2, slice - 1e-9] {
@@ -287,7 +288,7 @@ struct SpinTeaseTests {
         let sign: Double = direction == .clockwise ? 1 : -1
         let count = 24
         let slice = 15.0
-        // 止まる角度が境目の 1 度手前なので、6 度の行き過ぎで次の境目を越えて戻る
+        // 止まる角度が境目の 1 度手前なので、9 度（スライス幅の 60%）の行き過ぎで次の境目を越えて戻る
         let to = sign * (1440 + 7 * slice + slice - 1)
         // 始点はどの境目にも置かない（境目ちょうどから回り出すと、数え方の端の扱いが向きで違う）
         let path = SpinPath.teased(.overshoot, from: sign * 0.5, to: to, count: count)
@@ -426,7 +427,7 @@ struct SpinTeaseTests {
     }
 
     @Test func 回る距離が短すぎれば焦らしを入れず同じ長さ() {
-        // スライス 1 つ分も回らず、止まりかける角度（境目の手前・止まる角度の 12° 手前）が回り始めより手前になる
+        // スライス 1 つ分も回らず、止まりかける角度（境目の手前・止まる角度の `spinTeaseCreepMax` 手前）が回り始めより手前になる
         let path = SpinPath.teased(.hesitate, from: 0, to: 3, count: 2)
         #expect(path.tease == nil)
         #expect(path.segments.count == 1)
