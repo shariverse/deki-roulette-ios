@@ -12,6 +12,9 @@ struct ResultActions: View {
     let shareText: String
     /// 共有シートに本文と一緒に渡す結果の画像。nil なら本文だけを共有する。
     var shareImage: UIImage? = nil
+    /// 「結果をコピー」ボタンのアクセシビリティ ID。App Store 用スクリーンショットの UI テストが、
+    /// 結果が出た（＝このボタンが出た）のを待つのに使う。
+    var copyIdentifier: String
 
     @State private var copied = false
     @State private var copyTask: Task<Void, Never>?
@@ -22,6 +25,7 @@ struct ResultActions: View {
                 ResultActionLabel(title: copied ? L10n.copied : L10n.copyResult)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(copyIdentifier)
 
             // 開始ボタンの `flare` より目立たせないため、コピーと同じ控えめな見た目にする
             if let shareImage {
@@ -99,7 +103,7 @@ private struct ResultActionLabel: View {
 }
 
 #Preview {
-    ResultActions(copyText: "結果: ラーメン", shareText: "結果: ラーメン\n\nデキレーレット")
+    ResultActions(copyText: "結果: ラーメン", shareText: "結果: ラーメン\n\nデキレーレット", copyIdentifier: "result.copy")
         .padding()
         .background(Theme.ink900)
 }

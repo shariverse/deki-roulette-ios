@@ -112,13 +112,19 @@ struct RouletteScreen: View {
                 enabled: model.canSpin,
                 action: spin
             )
+            .accessibilityIdentifier("roulette.spin")
 
             ZStack {
                 // 結果が出ている間だけ出す。順番決めと同じ位置・同じ見た目
                 if let outcome = model.outcome, !model.spinning {
                     let text = ResultText.roulette(label: outcome.label, heading: L10n.resultHeading)
-                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
-                        .id(outcome.label + "\(model.spinCount)")
+                    ResultActions(
+                        copyText: text,
+                        shareText: ResultText.share(text, appName: L10n.appName),
+                        shareImage: shareImage,
+                        copyIdentifier: "roulette.result.copy"
+                    )
+                    .id(outcome.label + "\(model.spinCount)")
                 }
             }
             .frame(height: 32)

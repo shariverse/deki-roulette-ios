@@ -88,14 +88,20 @@ struct OrderScreen: View {
                 enabled: model.canShuffle,
                 action: { model.shuffleItems(reducedMotion: reduceMotion) }
             )
+            .accessibilityIdentifier("order.shuffle")
 
             ZStack {
                 // 演出が終わって結果が出ている間だけ出す。結果が変わると作り直されるので
                 // 「コピーしました」も自然に戻る
                 if let ordered = model.ordered, !model.revealing {
                     let text = ResultText.order(ordered.map(\.label))
-                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
-                        .id(model.resultId)
+                    ResultActions(
+                        copyText: text,
+                        shareText: ResultText.share(text, appName: L10n.appName),
+                        shareImage: shareImage,
+                        copyIdentifier: "order.result.copy"
+                    )
+                    .id(model.resultId)
                 }
             }
             // コピーボタンの有無で上のボタンが動かないよう高さを固定する。大きい文字では最小高さだけ残す
