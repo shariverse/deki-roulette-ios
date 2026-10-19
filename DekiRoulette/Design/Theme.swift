@@ -108,10 +108,20 @@ enum Theme {
     /// 曲線は `Config.spinEasing` に置き、触覚の発火時刻（`HapticSchedule`）とクリック音の時刻（`SpinTicks`）の逆算と同じ形を共有する。
     static let spinAnimation = spinAnimation(easing: Config.spinEasing)
 
-    /// フリックで始めたスピンは、離した瞬間の速さに合わせた曲線（`RouletteModel.spinEasing`）で回す。長さは同じ。
-    /// 勢いが足りずに惰性で回すときは、曲線と長さを `FlickCoast` が決める（`RouletteModel.rotationDuration`）。
+    /// 曲線 `easing` で `duration` 秒の補間。フリックで始めたスピンは離した瞬間の速さに合わせた曲線、
+    /// 勢いが足りずに惰性で回すときは `FlickCoast` が決めた曲線と長さを渡す（`spinAnimation(path:)` が区間 1 つの動きで使う）。
     static func spinAnimation(easing: CubicBezierCurve, duration: TimeInterval = Config.spinDuration) -> Animation {
         .timingCurve(easing.x1, easing.y1, easing.x2, easing.y2, duration: duration)
+    }
+
+    /// 盤面の動き（`RouletteModel.rotationPath`）の補間。区間 1 つ（演出「なし」のスピン・惰性）は今までどおり
+    /// `spinAnimation(easing:duration:)` の `timingCurve` で、焦らしを入れた区間の列は `SpinPathAnimation` で補間する。
+    static func spinAnimation(path: SpinPath) -> Animation {
+        guard path.segments.count > 1 else {
+            let motion = path.segments[0]
+            return spinAnimation(easing: motion.easing, duration: motion.duration)
+        }
+        return Animation(SpinPathAnimation(path: path))
     }
 
     /// 結果が現れる演出。両画面で使い回す。
@@ -146,6 +156,8 @@ enum Theme {
         static let thickness: CGFloat = 14
         /// 外周の縁が盤の表面より手前に出る高さ。
         static let rimLift: CGFloat = 3
+        /// 外周の縁の幅（スライスの円の外側。2D の盤面の縁と同じ）。
+        static let rimWidth: CGFloat = 11
         /// 中心のハブが盤の表面より手前に出る高さ。
         static let hubLift: CGFloat = 6
         /// 盤を裏から支える支柱の太さ（半径）と長さ。盤が傾くと縁の下から見える。
@@ -158,6 +170,31 @@ enum Theme {
         /// 盤の側面・縁・支柱を照らす光の強さ。表面のスライスは照明に依らず塗りの色のまま出す。
         static let ambientLight: CGFloat = 500
         static let keyLight: CGFloat = 800
+        /// 電飾の電球を外周の縁の上面から浮かせる高さ（pt。直径に依らない）。持ち上げた止まったスライスの面（縁の上面 + 0.6pt）より手前、
+        /// 結果の帯・針（縁・ハブの上面 + 1pt 以上）より奥に置き、光彩の画像に隠れず、針の後ろになる（2D の重なり順と同じ）。
+        static let lightLift: CGFloat = 0.8
+        /// 電球の円の細かさ（周の分割数）。
+        static let lightSegments = 16
+        /// 光の尾・残像の残像（遅れた角度のスライスの塗り）を盤の表面から浮かせる高さ（pt。直径に依らない）。
+        /// ラベル（0.3pt）より手前（2D と同じくラベルの上に重なる）、止まっていないスライスを暗くする層（0.4pt）・ハブ・縁より奥に置く。
+        static let ghostLift: CGFloat = 0.35
+        /// 光の尾を外周の縁の上面から浮かせる高さ（pt。直径に依らない）。縁の外周線（上面 + 0.1pt）より手前、
+        /// 電飾のにじみ（上面 + 0.7pt）と電球（`lightLift`）より奥に置き、電飾と一緒のときは 2D と同じく電球の奥になる。
+        static let trailLift: CGFloat = 0.3
+        /// 光の尾を描く弧の切れ端 1 つの角度（度）。長さに依らない同じ形の切れ端を並べて回し、濃さだけを毎フレーム変える
+        /// （メッシュを作り直さない）。2D の 1 区間（最長 120 度 ÷ 24 区間 = 5 度）の半分。
+        static let trailPieceAngle: Double = 2.5
+
+        /// 直径 `diameter`（pt）の盤での、光の尾のにじみの内径と外径（pt）。2D と同じ芯の環（`TrailRing.ringRadius`）を中心に
+        /// `TrailRing.glowWidth` の幅だけ広げるが、外は外周の縁（スライスの円の外 `rimWidth`）で止める。2D では縁の外も盤面の枠の中の地に重なるが、
+        /// 3D の縁の外は盤の無い宙なので、はみ出すと傾けたときに浮いて見えるため。
+        static func trailGlowBounds(diameter: CGFloat) -> (inner: CGFloat, outer: CGFloat) {
+            let scale = max(diameter, 0) / CGFloat(WheelLabel.referenceDiameter)
+            let ring = TrailRing.ringRadius(diameter: diameter)
+            let half = TrailRing.glowWidth * scale / 2
+            let rim = CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + rimWidth * scale
+            return (ring - half, min(ring + half, rim))
+        }
     }
 
     // MARK: 停止の強調
@@ -198,6 +235,115 @@ enum Theme {
     /// 他のスライスが暗くなる／戻るときの変化。
     static let stopDimAnimation = Animation.easeOut(duration: 0.25)
 
+    // MARK: 電飾
+
+    // 「スピンの演出」の電飾（`WheelLights`。電球の数は `Config.wheelLightCount`）。2D の盤面の縁（スライスの円の外側にある暗い環）の上に、
+    // 回らない層で電球を並べる。盤面の枠と寸法は変えず、縁の幅（基準直径でスライスの円の外 5〜11pt）と枠までの余白（〜16pt）の中に収める。
+    // 盤面と同じく外観に依らず固定の暖かい白系にし、`gold`（順番決めの 1 位・フォーカスリング）と `flare`（開始ボタン）は使わない。
+
+    /// 電球の色。明るさ（`WheelLights.Bulb.brightness`）を不透明度にして縁の上に重ねる。縁（`wheelRim`）に対して 3:1 以上、
+    /// いちばん暗いときに重ねた色でも縁から見分けられること（`ThemeContrastTests`）。
+    static let wheelLight = Color(hex: 0xFFE7B0)
+
+    /// 電飾の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）。
+    enum LightRing {
+        /// 電球の環の半径の、スライスの円の半径からの出幅。縁の外周線（+3.5〜5pt）と縁の外周（+11pt）の間の中央。
+        static let ringOffset: CGFloat = 8
+        /// 電球の半径。縁の幅（6pt）に収まる大きさ。
+        static let bulbRadius: CGFloat = 2.2
+        /// にじみが最も強いときに電球の外へ広げる光の幅。環の外側でも盤面の枠（スライスの円の外 16pt）を越えない。
+        static let haloWidth: CGFloat = 5
+        /// にじみの光の中心の不透明度（にじみの強さ × 明るさに掛ける）。
+        static let haloOpacity = 0.6
+
+        /// 直径 `diameter`（pt）の盤面での電球の環の半径（pt）。スライスの円（`WheelGeometry.sliceRadius`）の外 `ringOffset`。
+        /// 2D の `WheelLightsView` と 3D の `Wheel3DScene` が同じ値を使う。
+        static func ringRadius(diameter: CGFloat) -> CGFloat {
+            CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + ringOffset * scale(diameter)
+        }
+
+        /// 直径 `diameter`（pt）の盤面での電球の半径（pt）。
+        static func bulbRadius(diameter: CGFloat) -> CGFloat {
+            bulbRadius * scale(diameter)
+        }
+
+        /// 直径 `diameter`（pt）の盤面での、にじみが最も強いときに電球の外へ広げる光の幅（pt）。
+        static func haloWidth(diameter: CGFloat) -> CGFloat {
+            haloWidth * scale(diameter)
+        }
+
+        private static func scale(_ diameter: CGFloat) -> CGFloat {
+            max(diameter, 0) / CGFloat(WheelLabel.referenceDiameter)
+        }
+    }
+
+    // MARK: 光の尾・残像
+
+    // 「スピンの演出」の光の尾・残像（`WheelTrails`）。残像はスライスの塗り（`sliceColor(in:at:)`）だけを薄く重ね、
+    // 光の尾は盤面の縁（スライスの円の外側にある暗い環）の上を針の下から後ろへ伸びる弧にする。
+    // 盤面と同じく外観に依らず固定の冷たい白系にし（電飾の暖かい白と見分ける）、`gold` / `flare` は使わない。
+
+    /// 光の尾の色。濃さ（`WheelTrails.Trail.opacity`）を不透明度にして縁の上に重ねる。縁（`wheelRim`）に対して 3:1 以上（`ThemeContrastTests`）。
+    static let wheelTrail = Color(hex: 0xD8F0FF)
+
+    /// 光の尾・残像の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）。
+    enum TrailRing {
+        /// 光の尾の芯の中心の半径の、スライスの円の半径からの出幅（縁の中央。電飾の電球の環と同じ）。
+        static let ringOffset: CGFloat = 8
+        /// 光の尾の芯の太さ。縁の幅（6pt）に収める。
+        static let coreWidth: CGFloat = 4
+        /// 芯のまわりのにじみの太さ。盤面の枠（スライスの円の外 16pt）を越えない。
+        static let glowWidth: CGFloat = 12
+        /// にじみの不透明度（芯の濃さに掛ける）。
+        static let glowOpacity = 0.35
+        /// 尾を描き分ける区間の数（頭から先へ段階的に薄くする）。
+        static let segments = 24
+
+        /// 直径 `diameter`（pt）の盤面での光の尾の芯の中心の半径（pt）。スライスの円の外 `ringOffset`。
+        /// 2D の `WheelTrailsView` と 3D の `Wheel3DScene` が同じ値を使う。
+        static func ringRadius(diameter: CGFloat) -> CGFloat {
+            CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + ringOffset * scale(diameter)
+        }
+
+        private static func scale(_ diameter: CGFloat) -> CGFloat {
+            max(diameter, 0) / CGFloat(WheelLabel.referenceDiameter)
+        }
+    }
+
+    // MARK: 火花・紙吹雪
+
+    // 「スピンの演出」の針の先の火花と停止の瞬間の紙吹雪（`WheelParticles`）。盤面と同じく外観に依らず固定し、
+    // `gold`（順番決めの 1 位・フォーカスリング）と `flare`（開始ボタン・針）は使わない。
+
+    /// 火花の芯（白熱した白）。縁（`wheelRim`）に対して 3:1 以上（`ThemeContrastTests`）。
+    static let wheelSpark = Color(hex: 0xFFF6E0)
+    /// 火花のにじみと尾（橙）。芯のまわりに薄く重ねる。針の `flare`（赤）・`gold`（黄）と色相を分ける。
+    static let wheelSparkGlow = Color(hex: 0xFF9A3C)
+
+    /// 紙吹雪の色。スライスの 10 色（`sliceColors`）を固定で使う。紙吹雪は特定のスライスを指さないので、
+    /// 項目の見た目（`sliceColor(in:at:)`）や止まったスライスでは変えない（指定・結果に依らず同じ見た目）。
+    static let confettiColors: [Color] = sliceColors
+
+    /// 火花の寸法（基準直径 `WheelLabel.referenceDiameter` での pt）。
+    enum SparkGlow {
+        /// にじみの半径の、芯の半径に対する倍率。
+        static let haloScale: CGFloat = 3
+        /// にじみの不透明度（火花の濃さに掛ける）。
+        static let haloOpacity = 0.45
+    }
+
+    // MARK: 停止の瞬間のフラッシュ
+
+    /// 停止の瞬間に盤面の枠の中へ 1 回だけ重ねる光（`WheelStopEffects.flashOpacity`）。盤面と同じく外観に依らず固定の白系で、
+    /// 不透明度はいちばん明るいときも 0.25。`gold` / `flare` は使わない。縁（`wheelRim`）に対して 3:1 以上（`ThemeContrastTests`）。
+    static let stopFlash = Color(hex: 0xFFF8EC)
+
+    /// フラッシュの丸い光の形。中心で不透明度 × 1、半径の半ばで × `middleOpacity`、盤面の枠の縁（半径 = 一辺 ÷ 2）で 0 にする。
+    /// 2D の `WheelStopFlashView` と 3D の `Wheel3DScene` が同じ形にする。
+    enum StopFlash {
+        static let middleOpacity = 0.7
+    }
+
     // MARK: 結果の帯
 
     // 結果が出ている間、盤面の中心より下に重ねて結果のラベルを全文で出す帯（寸法と位置は `ResultBand`）。
@@ -210,6 +356,8 @@ enum Theme {
     static let resultBandInk = onSlice
     /// 帯の影。止まったスライスと沈めた盤面から浮かせる。
     static let resultBandShadow = pointerShadow
+    /// 「スピンの演出」が「なし」以外のときの帯の登場（小さい大きさから少し行き過ぎて収まる。`ResultBand.popIn*`）。
+    static let resultBandPopAnimation = Animation.spring(duration: ResultBand.popInDuration, bounce: ResultBand.popInBounce)
 
     /// 削除を元に戻すトーストの出入り。
     static let undoToastAnimation = Animation.easeOut(duration: 0.2)

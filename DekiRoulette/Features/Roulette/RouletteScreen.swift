@@ -7,10 +7,13 @@ struct RouletteScreen: View {
     @AppStorage(Config.soundEnabledKey) private var soundEnabled = true
     @AppStorage(Config.glowStyleKey) private var glowStyle = GlowStyle.default
     @AppStorage(Config.wheel3DEnabledKey) private var wheel3DEnabled = false
+    @AppStorage(Config.spinEffectStyleKey) private var spinEffectStyle = SpinEffectStyle.default
     let model: RouletteModel
     @State private var sound = SpinSoundPlayer()
     /// 共有シートに本文と一緒に渡す結果の画像。結果ごとに 1 回だけ描く（`shareImageKey` の変化で `.task` が描き直す）。
     @State private var shareImage: UIImage?
+    /// 画面が出ているか。タブを切り替えても画面は階層に残り `onChange` が走るので、離れている間に止まったスピンの決まり音を鳴らさない。
+    @State private var onScreen = false
 
     var body: some View {
         PageFrame(
@@ -63,8 +66,30 @@ struct RouletteScreen: View {
         .sensoryFeedback(trigger: model.outcome) { _, outcome in
             hapticsEnabled && outcome != nil ? .success : nil
         }
-        .onAppear { if soundEnabled { sound.prepare() } }
+        // 停止時の決まり音。結果（`outcome`）は抽選したスピンの完了（`finishSpin`。保険のタイマーでも同じ）でだけ出るので、
+        // 惰性では鳴らない。動きを減らす設定でも鳴らす。判定に指定や結果のラベルは使わない
+        .onChange(of: model.outcome) { _, outcome in
+            guard outcome != nil else { return }
+            // うなりは止まる前に消えているが、保険のタイマーで止まったときも決まり音と重ねないよう、ここで切る
+            sound.stopHum()
+            guard onScreen, StopChime.plays(style: spinEffectStyle, soundEnabled: soundEnabled, stop: .spin) else { return }
+            sound.playChime()
+        }
+        // 「なし」のときは効果音（決まり音・うなり）を読み込まない
+        // 画面を出したまま設定で「なし」から変えた・効果音を ON にしたら、最初のスピンで読み込みを待たないよう先に読んでおく。
+        // 画面を離れている間（別のタブ）は読まず、戻ったときの `onAppear` に任せる
+        .onChange(of: spinEffectStyle) { _, style in
+            if onScreen, soundEnabled { sound.prepare(effects: style.showsCommonEffects) }
+        }
+        .onChange(of: soundEnabled) { _, enabled in
+            if onScreen, enabled { sound.prepare(effects: spinEffectStyle.showsCommonEffects) }
+        }
+        .onAppear {
+            onScreen = true
+            if soundEnabled { sound.prepare(effects: spinEffectStyle.showsCommonEffects) }
+        }
         .onDisappear {
+            onScreen = false
             sound.stop()
             // 惰性の残りの触覚の刻みも止める
             model.stopCoast()
@@ -136,10 +161,14 @@ struct RouletteScreen: View {
                 // 2D と同じく、結果が出ている間だけ止まったスライスを強調する
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
-                spinEasing: model.spinEasing,
-                rotationDuration: model.rotationDuration,
+                rotationPath: model.rotationPath,
                 glowStyle: glowStyle,
                 result: wheel3DResult,
+                // 電飾・光の尾・残像・火花・紙吹雪・フラッシュ・余韻・帯の登場演出は 2D と同じ値を受け取り、指定・印を見ない。
+                // 流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
+                effectStyle: spinEffectStyle,
+                motion: model.currentMotion,
+                now: model.now,
                 // 2D と同じく、指を離した角度からフリックのスピンを始める
                 onBoundaryCross: dragCrossedBoundary,
                 onGrab: grab,
@@ -152,9 +181,13 @@ struct RouletteScreen: View {
                 // 結果が出ている間だけ止まったスライスを強調する。項目を触って結果が消えれば強調も解ける
                 highlightedIndex: model.outcome?.index,
                 interactive: !model.spinning,
-                spinEasing: model.spinEasing,
-                rotationDuration: model.rotationDuration,
+                rotationPath: model.rotationPath,
                 glowStyle: glowStyle,
+                // 電飾・光の尾・残像・火花・紙吹雪・フラッシュ・余韻は 3D と同じ値を受け取り、指定・印を見ない。
+                // 流れと濃さは盤面が自分で回る動きと時計から毎フレーム引く
+                effectStyle: spinEffectStyle,
+                motion: model.currentMotion,
+                now: model.now,
                 onBoundaryCross: dragCrossedBoundary,
                 onGrab: grab,
                 onRelease: release
@@ -193,6 +226,8 @@ struct RouletteScreen: View {
                     accent: Theme.sliceColor(in: model.items, at: outcome.index),
                     diameter: diameter
                 )
+                    // 「スピンの演出」が「なし」以外では、小さい大きさから少し行き過ぎて収まるように出す（帯の中心で拡大する）
+                    .modifier(ResultBandPopIn(enabled: spinEffectStyle.showsCommonEffects && !reduceMotion))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     // 盤面は正方形なので、枠の中心が盤面の中心
                     .offset(y: ResultBand.centerOffset(diameter: diameter))
@@ -239,7 +274,7 @@ struct RouletteScreen: View {
         guard let next = model.beginCoast(angularVelocity: angularVelocity, reducedMotion: reduceMotion) else { return }
         // 惰性で回る間も、針が境目を越えるたびに鳴らす（時刻は惰性の曲線から先に求めてある。触覚はモデルが刻む）
         if soundEnabled { sound.play(at: model.clickTimes) }
-        withAnimation(Theme.spinAnimation(easing: model.spinEasing, duration: model.rotationDuration)) {
+        withAnimation(Theme.spinAnimation(path: model.rotationPath)) {
             model.rotation = next
         }
     }
@@ -259,20 +294,48 @@ struct RouletteScreen: View {
     }
 
     private func spin(fullSpins: Int?, direction: SpinDirection?, releaseVelocity: Double?) {
+        // 「スピンの演出」が「なし」以外なら止まり際の焦らしが入る（動きを減らす設定では入らない）。指定は渡さない
         guard let next = model.beginSpin(
-            reducedMotion: reduceMotion, fullSpins: fullSpins, direction: direction, releaseVelocity: releaseVelocity
+            reducedMotion: reduceMotion, style: spinEffectStyle, fullSpins: fullSpins, direction: direction,
+            releaseVelocity: releaseVelocity
         ) else { return }
-        if soundEnabled { sound.play(at: model.clickTimes) }
+        if soundEnabled {
+            sound.play(at: model.clickTimes)
+            // うなりは「なし」・動きを減らす設定では空（鳴っていたものを止めるだけ）。指定は渡さない
+            sound.playHum(model.humStrokes)
+        }
         if reduceMotion {
             // 動きを減らす設定では回さずに止まる。終了は保険のタイマーが担う
             model.rotation = next
         } else {
-            withAnimation(Theme.spinAnimation(easing: model.spinEasing)) {
+            // 焦らしを入れたスピンは区間の列で補間する（2D・3D の盤面の `.animation` も同じ動き）
+            withAnimation(Theme.spinAnimation(path: model.rotationPath)) {
                 model.rotation = next
             } completion: {
                 model.finishSpin()
             }
         }
+    }
+}
+
+/// 結果の帯の登場演出（「スピンの演出」が「なし」以外のとき。`docs/SPEC.md` の §5.5）。`revealOnAppear` に重ねて、
+/// 帯を `ResultBand.popInStartScale` から `Theme.resultBandPopAnimation` のばねで少し行き過ぎて 1 に収める。帯の文字・寸法・色は変えない。
+/// `enabled` が false（「なし」・動きを減らす設定）なら何もしない。出し直しは帯の `.id`（スピンごと）で作り直されたとき。
+private struct ResultBandPopIn: ViewModifier {
+    let enabled: Bool
+    @State private var popped = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(enabled && !popped ? ResultBand.popInStartScale : 1)
+            .onAppear {
+                // 出たときに無効なら登場済みにしておく（結果を出したまま設定を変えても、途中から小さくならない）
+                guard enabled else {
+                    popped = true
+                    return
+                }
+                withAnimation(Theme.resultBandPopAnimation) { popped = true }
+            }
     }
 }
 

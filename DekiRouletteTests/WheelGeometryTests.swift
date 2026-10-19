@@ -7,6 +7,14 @@ struct WheelGeometryTests {
         abs(a.x - b.x) < 1e-9 && abs(a.y - b.y) < 1e-9
     }
 
+    @Test func スライスの円は盤面の枠から基準直径で16pt内側で直径に比例する() {
+        #expect(abs(WheelGeometry.sliceRadius(diameter: 320) - 144) < 1e-9)
+        #expect(abs(WheelGeometry.sliceRadius(diameter: 480) - 216) < 1e-9)
+        #expect(WheelGeometry.sliceRadius(diameter: -10) == 0)
+        // 結果の帯の寸法と同じ値
+        #expect(WheelGeometry.sliceInset == ResultBand.baseSliceInset)
+    }
+
     @Test func 零度は12時() {
         #expect(isClose(WheelGeometry.point(angle: 0, radius: 10), SIMD2(0, 10)))
     }
@@ -60,6 +68,32 @@ struct WheelGeometryTests {
         #expect(mesh.vertices.count == mesh.normals.count)
         expectFacesMatchNormals(mesh.top, in: mesh)
         expectFacesMatchNormals(mesh.side, in: mesh)
+    }
+
+    @Test(arguments: [(0.0, 90.0), (-2.5, 0.0), (0.0, 360.0), (200.0, 320.0)])
+    func 扇形の帯は法線の側を表に向け内径と外径の間に収まる(start: Double, end: Double) {
+        let mesh = WheelGeometry.annulusMesh(start: start, end: end, inner: 20, outer: 100)
+        #expect(mesh.vertices.count == mesh.normals.count)
+        #expect(mesh.side.isEmpty)
+        expectFacesMatchNormals(mesh.top, in: mesh)
+        for vertex in mesh.vertices {
+            let radius = (vertex.x * vertex.x + vertex.y * vertex.y).squareRoot()
+            #expect(radius > 20 - 1e-9 && radius < 100 + 1e-9)
+            #expect(vertex.z == 0)
+        }
+    }
+
+    @Test func 扇形の帯の面積は内径と外径の差の扇() {
+        let mesh = WheelGeometry.annulusMesh(start: 0, end: 90, inner: 20, outer: 100, segmentsPerTurn: 720)
+        var area = 0.0
+        for triangle in stride(from: 0, to: mesh.top.count, by: 3) {
+            let a = mesh.vertices[Int(mesh.top[triangle])]
+            let b = mesh.vertices[Int(mesh.top[triangle + 1])]
+            let c = mesh.vertices[Int(mesh.top[triangle + 2])]
+            area += ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2
+        }
+        let expected = Double.pi * (100 * 100 - 20 * 20) / 4
+        #expect(abs(area - expected) / expected < 1e-3)
     }
 
     @Test func スライスの表面は手前で側面は奥へ伸びる() {

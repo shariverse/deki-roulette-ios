@@ -20,15 +20,23 @@ enum FlickSpin {
         // 窓は指を離した時刻から取り、窓の中の点だけを使う。窓をまたぐ区間や、中心付近で止めていた間より前の動きを
         // 足すと、最後に止めていても手前の動きで回ってしまう
         guard let releaseTime = samples.last?.time else { return 0 }
-        let windowStart = releaseTime - Config.flickSampleWindow
-        let recent = samples.filter { $0.time >= windowStart }
-        guard let first = recent.first, let last = recent.last, last.time > first.time else { return 0 }
+        return angularVelocity(samples: samples, center: center, at: releaseTime)
+    }
+
+    /// ドラッグ中の時刻 `now` までの `Config.flickSampleWindow` 秒に、盤面中心 `center` のまわりを回った角度から求めた角速度（度/秒）。
+    /// 速さに連動する演出が、指を離す前の毎フレームに引く。窓の終わりを最後の点ではなく `now` に取るので、
+    /// 指を止めると（点が増えなくなると）角速度は窓の長さをかけて 0 に落ちる。`now` は `samples` と同じ時計の秒。
+    /// `now` に最後の点の時刻を渡すと、`angularVelocity(samples:center:)`（指を離したときのフリックの角速度）と同じ値になる。
+    static func angularVelocity(samples: [Sample], center: CGPoint, at now: TimeInterval) -> Double {
+        let windowStart = now - Config.flickSampleWindow
+        let recent = samples.filter { $0.time >= windowStart && $0.time <= now }
+        guard let first = recent.first, now > first.time else { return 0 }
 
         var swept = 0.0
         for (from, to) in zip(recent, recent.dropFirst()) {
             swept += WheelDrag.rotationDelta(from: from.location, to: to.location, center: center)
         }
-        return swept / (last.time - first.time)
+        return swept / (now - first.time)
     }
 
     /// フリックで始めるスピンの周回数と向き。

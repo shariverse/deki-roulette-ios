@@ -29,19 +29,27 @@ final class RouletteModel {
     /// スピン中（または惰性で回る間）にクリック音を鳴らす時刻（開始からの秒）。View が再生に渡す。
     private(set) var clickTimes: [TimeInterval] = []
 
+    /// スピン中に流すうなり（ドラムロール）の打ち（`SpinHum.strokes(along:)`）。View が再生に渡す。
+    /// 「スピンの演出」が「なし」・動きを減らす設定・惰性では空（鳴らさない）。指定の有無では変わらない。
+    private(set) var humStrokes: [SpinHum.Stroke] = []
+
     /// 始めたスピンの回数。同じラベルが続けて出ても結果表示を出し直すための識別子に使う（`rotation` は指で動かしても変わるため使わない）。
     private(set) var spinCount = 0
 
-    /// いまの回転の曲線。ボタンでは `Config.spinEasing`、フリックでは離した瞬間の速さに合わせて始点の傾きを変える。
-    /// 勢いが足りずに惰性で回すときは `FlickCoast.easing`。View の補間と、回転音・触覚の時刻の逆算はこの曲線を共有する。
-    private(set) var spinEasing = Config.spinEasing
-
-    /// いまの回転の補間の長さ（秒）。スピンは `Config.spinDuration`、惰性は `FlickCoast` が決めた時間。
-    /// View の補間（`Theme.spinAnimation(easing:duration:)`）は `spinEasing` と一緒にこれを使う。
-    private(set) var rotationDuration = Config.spinDuration
+    /// いま（または直前）の回転の動き。View の補間（`Theme.spinAnimation(path:)`）と、回転音・触覚の時刻・完了の保険はこの動きを共有する。
+    /// スピンは `SpinPath.spin`（演出「なし」なら `Config.spinDuration` 秒・`Config.spinEasing` の区間 1 つ。フリックでは
+    /// 離した瞬間の速さに合わせて始点の傾きを変える。「なし」以外では止まり際の焦らしを足した区間の列）、
+    /// 勢いが足りずに惰性で回すときは `FlickCoast` が決めた区間 1 つ。
+    private(set) var rotationPath = SpinPath.idle
 
     /// 直前のフリックの向き。「スピン」ボタンはこの向きで回す。保存しないので起動ごとに時計回りから始まる。
     private(set) var lastDirection: SpinDirection = .clockwise
+
+    /// いま盤面が自分で回っている動き（スピン・惰性）と、その開始時刻（`now()` の時計の秒）。
+    /// 補間中の角度は observable でないので、速さに連動する演出は `TimelineView` で毎フレーム
+    /// `motion.angle(at:)` / `angularVelocity(at:)` に `now() - start` を渡して引く。動きを減らす設定のスピン（回らない）と、
+    /// 止まったあと（スピンの完了・惰性を止めた・指で回した）は nil。惰性は止まり切っても次の操作までは残る（長さを過ぎた角速度は 0）。
+    private(set) var currentMotion: TimedSpinMotion?
 
     private var pendingOutcome: SpinOutcome?
     /// 惰性で回っている動き。補間中の角度は observable でないので、途中で盤面に触れたときはここから今の角度を逆算する。
@@ -54,6 +62,10 @@ final class RouletteModel {
 
     /// 今の時刻（秒）。惰性の途中の角度の逆算に使う。テストで差し替える。
     @ObservationIgnored var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+
+    /// スピンの乱数の取得元（止まる項目・止まる位置と周回数・焦らしの入り方）。テストで決まった列に差し替える。
+    /// 指定の有無で引く回数と順番が変わらないよう、`beginSpin` は指定があっても止まる項目の乱数を引く。
+    @ObservationIgnored var randomSource = AnyRandomNumberGenerator(SystemRandomNumberGenerator())
 
     init(items: [Item]) {
         self.items = items
@@ -160,41 +172,31 @@ final class RouletteModel {
     /// 次のスピンはこの角度から始まり、止まる累積角・回転音・触覚の時刻もここから求める。結果の決まり方は変わらない。
     func rotate(by delta: Double) {
         guard !spinning, delta != 0 else { return }
+        currentMotion = nil
         rotation += delta
     }
 
     /// 勢いの足りないフリックで指を離したあと、盤面を少しだけ惰性で回す。止まるべき累積回転角を返す。惰性を付けないときは nil。
     /// 抽選ではないので、結果・`spinCount`・`pendingOutcome`・「スピン」ボタンの向き（`lastDirection`）は変えない。
-    /// 呼び出し側はこの値を `rotation` に `Theme.spinAnimation(easing: spinEasing, duration: rotationDuration)` で反映する。
+    /// 呼び出し側はこの値を `rotation` に `Theme.spinAnimation(path: rotationPath)` で反映する。
     /// 演出中と動きを減らす設定では付けない（離した角度のまま止める）。
     /// スピンと同じく、針が境目を越える時刻を惰性の曲線から先に求め、回転音の時刻（`clickTimes`）と
     /// 触覚の刻み（`boundaryTick`。盤面が自分で回っている間なのでスピン中と同じ `.selection`）を用意する。
     func beginCoast(angularVelocity: Double, reducedMotion: Bool) -> Double? {
         guard !spinning, !reducedMotion, let coast = FlickCoast.coast(angularVelocity: angularVelocity) else { return nil }
-        spinEasing = coast.easing
-        rotationDuration = coast.duration
-        coasting = Coasting(from: rotation, start: now(), coast: coast)
-        let next = rotation + coast.distance
+        let path = SpinPath(coast.motion(from: rotation))
+        rotationPath = path
+        let start = now()
+        coasting = Coasting(from: rotation, start: start, coast: coast)
+        currentMotion = TimedSpinMotion(path: path, start: start)
 
-        clickTimes = SpinTicks.boundaryCrossings(
-            from: rotation,
-            to: next,
-            count: items.count,
-            duration: coast.duration,
-            easing: coast.easing,
-            minInterval: Config.clickMinInterval
-        )
+        clickTimes = SpinTicks.boundaryCrossings(along: path, count: items.count, minInterval: Config.clickMinInterval)
+        // 抽選しないので、うなりは付けない
+        humStrokes = []
         tickTask?.cancel()
-        let crossings = HapticSchedule.boundaryCrossings(
-            from: rotation,
-            to: next,
-            count: items.count,
-            duration: coast.duration,
-            easing: coast.easing,
-            minInterval: Config.hapticMinInterval
-        )
+        let crossings = HapticSchedule.boundaryCrossings(along: path, count: items.count, minInterval: Config.hapticMinInterval)
         tickTask = TickScheduler.run(at: crossings) { [weak self] in self?.boundaryTick += 1 }
-        return next
+        return path.to
     }
 
     /// 惰性で回っている途中なら、今の角度を曲線から逆算して返し、惰性を打ち切る（盤面に再び触れた、画面を離れたとき）。
@@ -204,6 +206,7 @@ final class RouletteModel {
     func stopCoast() -> Double? {
         guard let coasting else { return nil }
         self.coasting = nil
+        currentMotion = nil
         tickTask?.cancel()
         tickTask = nil
         let elapsed = now() - coasting.start
@@ -221,63 +224,65 @@ final class RouletteModel {
     }
 
     /// スピンを開始し、盤面が止まるべき累積回転角を返す。回せないときは nil。
-    /// 呼び出し側はこの値を `rotation` にアニメーション付きで反映し、
+    /// 呼び出し側はこの値を `rotation` に `Theme.spinAnimation(path: rotationPath)` で反映し、
     /// アニメーション完了時に `finishSpin()` を呼ぶ。
+    /// `style` は「スピンの演出」。「なし」以外なら止まり際の焦らし（`SpinTease`）を入れる（動きを減らす設定では入れない）。
+    /// 焦らしは止まる位置を変えず、入り方は演出の設定・乱数・止まる累積角と件数だけで決める（指定は渡さない）。
     /// `fullSpins` を渡すと周回数だけをその値にする（フリックの強さの反映）。止まる位置の決め方は変わらない。
     /// `direction` を渡すとその向きに回し、以後のボタンのスピンもその向きを引き継ぐ（フリックの向きの反映）。
     /// 省くと直前に渡された向き（初期値は時計回り）で回す。
-    /// `releaseVelocity` に指を離した瞬間の角速度（度/秒）を渡すと、盤面の初速をそれに合わせる（`spinEasing`）。
+    /// `releaseVelocity` に指を離した瞬間の角速度（度/秒）を渡すと、盤面の初速をそれに合わせる（`SpinPath.spin` が主の区間の曲線を決める）。
     /// 長さと止まる位置は変わらない。省くと `Config.spinEasing` で回す（ボタンには初速が無い）。
     func beginSpin(
-        reducedMotion: Bool, fullSpins: Int? = nil, direction: SpinDirection? = nil, releaseVelocity: Double? = nil
+        reducedMotion: Bool, style: SpinEffectStyle = SpinEffectStyle.none, fullSpins: Int? = nil,
+        direction: SpinDirection? = nil, releaseVelocity: Double? = nil
     ) -> Double? {
         guard canSpin else { return nil }
+        if let targetId, !items.contains(where: { $0.id == targetId }) { return nil }
         if let direction { lastDirection = direction }
 
-        let targetIndex: Int
-        if let targetId {
-            guard let found = items.firstIndex(where: { $0.id == targetId }) else { return nil }
-            targetIndex = found
-        } else {
-            targetIndex = Int.random(in: 0..<items.count)
-        }
+        // 乱数は指定の有無に依らず同じ順・同じ回数で引く（止まる項目 → 止まる位置と周回数 → 焦らしの入り方）。
+        // 指定があるときも止まる項目の乱数を引いてから捨てるので、後に続く焦らしの入り方が指定の有無で変わらない
+        let drawnIndex = Int.random(in: 0..<items.count, using: &randomSource)
+        let targetIndex = targetId.flatMap { id in items.firstIndex(where: { $0.id == id }) } ?? drawnIndex
 
         // 惰性の途中で始めたら、惰性はそこで打ち切る（止まる位置は惰性の行き先の `rotation` から求める）。
         // 惰性の音と触覚の刻みは、下でスピンのものに差し替える
         coasting = nil
-        rotationDuration = Config.spinDuration
 
         let next = if let fullSpins {
             RouletteMath.nextRotation(
-                current: rotation, targetIndex: targetIndex, count: items.count, fullSpins: fullSpins, direction: lastDirection
+                current: rotation, targetIndex: targetIndex, count: items.count, fullSpins: fullSpins,
+                direction: lastDirection, using: &randomSource
             )
         } else {
-            RouletteMath.nextRotation(current: rotation, targetIndex: targetIndex, count: items.count, direction: lastDirection)
+            RouletteMath.nextRotation(
+                current: rotation, targetIndex: targetIndex, count: items.count, direction: lastDirection, using: &randomSource
+            )
         }
-        spinEasing = if let releaseVelocity {
-            FlickSpin.easing(angularVelocity: releaseVelocity, distance: abs(next - rotation), duration: Config.spinDuration)
-        } else {
-            Config.spinEasing
-        }
+        // 動きを減らす設定では回さないので、焦らしを入れない（乱数も引かない）
+        let path = SpinPath.spin(
+            from: rotation, to: next, count: items.count, style: reducedMotion ? SpinEffectStyle.none : style,
+            releaseVelocity: releaseVelocity, using: &randomSource
+        )
+        rotationPath = path
         pendingOutcome = SpinOutcome(index: targetIndex, label: items[targetIndex].label)
         outcome = nil
         spinning = true
         spinCount += 1
+        currentMotion = reducedMotion ? nil : TimedSpinMotion(path: path, start: now())
 
-        // 補間中の角度は observable でないので、境目を越える時刻を先に求めておく。
+        // 補間中の角度は observable でないので、境目を越える時刻を先に求めておく。焦らしで戻る向きに越える境目も数える。
         // 動きを減らす設定では盤面が回らないので鳴らさない
         clickTimes = reducedMotion ? [] : SpinTicks.boundaryCrossings(
-            from: rotation,
-            to: next,
-            count: items.count,
-            duration: Config.spinDuration,
-            easing: spinEasing,
-            minInterval: Config.clickMinInterval
+            along: path, count: items.count, minInterval: Config.clickMinInterval
         )
+        // うなりも同じ動きから打つ時刻と強さを先に求める。「なし」と動きを減らす設定では付けない
+        humStrokes = SpinHum.plays(style: style, reducedMotion: reducedMotion) ? SpinHum.strokes(along: path) : []
 
-        // 完了コールバックが来ない環境（バックグラウンド等）向けの保険
+        // 完了コールバックが来ない環境（バックグラウンド等）向けの保険。長さ（焦らしを含む）の 0.6 秒後
         fallbackTask?.cancel()
-        let wait = reducedMotion ? Config.reducedMotionSpinDuration : Config.spinFallback
+        let wait = reducedMotion ? Config.reducedMotionSpinDuration : path.fallback
         fallbackTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(wait))
             guard !Task.isCancelled else { return }
@@ -288,12 +293,7 @@ final class RouletteModel {
         // 動きを減らす設定では回らないので刻まない
         tickTask?.cancel()
         let crossings = reducedMotion ? [] : HapticSchedule.boundaryCrossings(
-            from: rotation,
-            to: next,
-            count: items.count,
-            duration: Config.spinDuration,
-            easing: spinEasing,
-            minInterval: Config.hapticMinInterval
+            along: path, count: items.count, minInterval: Config.hapticMinInterval
         )
         tickTask = TickScheduler.run(at: crossings) { [weak self] in self?.boundaryTick += 1 }
         return next
@@ -305,6 +305,7 @@ final class RouletteModel {
         tickTask?.cancel()
         tickTask = nil
         spinning = false
+        currentMotion = nil
         guard let pendingOutcome else { return }
         outcome = pendingOutcome
         self.pendingOutcome = nil

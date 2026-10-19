@@ -55,6 +55,16 @@ enum L10n {
         case .rainbow: tr("glowStyleRainbow")
         }
     }
+    static var spinEffectStyleTitle: String { tr("spinEffectStyleTitle") }
+    static func spinEffectStyleName(_ style: SpinEffectStyle) -> String {
+        switch style {
+        case .none: tr("spinEffectStyleNone")
+        case .lights: tr("spinEffectStyleLights")
+        case .trails: tr("spinEffectStyleTrails")
+        case .confetti: tr("spinEffectStyleConfetti")
+        case .all: tr("spinEffectStyleAll")
+        }
+    }
     static var wheel3DTitle: String { tr("wheel3DTitle") }
     static var tiltReferenceTitle: String { tr("tiltReferenceTitle") }
     static func tiltReferenceName(_ reference: TiltReference) -> String {

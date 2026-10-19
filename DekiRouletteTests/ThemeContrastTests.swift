@@ -94,6 +94,87 @@ struct ThemeContrastTests {
         }
     }
 
+    // MARK: 電飾
+
+    @Test(arguments: styles)
+    func 電飾の電球は盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.wheelLight, on: Theme.wheelRim, style) >= 3)
+    }
+
+    /// 電球は明るさを不透明度にして縁に重ねる。いちばん暗いとき（並びの間・点滅と脈動の暗いとき）でも、点いていると縁から見分けられること。
+    @Test(arguments: styles)
+    func 電飾のいちばん暗い電球も盤面の縁から1_5対1以上(style: UIUserInterfaceStyle) {
+        let dimmest = min(WheelLights.baseLevel, WheelLights.blinkLowLevel, WheelLights.stillLevel)
+        let bulb = composite(resolve(Theme.wheelLight.opacity(dimmest), style), over: resolve(Theme.wheelRim, style))
+        let rim = luminance(resolve(Theme.wheelRim, style))
+        #expect((luminance(bulb) + 0.05) / (rim + 0.05) >= 1.5)
+    }
+
+    // MARK: 光の尾
+
+    @Test(arguments: styles)
+    func 光の尾は盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.wheelTrail, on: Theme.wheelRim, style) >= 3)
+    }
+
+    /// 光の尾は電飾の電球と同じ縁の上に重なるので、電飾の暖かい白とは色味で見分ける（青みが強い）。
+    @Test(arguments: styles)
+    func 光の尾は電飾と色味が違う(style: UIUserInterfaceStyle) {
+        func blueMinusRed(_ color: Color) -> Double {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            resolve(color, style).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            return Double(blue - red)
+        }
+        #expect(blueMinusRed(Theme.wheelTrail) > 0.1)
+        #expect(blueMinusRed(Theme.wheelLight) < -0.1)
+    }
+
+    // MARK: 火花・紙吹雪
+
+    @Test(arguments: styles)
+    func 火花の芯とにじみは盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.wheelSpark, on: Theme.wheelRim, style) >= 3)
+        #expect(ratio(Theme.wheelSparkGlow, on: Theme.wheelRim, style) >= 3)
+    }
+
+    /// 火花の橙は針の `flare`（赤）や `gold` と同じ色にしない（専用色を流用しない）。
+    @Test func 火花はgoldとflareを使わない() {
+        for style in styles {
+            for spark in [Theme.wheelSpark, Theme.wheelSparkGlow] {
+                #expect(resolve(spark, style) != resolve(Theme.gold, style))
+                #expect(resolve(spark, style) != resolve(Theme.flare, style))
+            }
+        }
+    }
+
+    /// 紙吹雪はスライスの 10 色で、盤面の縁の上でも見分けられること。
+    @Test(arguments: styles)
+    func 紙吹雪はスライスの10色で盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(Theme.confettiColors.count == 10)
+        for (confetto, slice) in zip(Theme.confettiColors, Theme.sliceColors) {
+            #expect(resolve(confetto, style) == resolve(slice, style))
+            #expect(ratio(confetto, on: Theme.wheelRim, style) >= 3)
+        }
+    }
+
+    /// 停止の瞬間のフラッシュは盤面の縁の上でも見える白系で、`gold` / `flare` を流用しない。
+    @Test(arguments: styles)
+    func フラッシュは盤面の縁に対して3対1以上(style: UIUserInterfaceStyle) {
+        #expect(ratio(Theme.stopFlash, on: Theme.wheelRim, style) >= 3)
+        #expect(resolve(Theme.stopFlash, style) != resolve(Theme.gold, style))
+        #expect(resolve(Theme.stopFlash, style) != resolve(Theme.flare, style))
+    }
+
+    /// フラッシュがいちばん明るいときも、結果の帯の文字は帯の地に対して 4.5:1 以上（帯はフラッシュより手前だが、重なっても読める）。
+    @Test(arguments: styles)
+    func フラッシュが重なっても結果の帯の文字は4_5対1以上(style: UIUserInterfaceStyle) {
+        let flash = resolve(Theme.stopFlash.opacity(WheelStopEffects.flashPeakOpacity), style)
+        let fill = composite(flash, over: resolve(Theme.resultBandFill, style))
+        let ink = composite(flash, over: resolve(Theme.resultBandInk, style))
+        let (high, low) = (luminance(fill), luminance(ink))
+        #expect((high + 0.05) / (low + 0.05) >= 4.5)
+    }
+
     // MARK: 共有画像
 
     @Test(arguments: styles)
@@ -113,8 +194,9 @@ struct ThemeContrastTests {
         let fixed = [
             Theme.onSlice, Theme.wheelRim, Theme.wheelEdge, Theme.wheelHub, Theme.wheelHubMark,
             Theme.flare, Theme.onFlare, Theme.destructive, Theme.onDestructive, Theme.stopOutline,
-            Theme.resultBandFill, Theme.resultBandInk, Theme.shareBackground, Theme.shareInk,
-        ] + Theme.sliceColors
+            Theme.resultBandFill, Theme.resultBandInk, Theme.shareBackground, Theme.shareInk, Theme.wheelLight,
+            Theme.wheelTrail, Theme.wheelSpark, Theme.wheelSparkGlow, Theme.stopFlash,
+        ] + Theme.sliceColors + Theme.confettiColors
         for color in fixed {
             #expect(resolve(color, .light) == resolve(color, .dark))
         }
