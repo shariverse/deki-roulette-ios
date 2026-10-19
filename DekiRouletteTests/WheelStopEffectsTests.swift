@@ -191,7 +191,7 @@ struct WheelStopEffectsTests {
         ))
     }
 
-    @Test func スタイルに含まない演出には時刻を渡さない() {
+    @Test func 組み合わせに含まない演出には時刻を渡さない() {
         let none = stopped().cues(effects: .none, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(none == WheelStopCues(highlight: 2))
         let lights = stopped().cues(effects: SpinEffectsFixtures.lights, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)

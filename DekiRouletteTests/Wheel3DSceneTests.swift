@@ -1223,7 +1223,7 @@ struct Wheel3DSceneTests {
         #expect(still.pointerBounceDepth == 0)
     }
 
-    @Test func 結果の帯はなし以外のとき新しい結果でだけ登場演出を重ねる() {
+    @Test func 結果の帯は停止の演出がONのとき新しい結果でだけ登場演出を重ねる() {
         let scene = makeScene(count: 4, rotation: 0)
         let result = { (id: String) in Wheel3DResult(id: id, label: "\u{3000}", accent: Theme.sliceColor(at: 1, count: 4)) }
         scene.show(result: result("a1"), reduceMotion: false, popIn: true)
