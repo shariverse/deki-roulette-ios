@@ -226,8 +226,19 @@ enum Theme {
     static let stopPulseScale: CGFloat = 1.10
     /// 結果が出ている間、止まったスライスを前に出しておく倍率。
     static let stopHoldScale: CGFloat = 1.07
-    /// 停止の瞬間に針が沈む量（pt）。
+    /// 停止の瞬間に針が沈む量（pt）。停止の演出が ON のときは 2 倍（`pointerBounceOffset(_:)`）。
     static let pointerBounceOffset: CGFloat = 4
+    /// 停止の演出が ON のとき、針を大きく弾く倍率（沈む量を `pointerBounceOffset` の何倍にするか）。
+    static let pointerBigBounceFactor: CGFloat = 2
+
+    /// 停止の瞬間に針が沈む量（pt）。動きを減らす設定では沈めない（0）。
+    static func pointerBounceOffset(_ bounce: PointerBounce) -> CGFloat {
+        switch bounce {
+        case .none: 0
+        case .normal: pointerBounceOffset
+        case .big: pointerBounceOffset * pointerBigBounceFactor
+        }
+    }
     /// 押し出し・沈み込みの行き。
     static let stopPulseAnimation = Animation.easeOut(duration: 0.14)
     /// 押し出し・沈み込みの戻り。少し弾ませる。強調が解けてスライスが元の大きさに戻るときにも使う。

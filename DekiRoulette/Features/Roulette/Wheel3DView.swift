@@ -238,7 +238,10 @@ private struct Wheel3DSceneView: UIViewRepresentable {
         context.coordinator.update(items: items, diameter: diameter, displayScale: displayScale)
         context.coordinator.spin(to: rotation)
         context.coordinator.tilt(to: tilt)
-        context.coordinator.highlight(highlight, reduceMotion: reduceMotion, afterglow: showsStopEffects)
+        context.coordinator.highlight(
+            highlight, reduceMotion: reduceMotion, afterglow: showsStopEffects,
+            pointerBounce: PointerBounce.at(stopEffects: showsStopEffects, reduceMotion: reduceMotion)
+        )
         context.coordinator.show(result: result, reduceMotion: reduceMotion, popIn: showsStopEffects)
         context.coordinator.light(lights)
         context.coordinator.trail(trails)
@@ -331,6 +334,8 @@ final class Wheel3DScene {
     var stoppedImagePlaneCount: Int {
         stoppedNode?.childNodes.filter { $0.geometry is SCNPlane }.count ?? 0
     }
+    /// 最後に止まったときに針を沈めた量（pt。テストで、停止の演出が ON なら 2 倍沈めることを見る）。
+    private(set) var pointerBounceDepth: Double = 0
     /// 結果の帯の登場演出（小さい大きさからばね）を流した回数。
     private(set) var bandPopCount = 0
 
@@ -468,7 +473,9 @@ final class Wheel3DScene {
     /// 止まったスライスは縁の高さまで持ち上げ、側面の付いた板として前に出す（隣に隠れず、傾けても浮いて見える）。
     /// 動きを減らす設定では大きさも高さも変えず、暗くする・縁取り・光彩だけを即座に出す。
     /// 大きさが変わって盤を組み直したときは、動かさずに出し直す。
-    func highlight(_ highlight: Wheel3DHighlight?, reduceMotion: Bool, afterglow: Bool = false) {
+    func highlight(
+        _ highlight: Wheel3DHighlight?, reduceMotion: Bool, afterglow: Bool = false, pointerBounce: PointerBounce = .normal
+    ) {
         let pulsesGlow = afterglow && !reduceMotion
         let changed = highlight != shownHighlight
         // 結果を出したまま「スピンの演出」を切り替えた（余韻の有無が変わった）ときは、動かさずに出し直す
@@ -503,9 +510,12 @@ final class Wheel3DScene {
         SCNTransaction.commit()
         Self.pulse(stopped, keyPath: .scale, from: Self.planeScale(1), peak: Self.planeScale(Theme.stopPulseScale),
                    rest: Self.planeScale(Theme.stopHoldScale))
-        // 針は沈んでから戻る（y は上向きなので、2D で下へ沈むのは -）
+        // 針は沈んでから戻る（y は上向きなので、2D で下へ沈むのは -）。停止の演出が ON なら 2D と同じく 2 倍沈める
+        let depth = Theme.pointerBounceOffset(pointerBounce)
+        pointerBounceDepth = Double(depth)
+        guard depth > 0 else { return }
         Self.pulse(pointerNode, keyPath: .position, from: SCNVector3Zero,
-                   peak: SCNVector3(0, -Float(Theme.pointerBounceOffset), 0), rest: SCNVector3Zero)
+                   peak: SCNVector3(0, -Float(depth), 0), rest: SCNVector3Zero)
     }
 
     private func build(_ shape: Shape) {

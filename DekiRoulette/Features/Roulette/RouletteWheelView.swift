@@ -128,8 +128,9 @@ struct RouletteWheelView: View {
                     }
                 }
 
+                // 停止の演出が ON なら大きく弾く（沈みを 2 倍に。戻りのばねは同じ）
                 WheelPointerView()
-                    .offset(y: -6 + (pulsing ? Theme.pointerBounceOffset : 0))
+                    .offset(y: -6 + (pulsing ? Theme.pointerBounceOffset(pointerBounce) : 0))
 
                 // 火花と紙吹雪は回らない層に置き、針より手前に重ねる。紙吹雪は結果が出た瞬間（強調を指で解いても止めない）に
                 // はじけさせる。止まったスライスがどれかは渡さない
@@ -166,6 +167,11 @@ struct RouletteWheelView: View {
             }
         }
         .accessibilityHidden(true)
+    }
+
+    /// 停止の瞬間の針の沈み方。3D と同じ規則で引く。
+    private var pointerBounce: PointerBounce {
+        PointerBounce.at(stopEffects: effects.stopEffects, reduceMotion: reduceMotion)
     }
 
     /// 止まったスライスの倍率。動きを減らす設定では大きさを変えない（暗くする・縁取り・光彩だけにする）。

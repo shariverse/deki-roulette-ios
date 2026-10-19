@@ -150,3 +150,20 @@ struct WheelStopCues: Equatable, Sendable {
     /// 紙吹雪がはじけた時刻。紙吹雪を出さない設定・動きを減らす設定・見ていない停止では nil。
     var confettiStart: TimeInterval?
 }
+
+/// 停止の瞬間の針の沈み方（`docs/SPEC.md` の §5.5「針を大きく弾く」）。2D の `RouletteWheelView` と 3D の `Wheel3DScene` が
+/// 同じ規則で引き、沈む量は `Theme.pointerBounceOffset(_:)` で決める。止まったスライス・指定は受け取らない。
+enum PointerBounce: Sendable {
+    /// 沈めない（動きを減らす設定）。
+    case none
+    /// 今までの沈み（4pt）。停止の演出が OFF のとき。
+    case normal
+    /// 大きく弾く（2 倍の 8pt）。停止の演出が ON のとき。戻りのばねは同じ。
+    case big
+
+    /// 停止の演出（`SpinEffects.stopEffects`）と動きを減らす設定から沈み方を決める。
+    static func at(stopEffects: Bool, reduceMotion: Bool) -> PointerBounce {
+        if reduceMotion { return .none }
+        return stopEffects ? .big : .normal
+    }
+}
