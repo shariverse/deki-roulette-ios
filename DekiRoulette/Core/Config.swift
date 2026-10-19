@@ -119,8 +119,8 @@ enum Config {
     static let effectPulseFrameInterval: TimeInterval = 1.0 / 20
 
     /// 止まり際の焦らし（`SpinTease`）でスピンに足す長さ（秒）。焦らしを入れるスピンは入り方に依らず
-    /// `spinDuration + spinTeaseDuration`（5.7 秒）で、主の区間は `spinDuration` のまま。
-    static let spinTeaseDuration: TimeInterval = 1.2
+    /// `spinDuration + spinTeaseDuration`（6.5 秒）で、主の区間は `spinDuration` のまま。
+    static let spinTeaseDuration: TimeInterval = 2.0
 
     /// 焦らしを入れたスピンの完了の保険（`spinFallback` と同じく、長さの 0.6 秒後）。
     static let spinTeaseFallback: TimeInterval = spinDuration + spinTeaseDuration + 0.6
@@ -130,25 +130,28 @@ enum Config {
     static let spinTeaseEasing = CubicBezierCurve(0.42, 0, 0.58, 1)
 
     /// ためらい・戻りかけで主の区間を止める、止まるスライスに入る境目の手前の距離。スライス幅に対する割合と上限（度）の小さい方。
+    /// 止まりかける角度は 1 つ前のスライス（隣）の中に収まる。
     static let spinTeaseApproachFraction: Double = 0.25
-    static let spinTeaseApproachMax: Double = 5
+    static let spinTeaseApproachMax: Double = 8
 
     /// ためらい・戻りかけの焦らしの区間で、止まりかけた角度から止まる角度まで進む距離の上限（度）。広いスライスの奥で止まるときも、
-    /// 止まりかけてから加速し直して大きく回らないようにする（`docs/SPEC.md` §5.5）。
-    static let spinTeaseCreepMax: Double = 12
+    /// 止まりかけてから加速し直して大きく回らないようにする（`docs/SPEC.md` §5.5）。戻りかけで進み直す距離（これ + 戻る角度）を
+    /// 焦らしの区間の残りで進んでも、演出の強さが 0.05（うなりの下限 `humMinIntensity`）に届かない大きさに抑える。
+    static let spinTeaseCreepMax: Double = 15
 
-    /// 戻りかけで戻る角度。スライス幅に対する割合と上限（度）の小さい方。手前の距離と足してもスライス幅の半分に収まり、
-    /// 戻りで 1 つ前の境目を越えない。
-    static let spinTeaseRollBackFraction: Double = 0.2
-    static let spinTeaseRollBackMax: Double = 3
+    /// 戻りかけで戻る角度。スライス幅に対する割合と上限（度）の小さい方。止まるスライスの中で止まりかけたときは
+    /// 止まるスライスに入る境目を越えて隣（1 つ前）のスライスまで戻ることがある。手前の距離と足してもスライス幅（の 75%）に収まり、
+    /// 隣の 1 つ先のスライスには入らない。
+    static let spinTeaseRollBackFraction: Double = 0.5
+    static let spinTeaseRollBackMax: Double = 10
 
     /// 戻りかけの焦らしの長さのうち、戻る区間に使う割合。残りで越えて止まる。
     static let spinTeaseRollBackShare: Double = 1.0 / 3
 
-    /// 行き過ぎで止まる角度を越える角度。スライス幅に対する割合と上限（度）の小さい方。スライス幅未満なので、
+    /// 行き過ぎで止まる角度を越える角度。スライス幅に対する割合と上限（度）の小さい方。スライス幅（の 60%）未満なので、
     /// 隣のスライスに入ることはあってもその次には入らない。
-    static let spinTeaseOvershootFraction: Double = 0.4
-    static let spinTeaseOvershootMax: Double = 8
+    static let spinTeaseOvershootFraction: Double = 0.6
+    static let spinTeaseOvershootMax: Double = 20
 
     /// 光の尾・残像（`WheelTrails`）を出し始める演出の強さ（0...1）。これ未満では出さず、ここから 1 まで比例して濃くする。
     static let wheelTrailThreshold = 0.35
