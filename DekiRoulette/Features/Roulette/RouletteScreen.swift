@@ -7,7 +7,8 @@ struct RouletteScreen: View {
     @AppStorage(Config.soundEnabledKey) private var soundEnabled = true
     @AppStorage(Config.glowStyleKey) private var glowStyle = GlowStyle.default
     @AppStorage(Config.wheel3DEnabledKey) private var wheel3DEnabled = false
-    @AppStorage(Config.spinEffectStyleKey) private var spinEffectStyle = SpinEffectStyle.default
+    /// 「スピンの演出」の設定（全体の ON / OFF と演出ごとのトグル）。
+    private let spinEffectsSetting = SpinEffectsSetting()
     let model: RouletteModel
     @State private var sound = SpinSoundPlayer()
     /// 共有シートに本文と一緒に渡す結果の画像。結果ごとに 1 回だけ描く（`shareImageKey` の変化で `.task` が描き直す）。
@@ -15,8 +16,8 @@ struct RouletteScreen: View {
     /// 画面が出ているか。タブを切り替えても画面は階層に残り `onChange` が走るので、離れている間に止まったスピンの決まり音を鳴らさない。
     @State private var onScreen = false
 
-    /// 付ける演出。設定で選んだ「スピンの演出」を演出ごとの ON / OFF に写す。
-    private var spinEffects: SpinEffects { spinEffectStyle.effects }
+    /// 付ける演出。全体が OFF なら何も付けない。
+    private var spinEffects: SpinEffects { spinEffectsSetting.effects }
 
     var body: some View {
         PageFrame(
@@ -297,14 +298,14 @@ struct RouletteScreen: View {
     }
 
     private func spin(fullSpins: Int?, direction: SpinDirection?, releaseVelocity: Double?) {
-        // 「スピンの演出」が「なし」以外なら止まり際の焦らしが入る（動きを減らす設定では入らない）。指定は渡さない
+        // 「スピンの演出」の焦らしが ON なら止まり際の焦らしが入る（動きを減らす設定では入らない）。指定は渡さない
         guard let next = model.beginSpin(
             reducedMotion: reduceMotion, effects: spinEffects, fullSpins: fullSpins, direction: direction,
             releaseVelocity: releaseVelocity
         ) else { return }
         if soundEnabled {
             sound.play(at: model.clickTimes)
-            // うなりは「なし」・動きを減らす設定では空（鳴っていたものを止めるだけ）。指定は渡さない
+            // うなりは演出の効果音が OFF・動きを減らす設定では空（鳴っていたものを止めるだけ）。指定は渡さない
             sound.playHum(model.humStrokes)
         }
         if reduceMotion {
@@ -321,9 +322,9 @@ struct RouletteScreen: View {
     }
 }
 
-/// 結果の帯の登場演出（「スピンの演出」が「なし」以外のとき。`docs/SPEC.md` の §5.5）。`revealOnAppear` に重ねて、
+/// 結果の帯の登場演出（「スピンの演出」の停止の演出が ON のとき。`docs/SPEC.md` の §5.5）。`revealOnAppear` に重ねて、
 /// 帯を `ResultBand.popInStartScale` から `Theme.resultBandPopAnimation` のばねで少し行き過ぎて 1 に収める。帯の文字・寸法・色は変えない。
-/// `enabled` が false（「なし」・動きを減らす設定）なら何もしない。出し直しは帯の `.id`（スピンごと）で作り直されたとき。
+/// `enabled` が false（停止の演出が OFF・動きを減らす設定）なら何もしない。出し直しは帯の `.id`（スピンごと）で作り直されたとき。
 private struct ResultBandPopIn: ViewModifier {
     let enabled: Bool
     @State private var popped = false

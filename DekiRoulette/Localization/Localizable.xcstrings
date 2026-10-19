@@ -1240,7 +1240,7 @@
         }
       }
     },
-    "spinEffectStyleTitle" : {
+    "spinEffectsTitle" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -1257,24 +1257,24 @@
         }
       }
     },
-    "spinEffectStyleNone" : {
+    "spinEffectsEnabled" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "None"
+            "value" : "Show effects"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "なし"
+            "value" : "演出を付ける"
           }
         }
       }
     },
-    "spinEffectStyleLights" : {
+    "spinEffectLights" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -1291,7 +1291,7 @@
         }
       }
     },
-    "spinEffectStyleTrails" : {
+    "spinEffectTrails" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -1303,41 +1303,92 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "光の尾"
+            "value" : "光の尾・残像"
           }
         }
       }
     },
-    "spinEffectStyleConfetti" : {
+    "spinEffectParticles" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confetti"
+            "value" : "Sparks and confetti"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "紙吹雪"
+            "value" : "火花・紙吹雪"
           }
         }
       }
     },
-    "spinEffectStyleAll" : {
+    "spinEffectTease" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All"
+            "value" : "Suspense before stopping"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全部入り"
+            "value" : "止まり際の焦らし"
+          }
+        }
+      }
+    },
+    "spinEffectStopEffects" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop flourish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止の演出"
+          }
+        }
+      }
+    },
+    "spinEffectSounds" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effect sounds"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出の効果音"
+          }
+        }
+      }
+    },
+    "spinEffectsSoundNote" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effect sounds play only when the spin sound is also on."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出の効果音は、ルーレットの回転音も ON のときだけ鳴ります。"
           }
         }
       }

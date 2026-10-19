@@ -177,7 +177,7 @@ struct WheelStopEffectsTests {
         return stop
     }
 
-    @Test func 全部入りでは停止の時刻をすべての演出に渡す() {
+    @Test func すべてONでは停止の時刻をすべての演出に渡す() {
         let cues = stopped().cues(effects: .all, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(cues == WheelStopCues(
             highlight: 2, lightsStoppedAt: 10, afterglowStart: 10, flashStart: 10, confettiStart: 10
@@ -194,11 +194,11 @@ struct WheelStopEffectsTests {
     @Test func スタイルに含まない演出には時刻を渡さない() {
         let none = stopped().cues(effects: .none, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(none == WheelStopCues(highlight: 2))
-        let lights = stopped().cues(effects: SpinEffectStyle.lights.effects, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let lights = stopped().cues(effects: SpinEffectsFixtures.lights, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(lights == WheelStopCues(highlight: 2, lightsStoppedAt: 10, afterglowStart: 10, flashStart: 10))
-        let trails = stopped().cues(effects: SpinEffectStyle.trails.effects, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let trails = stopped().cues(effects: SpinEffectsFixtures.trails, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(trails == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10))
-        let confetti = stopped().cues(effects: SpinEffectStyle.confetti.effects, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
+        let confetti = stopped().cues(effects: SpinEffectsFixtures.confetti, reduceMotion: false, highlightedIndex: 2, displacedByDrag: false)
         #expect(confetti == WheelStopCues(highlight: 2, afterglowStart: 10, flashStart: 10, confettiStart: 10))
     }
 

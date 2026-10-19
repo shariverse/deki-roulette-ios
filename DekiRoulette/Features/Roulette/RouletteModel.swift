@@ -30,15 +30,15 @@ final class RouletteModel {
     private(set) var clickTimes: [TimeInterval] = []
 
     /// スピン中に流すうなり（ドラムロール）の打ち（`SpinHum.strokes(along:)`）。View が再生に渡す。
-    /// 「スピンの演出」が「なし」・動きを減らす設定・惰性では空（鳴らさない）。指定の有無では変わらない。
+    /// 演出の効果音（`SpinEffects.sounds`）が OFF・動きを減らす設定・惰性では空（鳴らさない）。指定の有無では変わらない。
     private(set) var humStrokes: [SpinHum.Stroke] = []
 
     /// 始めたスピンの回数。同じラベルが続けて出ても結果表示を出し直すための識別子に使う（`rotation` は指で動かしても変わるため使わない）。
     private(set) var spinCount = 0
 
     /// いま（または直前）の回転の動き。View の補間（`Theme.spinAnimation(path:)`）と、回転音・触覚の時刻・完了の保険はこの動きを共有する。
-    /// スピンは `SpinPath.spin`（演出「なし」なら `Config.spinDuration` 秒・`Config.spinEasing` の区間 1 つ。フリックでは
-    /// 離した瞬間の速さに合わせて始点の傾きを変える。「なし」以外では止まり際の焦らしを足した区間の列）、
+    /// スピンは `SpinPath.spin`（焦らしが OFF なら `Config.spinDuration` 秒・`Config.spinEasing` の区間 1 つ。フリックでは
+    /// 離した瞬間の速さに合わせて始点の傾きを変える。焦らしが ON なら止まり際の焦らしを足した区間の列）、
     /// 勢いが足りずに惰性で回すときは `FlickCoast` が決めた区間 1 つ。
     private(set) var rotationPath = SpinPath.idle
 
@@ -278,7 +278,7 @@ final class RouletteModel {
         clickTimes = reducedMotion ? [] : SpinTicks.boundaryCrossings(
             along: path, count: items.count, minInterval: Config.clickMinInterval
         )
-        // うなりも同じ動きから打つ時刻と強さを先に求める。「なし」と動きを減らす設定では付けない
+        // うなりも同じ動きから打つ時刻と強さを先に求める。演出の効果音が OFF のときと動きを減らす設定では付けない
         humStrokes = SpinHum.plays(effects: effects, reducedMotion: reducedMotion) ? SpinHum.strokes(along: path) : []
 
         // 完了コールバックが来ない環境（バックグラウンド等）向けの保険。長さ（焦らしを含む）の 0.6 秒後

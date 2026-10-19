@@ -131,10 +131,10 @@ struct SettingsView: View {
     }
 }
 
-/// 設定から進む「ルーレットの詳細設定」。止まったスライスの光彩の色、スピンの演出、3D 表示の ON/OFF と傾きの基準を選ぶ。
+/// 設定から進む「ルーレットの詳細設定」。止まったスライスの光彩の色、スピンの演出（全体と演出ごとの ON/OFF）、3D 表示の ON/OFF と傾きの基準を選ぶ。
 private struct RouletteAdvancedSettingsView: View {
     @AppStorage(Config.glowStyleKey) private var glowStyle = GlowStyle.default
-    @AppStorage(Config.spinEffectStyleKey) private var spinEffectStyle = SpinEffectStyle.default
+    private let spinEffects = SpinEffectsSetting()
     @AppStorage(Config.wheel3DEnabledKey) private var wheel3DEnabled = false
     @AppStorage(Config.tiltReferenceKey) private var tiltReference = TiltReference.default
 
@@ -148,12 +148,27 @@ private struct RouletteAdvancedSettingsView: View {
                         }
                     }
                 }
-                SettingsSection(title: L10n.spinEffectStyleTitle) {
-                    ForEach(SpinEffectStyle.allCases, id: \.self) { style in
-                        SettingsChoiceRow(title: L10n.spinEffectStyleName(style), selected: spinEffectStyle == style) {
-                            spinEffectStyle = style
+                SettingsSection(title: L10n.spinEffectsTitle) {
+                    Toggle(L10n.spinEffectsEnabled, isOn: spinEffects.enabledBinding)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.ivory)
+                        .tint(Theme.ivory)
+                    Divider()
+                        .overlay(Theme.ink700)
+                    // 全体が OFF の間も個別の選択は残し、選べないことだけを見せる（傾きの基準と同じ）
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(SpinEffectItem.allCases, id: \.self) { item in
+                            Toggle(L10n.spinEffectName(item), isOn: spinEffects.binding(for: item))
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.ivory)
+                                .tint(Theme.ivory)
                         }
+                        Text(L10n.spinEffectsSoundNote)
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
                     }
+                    .disabled(!spinEffects.enabled)
+                    .opacity(spinEffects.enabled ? 1 : 0.5)
                 }
                 SettingsToggle(title: L10n.wheel3DTitle, isOn: $wheel3DEnabled)
                 // 傾きの基準は 3D 表示のときだけ効く。OFF の間も選んだ値は残し、選べないことだけを見せる

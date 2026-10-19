@@ -144,3 +144,13 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - `.github/workflows/build.yml` の PR 側のジョブは、同じリポジトリのブランチでは `if` で常にスキップされ、push 側だけで走る。push 側は `paths-ignore` で
   `**/*.md` と `docs/**` だけの変更では走らないので、最後のコミットがドキュメントだけだと `gh pr checks` にはスキップしか出ない。
   その前のコードのコミットの push の Build の結果を見る（2026-10-18）
+
+## 文言・設定画面
+
+- `Localizable.xcstrings` はキーが並べ替えられていない（追加順）。Python の `json.load` → `json.dump` で書き直すと、空のエントリ（`"%lld" : {}`）の書き方や並び順が変わって差分が数百行に膨らむ。
+  キーの追加・削除はテキストのまま該当の塊だけを差し替える（`json.loads` で壊れていないかだけ確かめる）（2026-10-19）
+- `@AppStorage` を束ねた `DynamicProperty` の struct を View に持たせるとき、`private var x = …` にすると View の memberwise init が private になり、
+  ほかのファイルから View を作れなくなる。`private let` にする（`DynamicProperty` は `let` でも更新を受ける）（2026-10-19）
+- 「ルーレットの詳細設定」（`RouletteAdvancedSettingsView`）は `private` なので、スクリーンショットを撮るときは一時的に `private` を外し、コミットしない一時テストから
+  `NavigationStack { RouletteAdvancedSettingsView() }` を present する。保存値の状態を変えて撮るときは
+  `xcrun simctl spawn <SIM> defaults write <バンドル ID> <キー> -bool NO` で書いてから起動し、撮ったら `defaults delete` で戻す（2026-10-19）

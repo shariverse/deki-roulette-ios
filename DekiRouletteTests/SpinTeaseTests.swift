@@ -342,7 +342,7 @@ struct SpinTeaseTests {
             let expected = SpinTease.random(using: &reference)
             for spin in Self.cases() {
                 var rng = SeededGenerator(seed: seed)
-                let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: SpinEffectStyle.lights.effects, using: &rng)
+                let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: SpinEffectsFixtures.lights, using: &rng)
                 #expect(path.tease == expected)
             }
         }
@@ -359,11 +359,11 @@ struct SpinTeaseTests {
         }
     }
 
-    @Test(arguments: [SpinEffectStyle.lights, .trails, .confetti, .all])
-    func なし以外のスタイルでは毎回入れる(style: SpinEffectStyle) {
+    @Test(arguments: SpinEffectsFixtures.withCommon)
+    func なし以外のスタイルでは毎回入れる(effects: SpinEffects) {
         for spin in Self.cases() {
             var rng = SeededGenerator(seed: 5)
-            let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: style.effects, using: &rng)
+            let path = SpinPath.spin(from: spin.from, to: spin.to, count: spin.count, effects: effects, using: &rng)
             #expect(path.tease != nil)
             #expect(abs(path.duration - Self.teaseDuration) < 1e-9)
             #expect(abs(path.to - spin.to) < 1e-9)
