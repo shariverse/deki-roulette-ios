@@ -125,33 +125,47 @@ enum Config {
     /// 焦らしを入れたスピンの完了の保険（`spinFallback` と同じく、長さの 0.6 秒後）。
     static let spinTeaseFallback: TimeInterval = spinDuration + spinTeaseDuration + 0.6
 
-    /// 焦らしの区間の曲線（ease-in-out）。始点・終点の傾きが 0 なので、主の区間（終点の傾きが 0 の `spinEasing`）や
-    /// 前後の焦らしの区間と角速度 0 でつながる。
-    static let spinTeaseEasing = CubicBezierCurve(0.42, 0, 0.58, 1)
+    /// 焦らしの区間の曲線（ease-in-out の sine。`cubic-bezier(0.37, 0, 0.63, 1)`）。始点・終点の傾きが 0 なので、主の区間（終点の傾きが 0 の
+    /// `spinEasing`）や前後の焦らしの区間と角速度 0 でつながる。振り子の揺れ（正弦波）に近い形で、中ほどの傾き（約 1.59 倍）が
+    /// `CubicBezierCurve(0.42, 0, 0.58, 1)`（約 1.72 倍）より小さいので、同じ振れ幅でも速さの山が低い。
+    static let spinTeaseEasing = CubicBezierCurve(0.37, 0, 0.63, 1)
 
     /// ためらい・戻りかけで主の区間を止める、止まるスライスに入る境目の手前の距離。スライス幅に対する割合と上限（度）の小さい方。
     /// 止まりかける角度は 1 つ前のスライス（隣）の中に収まる。
     static let spinTeaseApproachFraction: Double = 0.25
     static let spinTeaseApproachMax: Double = 8
 
-    /// ためらい・戻りかけの焦らしの区間で、止まりかけた角度から止まる角度まで進む距離の上限（度）。広いスライスの奥で止まるときも、
-    /// 止まりかけてから加速し直して大きく回らないようにする（`docs/SPEC.md` §5.5）。戻りかけで進み直す距離（これ + 戻る角度）を
-    /// 焦らしの区間の残りで進んでも、演出の強さが 0.05（うなりの下限 `humMinIntensity`）に届かない大きさに抑える。
-    static let spinTeaseCreepMax: Double = 15
+    /// ためらい・戻りかけで、止まりかけた角度から止まる角度までの距離の上限（度）。広いスライスの奥で止まるときも、
+    /// 止まりかけてから加速し直して大きく回らないようにする（`docs/SPEC.md` §5.5）。止まりかけてから止まる角度を越えて揺れるまで
+    /// （これ + 戻る角度 + 揺れ）を 1 つの区間で進んでも、演出の強さが 0.05（うなりの下限 `humMinIntensity`）に届かない大きさに抑える。
+    static let spinTeaseCreepMax: Double = 10
 
     /// 戻りかけで戻る角度。スライス幅に対する割合と上限（度）の小さい方。止まるスライスの中で止まりかけたときは
     /// 止まるスライスに入る境目を越えて隣（1 つ前）のスライスまで戻ることがある。手前の距離と足してもスライス幅（の 75%）に収まり、
     /// 隣の 1 つ先のスライスには入らない。
     static let spinTeaseRollBackFraction: Double = 0.5
-    static let spinTeaseRollBackMax: Double = 10
+    static let spinTeaseRollBackMax: Double = 7
 
-    /// 戻りかけの焦らしの長さのうち、戻る区間に使う割合。残りで越えて止まる。
-    static let spinTeaseRollBackShare: Double = 1.0 / 3
-
-    /// 行き過ぎで止まる角度を越える角度。スライス幅に対する割合と上限（度）の小さい方。スライス幅（の 60%）未満なので、
-    /// 隣のスライスに入ることはあってもその次には入らない。
+    /// 行き過ぎで止まる角度を越える角度（最初の振れ）。スライス幅に対する割合と上限（度）の小さい方。スライス幅（の 60%）未満なので、
+    /// 隣のスライスに入ることはあってもその次には入らない。そのあと `spinTeaseSwingDecay` ずつ縮めて戻り過ぎ・少し行き過ぎてから止まる。
     static let spinTeaseOvershootFraction: Double = 0.6
-    static let spinTeaseOvershootMax: Double = 20
+    static let spinTeaseOvershootMax: Double = 14
+
+    /// ためらいで止まりかけたあと、止まる角度を越えて揺れる最初の振れ幅。スライス幅に対する割合と上限（度）の小さい方。
+    /// そのあと `spinTeaseSwingDecay` 倍だけ戻り過ぎてから止まる。戻りかけは戻ったあとにこれの `spinTeaseSwingDecay` 倍だけ行き過ぎてから止まる。
+    static let spinTeaseSwingFraction: Double = 0.4
+    static let spinTeaseSwingMax: Double = 8
+
+    /// 止まる角度のまわりの揺れが 1 回折り返すごとに縮む割合（振り子の減衰）。行き過ぎの o → 戻り過ぎ 0.4 o → 少し行き過ぎ 0.16 o。
+    static let spinTeaseSwingDecay: Double = 0.4
+
+    /// 焦らしの区間（3 つ）の長さの割合（`spinTeaseDuration` に掛ける）。ためらい・行き過ぎは、止まる角度を越える最初の大きな振れを
+    /// いちばん長くし、振れが小さくなるほど短くする（1.0 → 0.6 → 0.4 秒）。
+    static let spinTeaseSwingShares: [Double] = [0.5, 0.3, 0.2]
+
+    /// 戻りかけの焦らしの区間（戻る → 進み直して少し行き過ぎる → 止まる）の長さの割合。進み直す区間は距離（止まりかけた角度からの
+    /// 距離 + 戻る角度 + 揺れ）がいちばん長いので、いちばん長くする（0.5 → 1.2 → 0.3 秒）。
+    static let spinTeaseRollBackShares: [Double] = [0.25, 0.6, 0.15]
 
     /// 光の尾・残像（`WheelTrails`）を出し始める演出の強さ（0...1）。これ未満では出さず、ここから 1 まで比例して濃くする。
     static let wheelTrailThreshold = 0.35
