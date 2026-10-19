@@ -9,7 +9,7 @@ struct SpinHumTests {
         RouletteModel(items: ItemLabel.makeItems(labels))
     }
 
-    /// 焦らしを入れたスピンの動き（4.5 秒の主の区間 + 1.2 秒の焦らし）。
+    /// 焦らしを入れたスピンの動き（4.5 秒の主の区間 + 2 秒の焦らし）。
     private func teasedPath(_ tease: SpinTease, count: Int = 8, releaseVelocity: Double? = nil) -> SpinPath {
         var rng = SeededGenerator(seed: 5)
         let to = RouletteMath.nextRotation(current: 0, targetIndex: 2, count: count, direction: .clockwise, using: &rng)

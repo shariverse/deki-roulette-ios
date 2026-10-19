@@ -119,8 +119,8 @@ enum Config {
     static let effectPulseFrameInterval: TimeInterval = 1.0 / 20
 
     /// 止まり際の焦らし（`SpinTease`）でスピンに足す長さ（秒）。焦らしを入れるスピンは入り方に依らず
-    /// `spinDuration + spinTeaseDuration`（5.7 秒）で、主の区間は `spinDuration` のまま。
-    static let spinTeaseDuration: TimeInterval = 1.2
+    /// `spinDuration + spinTeaseDuration`（6.5 秒）で、主の区間は `spinDuration` のまま。
+    static let spinTeaseDuration: TimeInterval = 2.0
 
     /// 焦らしを入れたスピンの完了の保険（`spinFallback` と同じく、長さの 0.6 秒後）。
     static let spinTeaseFallback: TimeInterval = spinDuration + spinTeaseDuration + 0.6

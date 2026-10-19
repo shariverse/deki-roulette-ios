@@ -123,17 +123,17 @@ struct WheelParticlesTests {
     // MARK: 焦らしの動き（区間の列）
 
     @Test func 区間の列では全体の長さまで生まれうる() {
-        // 主の区間（4.5 秒）のあとの区間も速ければ火花が出る（焦らしの 5.7 秒まで生まれうる時刻がある）
+        // 主の区間（4.5 秒）のあとの区間も速ければ火花が出る（焦らしの 6.5 秒まで生まれうる時刻がある）
         let path = SpinPath(segments: [
             SpinMotion(from: 0, to: 4.5 * velocity(intensity: 1), duration: Config.spinDuration, easing: Self.linear),
             SpinMotion(
-                from: 4.5 * velocity(intensity: 1), to: 5.7 * velocity(intensity: 1),
+                from: 4.5 * velocity(intensity: 1), to: 6.5 * velocity(intensity: 1),
                 duration: Config.spinTeaseDuration, easing: Self.linear
             ),
         ])
         let motion = TimedSpinMotion(path: path, start: 0)
-        #expect(abs(path.duration - 5.7) < 1e-9)
-        #expect(!sparks(motion, now: 5.6).isEmpty)
+        #expect(abs(path.duration - 6.5) < 1e-9)
+        #expect(!sparks(motion, now: 6.4).isEmpty)
         // 止まり切ってから寿命が過ぎたら出ない
         #expect(sparks(motion, now: path.duration + Config.wheelSparkLifetime).isEmpty)
     }

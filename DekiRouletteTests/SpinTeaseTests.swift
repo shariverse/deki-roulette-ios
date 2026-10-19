@@ -74,7 +74,7 @@ struct SpinTeaseTests {
     }
 
     @Test func 焦らし込みの長さと保険() {
-        #expect(abs(Self.teaseDuration - 5.7) < 1e-9)
+        #expect(abs(Self.teaseDuration - 6.5) < 1e-9)
         #expect(abs(Config.spinTeaseFallback - (Self.teaseDuration + 0.6)) < 1e-9)
     }
 
