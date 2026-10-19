@@ -1223,7 +1223,15 @@ struct Wheel3DSceneTests {
         // 9 時の向き（針と重ならない）で、環・盤の面・枠の外を見る。縁は表面より浮いているので遠近で少し大きく見え、
         // 環の内側寄りは縁に隠れる。見えている外側寄りで確かめる
         let ring = location(x: -(inner + (outer - inner) * 0.6), y: 0, pixels: plain)
-        #expect(glowing.color(at: ring).x - plain.color(at: ring).x > 0.15, "\(glowing.color(at: ring)) / \(plain.color(at: ring))")
+        #expect(glowing.color(at: ring).x - plain.color(at: ring).x > 0.1, "\(glowing.color(at: ring)) / \(plain.color(at: ring))")
+        // 2D と同じ明るさ（透明な地に、色 × 不透明度 × グラデーションの位置の不透明度で重ねた値）に近い
+        let alpha = Config.wheelBackGlowMaxOpacity * (1 - 0.6)
+        // 色はダークの外観で解決する（テストのホストの外観に依らない）
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(Theme.wheelBackGlow).resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)).getRed(&r, green: &g, blue: &b, alpha: &a)
+        let expected = SIMD3(Double(r), Double(g), Double(b)) * alpha
+        let actual = glowing.color(at: ring)
+        #expect(max(abs(actual.x - expected.x), abs(actual.y - expected.y), abs(actual.z - expected.z)) < 0.08, "\(actual) / \(expected)")
         let face = location(x: -(inner - 20), y: 0, pixels: plain)
         #expect(isClose(glowing.color(at: face), plain.color(at: face)))
         let beyond = location(x: -(outer + 3), y: 0, pixels: plain)
@@ -1239,13 +1247,14 @@ struct Wheel3DSceneTests {
         let scene = makeScene(count: 4, rotation: 0)
         scene.backGlow(0.3, dark: true)
         #expect(scene.hasBackGlowNode)
-        #expect(abs((scene.backGlowOpacity ?? 0) - 0.3) < 1e-6)
+        // 線形の色空間で重ねる分を打ち消した不透明度を写す
+        #expect(abs((scene.backGlowOpacity ?? 0) - pow(0.3, 2.2)) < 1e-6)
         scene.backGlow(0, dark: true)
         #expect(scene.backGlowOpacity == nil)
         // 組み直しても出し直す
         scene.backGlow(0.5, dark: false)
         scene.update(labels: ["", "", ""], diameter: size)
-        #expect(abs((scene.backGlowOpacity ?? 0) - 0.5) < 1e-6)
+        #expect(abs((scene.backGlowOpacity ?? 0) - pow(0.5, 2.2)) < 1e-6)
     }
 
     /// 光っていない待機中に外観を変えても、次に光らせるときに今の外観の色で焼き直す。

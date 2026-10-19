@@ -632,7 +632,8 @@ final class Wheel3DScene {
     /// 光の尾のにじみと芯。残像より後、電飾のにじみ（10）と電球（11）より前に描き、電球の奥にする。
     private static let trailGlowRenderingOrder = 8
     private static let trailCoreRenderingOrder = 9
-    /// 背景の光の脈動。盤・縁（0）より後、強調の層・残像より前に描く（縁の外の環だけで、盤の面には重ならない）。
+    /// 背景の光の脈動。盤・縁と同じ 0 で、SceneKit が半透明のものを不透明な盤・縁より後に描くのに任せる。強調の層（1）・残像より前
+    /// （縁の外の環だけで、盤の面には重ならない。深度を書かないので、後に描く半透明のノードはどれも上に重なる）。
     private static let backGlowRenderingOrder = 0
     /// 停止の瞬間のフラッシュ。電飾（10・11）より後に描いて電球の上に重ね、深度は読むので手前の針には隠れる。
     private static let flashRenderingOrder = 15
@@ -1197,8 +1198,17 @@ final class Wheel3DScene {
         guard let node = backGlowNode else { return }
         let opacity = shownBackGlow.opacity
         node.isHidden = opacity <= 0
-        if opacity > 0 { node.opacity = CGFloat(opacity) }
+        if opacity > 0 { node.opacity = CGFloat(Self.linearAlpha(opacity)) }
     }
+
+    /// 2D と同じ見た目の不透明度 `alpha` を、SceneKit で重ねるときの不透明度に直す。SceneKit は線形の色空間で重ねてから sRGB に戻すので、
+    /// 透明な地（`SCNView` の背景は透明）に重ねた半透明の色はそのままだと 2D より明るく出る（不透明度 0.24 が 0.5 前後に見える）。
+    /// sRGB の明るさを冪 `backGlowGamma` で近似し、不透明度にも同じ冪を掛けて打ち消す（色 × 不透明度 の冪は、色の冪 × 不透明度の冪に分かれる）。
+    private static func linearAlpha(_ alpha: Double) -> Double {
+        pow(min(max(alpha, 0), 1), backGlowGamma)
+    }
+
+    private static let backGlowGamma = 2.2
 
     /// 背景の光の板。2D の `WheelBackGlowView` と同じく、外周の縁の外周（`Theme.BackGlow.innerRadius`）でいちばん明るく、
     /// 盤面の枠（`outerRadius` = 直径 ÷ 2）で 0 になる環を焼いた一辺 = 直径の板を、盤の表面のわずかに奥（`backGlowDepth`）に置く。
@@ -1243,8 +1253,12 @@ final class Wheel3DScene {
         let outer = Theme.BackGlow.outerRadius(diameter: CGFloat(diameter)) * ratio
         let color = UIColor(Theme.wheelBackGlow).resolvedColor(with: UITraitCollection(userInterfaceStyle: dark ? .dark : .light))
         return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { renderer in
-            let colors = [color.cgColor, color.withAlphaComponent(0).cgColor] as CFArray
-            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: [0, 1])
+            // 2D は内側の 1 から外側の 0 へ不透明度を線形に落とす。3D では重ねるときの明るさに合わせて、各点の不透明度を
+            // `linearAlpha` で直した値にする（間は細かく区切って線形に補う）
+            let steps = 16
+            let locations = (0...steps).map { CGFloat($0) / CGFloat(steps) }
+            let colors = locations.map { color.withAlphaComponent(CGFloat(linearAlpha(1 - Double($0)))).cgColor } as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: locations)
             else { return }
             let center = CGPoint(x: side / 2, y: side / 2)
             // 始まりの円の内側は塗らない（盤の面には重ねない）
