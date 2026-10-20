@@ -823,7 +823,7 @@ iOS 版には対応物が無い、または OS が代替する項目。
 | `aria-live` の結果通知 | `AccessibilityNotification.Announcement` | |
 | プリレンダ、SEO、sitemap、CSP、hreflang | 無し | Web 固有 |
 | ラベル 20 文字（UTF-16 単位） | 20 文字（`Character` 単位） | 絵文字等の結合文字で差が出る |
-| フッター末尾の著作権表示 | ヘッダ右上の設定アイコン（歯車）から開くシートの「著作権」項目 | 帰属の文（basekeita、Takumi Muraishi、M0710Fa の連名）と `© 2026 basekeita, Takumi Muraishi, M0710Fa` を載せる（`SettingsView`） |
+| フッター末尾の著作権表示 | ヘッダ右上の設定アイコン（歯車）から開くシートの「著作権」項目 | 帰属の文（basekeita、Takumi Muraishi、M0710Fa の連名）と `© 2026 basekeita, Takumi Muraishi, M0710Fa` を載せ、その下に X・LINE の商標の注記（「X は X Corp. の商標です。LINE は LY Corporation の商標です。本アプリはこれらの企業と提携・承認の関係にありません。」。英語は `X is a trademark of X Corp. LINE is a trademark of LY Corporation. This app is not affiliated with or endorsed by these companies.`。`trademarkNotice`）を `©` の行と同じ小さな `muted` の文字で置く（`SettingsView`） |
 | 入力欄は 1 行、Enter で追加するとフォーカスが外れる | 入力欄は複数行（`TextField(axis: .vertical)`、最大 5 行で伸びる）。Return は末尾の改行として入るので、それを送信の合図にして追加し、フォーカスを保つ | 改行区切りの貼り付けは行ごとに正規化してまとめて追加する（`ItemLabel.splitLines`、§4.2）。1 行の入力欄では貼り付けた改行が見えないため複数行にした。20 文字の制限は行ごとに掛ける（`ItemLabel.clampLines`）。複数行のときは追加ボタンが「N 件追加」になり、上限を超える分は切り捨てて「項目は 24 個までです」で伝える（`addItems(_:)` が追加できた件数を返す） |
 | ローンチ画面は無い | `UILaunchScreen` の `UIColorName` に無地の `LaunchBackground`（Color Set） | ライト `#FAF7F2` / ダーク `#17111F` で `ink900` と同じ 2 値。ロゴやアプリ名は置かない。`ink900` を変えるときは Color Set も合わせる |
 | （無し） | 項目リストに名前を付けて保存・読み込み・管理する（§4.6、`SavedListStore` / `SavedListsModel`） | 保存先は両画面で共通で、`RootView` が `SavedListsModel` を 1 つ生成して environment で配る。項目の永続化と同じ `ItemStorage` / `StoredItem` を使い、指定は含めない。上限は `Config.maxSavedLists`（20）、名前の上限は `Config.maxSavedListNameLength`（30） |

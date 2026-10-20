@@ -62,6 +62,10 @@ struct SettingsView: View {
                         Text(L10n.copyright)
                             .font(.caption)
                             .foregroundStyle(Theme.muted)
+                        Text(L10n.trademarkNotice)
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
+                            .lineSpacing(3)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
