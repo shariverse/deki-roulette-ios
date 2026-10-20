@@ -1,9 +1,21 @@
 import Foundation
 
-/// 結果の本文を X・LINE の投稿画面に渡す Web の URL。アプリが入っていればアプリが、無ければブラウザが開く。
+/// 結果の本文を X・LINE の投稿画面に渡す URL。X はアプリの投稿画面（URL スキーム）を先に開き、開けなければ Web の投稿画面を開く。
+/// LINE は Web の URL で、アプリが入っていればアプリが、無ければブラウザが開く。
 /// 投稿は利用者が各アプリで確定する（API による投稿はしない）。入力は共有の本文だけで、指定や項目リストは受け取らない。
 enum ShareIntent {
-    /// X の投稿画面。`text` に本文を入れる。
+    /// X に本文を渡すときに開く順。X アプリの投稿画面 → Web の投稿画面。前の URL が開けなかったときだけ次を開く。
+    static func xPostCandidates(text: String) -> [URL] {
+        [xAppPost(text: text), xPost(text: text)]
+    }
+
+    /// X アプリのネイティブの投稿画面。`message` に本文を入れる（画像は付かない）。
+    /// X が文書化した仕組みではないので、X アプリの更新で開かなくなることがある（そのときは `xPost(text:)` に落ちる）。
+    static func xAppPost(text: String) -> URL {
+        url(base: "twitter://post?message=", text: text)
+    }
+
+    /// X の Web の投稿画面。`text` に本文を入れる。X アプリが無いときのフォールバック。
     static func xPost(text: String) -> URL {
         url(base: "https://x.com/intent/post?text=", text: text)
     }
