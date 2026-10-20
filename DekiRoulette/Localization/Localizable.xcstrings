@@ -1887,19 +1887,53 @@
         }
       }
     },
-    "resultHeading" : {
+    "shareRouletteResult" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Result"
+            "value" : "The wheel picked “%@”!"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "結果"
+            "value" : "ルーレットで「%@」に決まりました！"
+          }
+        }
+      }
+    },
+    "shareOrderHeading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The order is set!"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "順番が決まりました！"
+          }
+        }
+      }
+    },
+    "shareHashtag" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "#DekiRoulette"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "#デキレーレット"
           }
         }
       }

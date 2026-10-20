@@ -92,8 +92,11 @@ struct OrderScreen: View {
             ZStack {
                 // 演出が終わって結果が出ている間だけ出す。結果が変わると作り直す
                 if let ordered = model.ordered, !model.revealing {
-                    let text = ResultText.order(ordered.map(\.label))
-                    ResultActions(shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
+                    let text = ResultText.order(ordered.map(\.label), heading: L10n.shareOrderHeading)
+                    ResultActions(
+                        shareText: ResultText.share(text, hashtag: L10n.shareHashtag, appStoreURL: Config.appStoreURL),
+                        shareImage: shareImage
+                    )
                         .id(model.resultId)
                 }
             }
