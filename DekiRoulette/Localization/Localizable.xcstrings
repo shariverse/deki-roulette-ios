@@ -1859,23 +1859,6 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "X"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "X"
-          }
-        }
-      }
-    },
-    "shareToXAccessibility" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
             "value" : "Post on X"
           }
         },
@@ -1888,23 +1871,6 @@
       }
     },
     "shareToLINE" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LINE"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LINE"
-          }
-        }
-      }
-    },
-    "shareToLINEAccessibility" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -1934,6 +1900,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "結果を共有"
+          }
+        }
+      }
+    },
+    "shareWithImage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share with Image…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像付きで共有…"
+          }
+        }
+      }
+    },
+    "shareTextOnly" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有…"
           }
         }
       }
