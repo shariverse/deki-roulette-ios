@@ -7,7 +7,8 @@ import UniformTypeIdentifiers
 /// 押しただけではメニューが出るだけでアプリを離れない（X・LINE の小さなボタンを誤って押していたため、1 つにまとめた）。
 /// 本文だけを写したいときは共有シートの「コピー」を使う（専用のコピーボタンは置かない）。
 /// `shareImage` があれば共有シートに本文と一緒に結果の画像（`ShareImageFile`）を渡し、無ければ本文だけを渡す。
-/// X・LINE は本文だけを Web の投稿画面の URL（`ShareIntent`）で開く（画像は付かない。確認は挟まない）。投稿は利用者が各アプリで確定する。
+/// X は本文だけを X アプリの投稿画面（URL スキーム）で開き、開けなければ Web の投稿画面で開く（`ShareIntent.xPostCandidates`）。
+/// LINE は本文だけを Web の URL（`ShareIntent.lineShare`）で開く。どちらも画像は付かず、確認は挟まない。投稿は利用者が各アプリで確定する。
 struct ResultActions: View {
     /// 共有シートと LINE に渡す本文（ハッシュタグ入り。`ResultText.share`）。
     let shareText: String
@@ -22,7 +23,7 @@ struct ResultActions: View {
         Menu {
             shareSheetItem
             Button {
-                openURL(ShareIntent.xPost(text: postText ?? shareText))
+                open(ShareIntent.xPostCandidates(text: postText ?? shareText))
             } label: {
                 Label(L10n.shareToX, systemImage: "square.and.pencil")
             }
@@ -38,6 +39,16 @@ struct ResultActions: View {
         // 盤面の下から上へ開いても、項目を上から「共有シート → X → LINE」の順に保つ
         .menuOrder(.fixed)
         .frame(maxWidth: Theme.Layout.resultActionsMaxWidth)
+    }
+
+    /// 候補の URL を前から開き、開けなかったら次を開く。`canOpenURL` を使わないので `LSApplicationQueriesSchemes` は要らない。
+    private func open(_ candidates: [URL]) {
+        guard let url = candidates.first else { return }
+        openURL(url) { accepted in
+            if !accepted {
+                open(Array(candidates.dropFirst()))
+            }
+        }
     }
 
     /// 共有シートを開く項目。画像を描き終える前（`shareImage` が nil）は本文だけを渡すので「画像付き」と言わない名前にする。

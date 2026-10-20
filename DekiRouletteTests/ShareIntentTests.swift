@@ -18,6 +18,33 @@ struct ShareIntentTests {
         #expect(try decodedText(url, prefix: "https://x.com/intent/post?text=") == "ルーレットで「ラーメン」に決まりました！\n\n#デキレーレット")
     }
 
+    @Test(arguments: [
+        "ルーレットで「ラーメン」に決まりました！\n\n#デキレーレット\nhttps://apps.apple.com/app/id6814132611",
+        "順番が決まりました！\n1. A & B\n2. C+D\n3. 50% off #1\nほか 3 件\n\n#デキレーレット",
+        "🍣 寿司 🍜 ラーメン 👨‍👩‍👧",
+        "a=b&message=injected#frag",
+    ])
+    func XアプリのURLのmessageに本文を入れる(text: String) throws {
+        let url = ShareIntent.xAppPost(text: text)
+        #expect(url.scheme == "twitter")
+        #expect(url.host() == "post")
+        let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        // `&` `#` を含む本文でも、クエリは message の 1 つだけで、フラグメントは付かない
+        #expect(components.queryItems?.count == 1)
+        #expect(components.queryItems?.first?.name == "message")
+        #expect(components.fragment == nil)
+        #expect(try decodedText(url, prefix: "twitter://post?message=") == text)
+    }
+
+    @Test func XはアプリのURLを先にWebのURLを後に開く() {
+        let text = "順番が決まりました！\n1. A\n2. B\n\n#デキレーレット"
+        let candidates = ShareIntent.xPostCandidates(text: text)
+        #expect(candidates == [ShareIntent.xAppPost(text: text), ShareIntent.xPost(text: text)])
+        #expect(candidates.map(\.scheme) == ["twitter", "https"])
+        // Web の URL は今までと同じ
+        #expect(candidates.last?.absoluteString == "https://x.com/intent/post?text=" + ShareIntent.percentEncoded(text))
+    }
+
     @Test func LINEの送信画面のURLに本文を入れる() throws {
         let url = ShareIntent.lineShare(text: "The wheel picked “Ramen”!\n\n#DekiRoulette")
         #expect(url.host() == "line.me")
