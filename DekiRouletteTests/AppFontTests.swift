@@ -76,6 +76,14 @@ struct AppFontTests {
         #expect(abs(Theme.Typography.defaultSize(for: style) - expected) < 1e-9)
     }
 
+    #if os(visionOS)
+    /// visionOS だけのスタイルも既定の大きさを引けるよう、UIKit のスタイルに写す。
+    @Test func visionOSだけのスタイルも写す() {
+        #expect(Theme.Typography.uiTextStyle(.extraLargeTitle) == .extraLargeTitle)
+        #expect(Theme.Typography.uiTextStyle(.extraLargeTitle2) == .extraLargeTitle2)
+    }
+    #endif
+
     @Test(arguments: [
         (Font.Weight.regular, AppFont.Face.regular),
         (.bold, .bold),
