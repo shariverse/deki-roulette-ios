@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 /// 本文だけを写したいときは共有シートの「コピー」を使う（専用のコピーボタンは置かない）。
 /// `shareImage` があれば共有シートに本文と一緒に結果の画像（`ShareImageFile`）を渡し、無ければ本文だけを渡す（今までどおり）。
 struct ResultActions: View {
-    /// 共有シートに渡す本文（アプリ名入り）。
+    /// 共有シートに渡す本文（ハッシュタグ入り。`ResultText.share`）。
     let shareText: String
     /// 共有シートに本文と一緒に渡す結果の画像。nil なら本文だけを共有する。
     var shareImage: UIImage? = nil
@@ -91,7 +91,7 @@ private struct ResultActionLabel: View {
 }
 
 #Preview {
-    ResultActions(shareText: "結果: ラーメン\n\nデキレーレット")
+    ResultActions(shareText: "ルーレットで「ラーメン」に決まりました！\n\n#デキレーレット")
         .padding()
         .background(Theme.ink900)
 }

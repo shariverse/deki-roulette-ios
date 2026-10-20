@@ -146,8 +146,11 @@ struct RouletteScreen: View {
             ZStack {
                 // 結果が出ている間だけ出す。順番決めと同じ位置・同じ見た目
                 if let outcome = model.outcome, !model.spinning {
-                    let text = ResultText.roulette(label: outcome.label, heading: L10n.resultHeading)
-                    ResultActions(shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
+                    let text = ResultText.roulette(label: outcome.label, template: L10n.shareRouletteResult)
+                    ResultActions(
+                        shareText: ResultText.share(text, hashtag: L10n.shareHashtag, appStoreURL: Config.appStoreURL),
+                        shareImage: shareImage
+                    )
                         .id(outcome.label + "\(model.spinCount)")
                 }
             }

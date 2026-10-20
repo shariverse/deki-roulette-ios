@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 共有シートに渡す順番決めの結果画像。一辺 `side` の正方形に、順位の行（カード）を上から並べ、アプリ名（`L10n.appName` の文字だけ）を下に置く。
 /// 寸法は `ShareImageLayout.order(side:)`、地と文字はルーレットの画像（`RouletteShareImageView`）と同じ固定色（`Theme.shareBackground` / `shareInk`）。
-/// 行は `ResultText.order` と同じ「1. ラベル」の並びで、1 位は画面（`OrderResultView`）と同じ `gold`、他は `muted` 系。
+/// 行は `ResultText.numbered` と同じ「1. ラベル」の並びで、1 位は画面（`OrderResultView`）と同じ `gold`、他は `muted` 系。
 /// 行の色のトークンは外観で変わるが、`ShareImageRenderer` がダークに固定して焼くので画像は端末の外観に依らない。
 /// 行数が上限を超えるときは上限より 1 つ少ない件数を並べ、最後の行を「ほか M 件」にする（`Order.rows(count:)`）。長いラベルは `labelLimit` で省略する。
 ///
