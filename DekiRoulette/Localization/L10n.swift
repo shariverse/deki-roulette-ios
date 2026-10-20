@@ -107,6 +107,12 @@ enum L10n {
     static var resetItemsMessage: String { tr("resetItemsMessage") }
     static var resetItemsAction: String { tr("resetItemsAction") }
     static var shareResult: String { tr("shareResult") }
+    /// 結果の下の X のボタンの文字と、読み上げの名前（行き先が分かるもの）。
+    static var shareToX: String { tr("shareToX") }
+    static var shareToXAccessibility: String { tr("shareToXAccessibility") }
+    /// 結果の下の LINE のボタンの文字と、読み上げの名前。
+    static var shareToLINE: String { tr("shareToLINE") }
+    static var shareToLINEAccessibility: String { tr("shareToLINEAccessibility") }
     /// 共有画像で省略した順位の件数の行（「ほか 3 件」）。
     static func shareOrderOthers(_ count: Int) -> String { fmt("shareOrderOthers", count) }
     /// 共有の本文のルーレットの結果の文。`%@` にラベルが入る（`ResultText.roulette(label:template:)`）。

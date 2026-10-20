@@ -2,22 +2,58 @@ import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// 結果の下に置く幅広の「結果を共有」。両画面で同じ見た目・同じ高さ（`Theme.Layout.resultActionsHeight`）にする。
+/// 結果の下に置く幅広の「結果を共有」と、X・LINE のボタン。両画面で同じ見た目・同じ高さ（`Theme.Layout.resultActionsHeight`）にする。
 /// 本文だけを写したいときは共有シートの「コピー」を使う（専用のコピーボタンは置かない）。
 /// `shareImage` があれば共有シートに本文と一緒に結果の画像（`ShareImageFile`）を渡し、無ければ本文だけを渡す（今までどおり）。
+/// X・LINE は本文だけを Web の投稿画面の URL（`ShareIntent`）で開く（画像は付かない）。投稿は利用者が各アプリで確定する。
 struct ResultActions: View {
-    /// 共有シートに渡す本文（ハッシュタグ入り。`ResultText.share`）。
+    /// 共有シートと LINE に渡す本文（ハッシュタグ入り。`ResultText.share`）。
     let shareText: String
+    /// X に渡す本文。X の上限に収めたもの（順番決めは `ResultText.orderPost`）。nil なら `shareText` を渡す。
+    var postText: String? = nil
     /// 共有シートに本文と一緒に渡す結果の画像。nil なら本文だけを共有する。
     var shareImage: UIImage? = nil
 
+    @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        // 「結果を共有」が残りの幅をすべて取る。行き先ごとのボタンを足すときはこの右に並べる
-        HStack(spacing: 8) {
-            shareButton
-                .frame(maxWidth: .infinity)
+        Group {
+            // アクセシビリティサイズでは横に並べると「結果を共有」が狭くなるので、X・LINE を下の段に回す
+            if TypeLayout.growsFixedAreas(for: typeSize) {
+                VStack(spacing: 8) {
+                    shareButton
+                    HStack(spacing: 8) { destinationButtons }
+                }
+            } else {
+                // 「結果を共有」が残りの幅をすべて取り、X・LINE は文字の幅だけ
+                HStack(spacing: 8) {
+                    shareButton
+                        .frame(maxWidth: .infinity)
+                    destinationButtons
+                }
+            }
         }
         .frame(maxWidth: Theme.Layout.resultActionsMaxWidth)
+    }
+
+    @ViewBuilder
+    private var destinationButtons: some View {
+        Button {
+            openURL(ShareIntent.xPost(text: postText ?? shareText))
+        } label: {
+            ResultActionLabel(title: L10n.shareToX, fillsWidth: false)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.shareToXAccessibility)
+
+        Button {
+            openURL(ShareIntent.lineShare(text: shareText))
+        } label: {
+            ResultActionLabel(title: L10n.shareToLINE, fillsWidth: false)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.shareToLINEAccessibility)
     }
 
     @ViewBuilder
@@ -59,11 +95,13 @@ enum ShareImageError: Error {
     case encodingFailed
 }
 
-/// 「結果を共有」のラベル。地は塗らず（ページの地のまま）、`ink600` の枠と `ivory` の文字にする。
+/// 「結果を共有」と X・LINE のボタンのラベル。地は塗らず（ページの地のまま）、`ink600` の枠と `ivory` の文字にする。
 /// 開始ボタン（`flare` の塗りと光彩）より控えめにして主従を保ち、`flare` / `gold` は使わない。
 private struct ResultActionLabel: View {
     let title: String
     var systemImage: String?
+    /// 残りの幅をすべて取るか（「結果を共有」）。偽なら文字の幅だけ（X・LINE）。
+    var fillsWidth = true
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -82,9 +120,15 @@ private struct ResultActionLabel: View {
                 .multilineTextAlignment(.center)
         }
         .foregroundStyle(Theme.ivory)
-        .padding(.horizontal, 20)
+        // X・LINE は短い名前なので折り返さず、幅も高さもタップ領域を下回らないようにする
+        .fixedSize(horizontal: !fillsWidth, vertical: false)
+        .padding(.horizontal, fillsWidth ? 20 : 16)
         .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: Theme.Layout.resultActionsHeight)
+        .frame(
+            minWidth: fillsWidth ? nil : Theme.Layout.resultActionsHeight,
+            maxWidth: fillsWidth ? .infinity : nil,
+            minHeight: Theme.Layout.resultActionsHeight
+        )
         .contentShape(.capsule)
         .overlay(Capsule().strokeBorder(Theme.ink600, lineWidth: 1.5))
     }
