@@ -52,6 +52,11 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
   文字の `.font` は `Theme.Typography` から引く: テキストスタイルは `font(_:weight:)`（`Font.custom(_:size:relativeTo:)`。既定の大きさはシステムの `.large` の値で、Dynamic Type に追従）、
   盤面・結果の帯・共有画像は `fixed(size:weight:)`（`fixedSize`。拡大しない）、UIKit で描く文字は `uiFont(size:weight:)`（読めなければ丸ゴシックのシステムの書体）。
   太さはフェイスで出すので `.weight(_:)` / `.bold()` を掛けない。SF Symbols（`Image(systemName:)`）の `.font` は記号の大きさ・太さなのでシステムのテキストスタイルのまま。
+  アプリの根（`DekiRouletteApp` と各 Preview）は `appTypography()`（本文のトークン）で、`.font` を持たない文字も同梱の書体にする（シートは環境を引き継ぐ）。
+  `.fontDesign(.rounded)` を同梱の書体の上の環境に置かない（`Font.custom` の文字までシステムの丸ゴシックに置き換わる）。固定サイズのシステムの書体は `.system(size:weight:design: .rounded)` で丸くする。
+  シートの題名は `appNavigationTitle(_:)`（`navigationTitle` と、同じ題名を `.principal` の `Text` で出す。`UINavigationBar` の外観の API は SwiftUI の題名に効かない）、
+  ツールバーの文字のボタンは `.font(Theme.Typography.barButton)`（付けないと環境の本文の Regular で描かれる）、タブの項目は `RootView.init` の `UITabBarAppearance` の文字の属性で当てる。
+  Zen Maru Gothic には `tnum` が無いので `.monospacedDigit()` は効かない。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
   絵文字の項目は `WheelLabel.display` が絵文字ぶん 1 文字短く省略して前に絵文字を付け、結果の帯（2D・3D・共有画像）は `WheelLabel.decorated` の全文を出す（読み上げと共有の本文はラベルのまま）。

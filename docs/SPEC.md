@@ -729,7 +729,7 @@ iOS 版は添字を `i % 10` ではなく件数つきで決める（§5.1、§12
 
 丸ゴシック系を優先: `ui-rounded`, Hiragino Maru Gothic ProN, Zen Maru Gothic, M PLUS Rounded 1c, … `system-ui`, `sans-serif`。
 
-iOS 版は同梱した Zen Maru Gothic（SIL Open Font License 1.1）を使う（§12）。
+iOS 版は同梱した Zen Maru Gothic（SIL Open Font License 1.1）をアプリ全体に使う（英数字も同じ書体。§12）。
 
 ### 9.3 アニメーション
 
@@ -811,6 +811,7 @@ iOS 版には対応物が無い、または OS が代替する項目。
 | `/` と `/order/` の 2 ページ | `TabView` の 2 タブ（ルーレット / 順番決め） | 項目や指定はタブ間で共有しない（同じ） |
 | 言語別 URL、言語切替、誘導リンク | OS の言語設定に従う（設定アプリの「アプリごとの言語」も有効） | アプリ内の言語切替は持たない |
 | `<title>` / `<h1>` の書き分け | 日本語の表示名「デキレーレット」、英語の表示名「DekiRoulette」 | Web 版の英語は一般語「Roulette」だが、iOS 版は英語もブランド名を出す。アプリ名は `InfoPlist.xcstrings`、ヘッダの見出しは `Localizable.xcstrings` の `title`。タブ・ナビのラベル（`rouletteNavLabel`）とタグラインは一般語のまま |
+| 丸ゴシック系の書体の並び（`ui-rounded` → Hiragino Maru Gothic ProN → Zen Maru Gothic …、§9.2） | Zen Maru Gothic を同梱し（Regular / Bold / Black）、アプリ全体の文字に当てる | iOS にヒラギノ丸ゴは無く、SF Rounded（`.fontDesign(.rounded)`）では英数字しか丸くならないため。日本語・英語どちらの表示でも、日本語の中の英数字も同じ書体にする。太さは regular 以下 → Regular、medium〜bold → Bold、heavy・black → Black のフェイスで出す（`AppFont`）。テキストスタイルの文字は Dynamic Type に追従する（`Theme.Typography.font(_:weight:)`）。シートの題名は `navigationTitle` の文字が同梱の書体にならないので、同じ題名をナビゲーションバーの中央の `Text` で出し、ツールバーの文字のボタン（「閉じる」「編集」）にも書体を当てる。タブの項目は `UITabBarAppearance` の文字の属性で当てる。`alert`・`confirmationDialog`・`Menu` の項目・共有シート・キーボード・コンテキストメニュー・スワイプの操作など、システムが描く部品はシステムの書体のまま。SF Symbols の大きさ・太さもシステムのテキストスタイルのまま。Zen Maru Gothic には等幅の数字（`tnum`）が無く、`.monospacedDigit()` は効かない（件数・順位の数字は字幅が変わる）。ライセンス文（`ZenMaruGothic-OFL.txt`）はアプリに同梱する |
 | 長押し 600ms（ポインタ）／ キーリピート（キーボード） | `onLongPressGesture(minimumDuration: 0.6)` | VoiceOver は「ダブルタップして押し続ける」でジェスチャを通せる |
 | 印を出す条件: ポインタ／フォーカスがリスト上、または指定直後 1.6 秒 | 行を押している間、または指定直後 1.6 秒 | タッチにはホバーが無いため「押している間」に置き換え |
 | `aria-pressed` / sr-only の先頭・末尾 | `.isSelected` トレイトと `accessibilityValue` | 伏せている間は付けない（同じ） |
