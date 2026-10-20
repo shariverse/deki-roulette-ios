@@ -21,21 +21,31 @@ struct FixedTextFitTests {
     }
 
     /// 盤面のラベルは半径方向に、中心から `WheelLabel.radiusFraction` × スライスの半径のところを中心に置く（`fixedSize` なので省略された文字列の幅のまま）。
-    /// いちばん長いラベルの文字が、内側はハブに、外側は盤面の外枠に掛からない。
+    /// 左半分は 180 度返すので、文字の並びの向きが内向き・外向きのどちらでも、いちばん長いラベルの文字（絵文字付きを含む）が、
+    /// 内側はハブに、外側は盤面の縁の外周（スライスの円の外 `Theme.Wheel3D.rimWidth`。2D の縁も同じ幅）に掛からない。
     @Test(arguments: [2, 5, 6, 8, 9, 24])
-    func 盤面のラベルはハブと外枠の間に収まる(count: Int) {
+    func 盤面のラベルはハブと縁の外周の間に収まる(count: Int) throws {
         for diameter in [240.0, WheelLabel.referenceDiameter, Double(Theme.Layout.wheelMaxWidthRegular)] {
             let font = Theme.Typography.uiFont(size: WheelLabel.fontSize(count: count, diameter: diameter), weight: .bold)
+            try #require(font.fontName == AppFont.Face.bold.postScriptName)
             let limit = WheelLabel.limit(count: count, diameter: diameter)
-            let center = WheelGeometry.sliceRadius(diameter: diameter) * WheelLabel.radiusFraction
+            let sliceRadius = WheelGeometry.sliceRadius(diameter: diameter)
+            let center = sliceRadius * WheelLabel.radiusFraction
+            let rimOuter = sliceRadius + Double(Theme.Wheel3D.rimWidth) * diameter / WheelLabel.referenceDiameter
+            let hub = ResultBand.hubRadius(diameter: diameter)
             for character in Self.widestCharacters {
-                let label = WheelLabel.display(String(repeating: character, count: Config.maxLabelLength), appearance: .auto, limit: limit)
-                let width = Double(Self.size(label, font: font).width)
-                let ink = Self.inkBounds(label, font: font)
-                let inner = center - width / 2 + Double(ink.minX)
-                let outer = center - width / 2 + Double(ink.maxX)
-                #expect(inner >= ResultBand.hubRadius(diameter: diameter), "count \(count) diameter \(diameter) \(character): inner \(inner)")
-                #expect(outer <= diameter / 2, "count \(count) diameter \(diameter) \(character): outer \(outer)")
+                for appearance in [ItemAppearance.auto, .emoji("🍣")] {
+                    let label = WheelLabel.display(String(repeating: character, count: Config.maxLabelLength), appearance: appearance, limit: limit)
+                    let width = Double(Self.size(label, font: font).width)
+                    let ink = Self.inkBounds(label, font: font)
+                    // 文字の並びが外向き（右半分）と内向き（左半分。中心について折り返す）の両方
+                    let outward = (center - width / 2 + Double(ink.minX), center - width / 2 + Double(ink.maxX))
+                    let inward = (center + width / 2 - Double(ink.maxX), center + width / 2 - Double(ink.minX))
+                    for (inner, outer) in [outward, inward] {
+                        #expect(inner >= hub, "count \(count) diameter \(diameter) \(label): inner \(inner) < hub \(hub)")
+                        #expect(outer <= rimOuter, "count \(count) diameter \(diameter) \(label): outer \(outer) > rim \(rimOuter)")
+                    }
+                }
             }
         }
     }
@@ -44,6 +54,7 @@ struct FixedTextFitTests {
     @Test func 結果の帯の行の高さの見積もりは実際の行の高さ以上() {
         let size = ResultBand.fontSize(diameter: WheelLabel.referenceDiameter)
         let font = Theme.Typography.uiFont(size: size, weight: .black)
+        #expect(font.fontName == AppFont.Face.black.postScriptName)
         #expect(Double(font.lineHeight) <= size * ResultBand.lineHeightRatio + 1e-9)
     }
 
@@ -52,6 +63,9 @@ struct FixedTextFitTests {
         let layout = ShareImageLayout.order(side: ShareImageLayout.defaultSide)
         let rankFont = Theme.Typography.uiFont(size: layout.fontSize, weight: .black)
         let labelFont = Theme.Typography.uiFont(size: layout.fontSize, weight: .bold)
+        #expect(rankFont.fontName == AppFont.Face.black.postScriptName)
+        #expect(labelFont.fontName == AppFont.Face.bold.postScriptName)
+        // 画面では順位に `.monospacedDigit()` を掛けているが、同梱の書体に等幅の数字（`tnum`）が無いので字幅は同じ
         for rank in ["10.", "24."] {
             #expect(Double(Self.size(rank, font: rankFont).width) <= layout.rankWidth)
         }
