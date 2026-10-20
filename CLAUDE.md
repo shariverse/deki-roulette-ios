@@ -415,6 +415,8 @@ X・LINE のボタンは、確認を挟まずに本文だけを投稿画面の U
 前の URL が開けなかったこと（`openURL(_:completion:)` の完了の `false`。`twitter` のスキームを受けるアプリが無いとき）で次へ進む（X アプリが開いてから投稿画面に進まなかった場合は Web に落ちない）。`canOpenURL` を使わないので `LSApplicationQueriesSchemes` は持たない。LINE は `lineShare`（`line.me/R/share`）。
 X に渡す本文だけは `ResultText.orderPost` が上限（`XPostLength`。twitter-text v3 の重み付きの長さ 280）に収め、収まらない並びは上位から入るだけ載せて「ほか M 件」にする（`ResultActions` の `postText`）。
 設定シートの「著作権」には、`©` の行の下に X・LINE の商標の注記（`L10n.trademarkNotice`。X Corp.・LY Corporation の商標で、提携・承認の関係に無いこと）を同じ `.caption`・`muted` で置く（ロゴのボタンを置くため）。
+「著作権」の下には「ライセンス」の行（`SettingsLinkRow`）を置き、同梱したもののライセンスの一覧（`LicensesView`）→ 全文（`LicenseDetailView`）に進む。一覧は `Licenses.all`（`Core/LicenseEntry.swift`。名前・著作権・ライセンスの名前・全文のリソース）で、
+ライブラリを足すときは配列に 1 件足して全文のファイルを同梱する（`LicensesTests` が全文を読めることを確かめる）。全文は原文の語句のまま、段落の中の改行だけを `LicenseText.paragraphs` でつないで出す。
 
 - 寸法とレイアウトは `ShareImageLayout`（`Core/`）が画像の一辺から決める純粋関数。基本は 1080×1080 px（`defaultSide`）、余白 8%、アプリ名の文字 3.6% で
   下の余白のすぐ上。ルーレット（`roulette(side:)`）は盤面の直径と中心・針（基準直径での 22×26pt に比例）・帯の中心（`ResultBand.centerOffset`）、
