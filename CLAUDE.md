@@ -54,7 +54,9 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
   太さはフェイスで出すので `.weight(_:)` / `.bold()` を掛けない。SF Symbols（`Image(systemName:)`）の `.font` は記号の大きさ・太さなのでシステムのテキストスタイルのまま。
   アプリの根（`DekiRouletteApp`。`RootView` とシートの Preview にも）は `appTypography()`（本文のトークン）で、`.font` を持たない文字も同梱の書体にする（シートは環境を引き継ぐ）。
   `List` のセクションの見出し・注記は本文を引き継がないよう `Theme.Typography.listSectionHeader` / `listSectionFooter` を明示する。
-  `.fontDesign(.rounded)` を同梱の書体の上の環境に置かない（`Font.custom` の文字までシステムの丸ゴシックに置き換わる）。固定サイズのシステムの書体は `.system(size:weight:design: .rounded)` で丸くする。
+  `.fontDesign(.rounded)` を同梱の書体の上の環境に置かない（`Font.custom` の文字までシステムの丸ゴシックに置き換わる）。`ImageRenderer` で焼く View（共有画像・3D の強調と帯）にも掛けない。
+  盤面のラベル・結果の帯・共有画像・3D のラベル画像も同梱の書体（Bold / Black）。同梱の書体は全角が 1em（SF Rounded + ヒラギノは約 0.94em）・英数字は狭く、1 行の高さが文字サイズの約 1.45 倍なので、
+  `ResultBand.lineHeightRatio` は 1.45。いちばん広い文字で上限の文字数のラベルがハブ・外枠・帯・共有画像の欄に収まることは `FixedTextFitTests` が実際の字幅で確かめる。
   シートの題名は `appNavigationTitle(_:)`（`navigationTitle` と、同じ題名を `.principal` の `Text` で出す。`UINavigationBar` の外観の API は SwiftUI の題名に効かない）、
   ツールバーの文字のボタンは `.font(Theme.Typography.barButton)`（付けないと環境の本文の Regular で描かれる）、タブの項目は `RootView.init` の `UITabBarAppearance` の文字の属性で当てる。
   Zen Maru Gothic には `tnum` が無いので `.monospacedDigit()` は効かない。
@@ -312,7 +314,7 @@ ON/OFF は `@AppStorage(Config.soundEnabledKey)`。
 `Wheel3DView` を出す（OFF のときの 2D は変えない。描画経路は二重になる）。SceneKit（`SCNView` を `UIViewRepresentable` で包む。
 iOS 17 のまま）で、厚みのある盤・外周の縁・中心のハブ・盤を裏の中心 1 点で支える支柱を描く（寸法は `Theme.Wheel3D`、メッシュは
 `WheelGeometry`）。スライスの塗りは 2D と同じ `Theme.sliceColor(in:at:)`（項目の見た目を踏まえる）で、表面は照明に依らない塗り（`.constant`）、側面・縁・
-支柱だけ陰影を付ける。ラベルは `WheelLabel` の省略・文字サイズで 1 枚の画像に焼いて表面に貼る。
+支柱だけ陰影を付ける。ラベルは `WheelLabel` の省略・文字サイズと同梱の書体（`Theme.Typography.uiFont(size:weight: .bold)`）で 1 枚の画像に焼いて表面に貼る。
 場面は盤面の枠より `Theme.Wheel3D.overscan` だけ広く描き（触れた操作は受けない）、傾いた盤や針が切れないようにする。
 
 回転は 2D と同じ `rotation` / `dragRotation` / `rotationPath` から決める。補間は SwiftUI に任せ（`Wheel3DSurface` の
@@ -425,8 +427,8 @@ X に渡す本文だけは `ResultText.orderPost` が上限（`XPostLength`。tw
   直径に比例した大きさで、帯は画面と同じ `ResultBandLabel` を置く。盤面の影は付けない。3D 表示（`wheel3DEnabled`）が ON でも 2D で描き、SceneKit の
   画面外描画は使わない。順番決めの行は `OrderResultView` と同じトークン（1 位は `gold`、他は `ivory` / `muted`、地は `ink800`）で「1. ラベル」の並び（絵文字の項目は `WheelLabel.display` で「1. 🍣 ラベル」）。
 - 配色は外観に依らず固定で、地は `Theme.shareBackground`（ダークの `ink900` と同じ値）、アプリ名は `Theme.shareInk`（ダークの `ivory` と同じ値）の文字だけ
-  （アイコンは `UIImage(named:)` で読めないので置かない）。`ShareImageRenderer.render` が `ImageRenderer` を `scale = 1`・`.fontDesign(.rounded)`・
-  `.environment(\.colorScheme, .dark)` で焼くので、外観で変わるトークンもダーク値に解決され、端末の画面倍率に依らず一辺 px の画像になる。
+  （アイコンは `UIImage(named:)` で読めないので置かない）。`ShareImageRenderer.render` が `ImageRenderer` を `scale = 1`・
+  `.environment(\.colorScheme, .dark)` で焼くので（書体は各 View の `Theme.Typography.fixed`。`.fontDesign(.rounded)` は掛けない）、外観で変わるトークンもダーク値に解決され、端末の画面倍率に依らず一辺 px の画像になる。
   追加した配色は `ThemeContrastTests` で検証する。見た目は `RouletteShareImageTests` / `OrderShareImageTests` が画素で確かめる（光彩は半径の 2〜3 倍まで届くので、
   「地」を見る画素は光彩の外に置く）。
 - 画像の生成は `@MainActor` の `ShareImageRenderer`（`roulette(items:outcome:rotation:glowStyle:)` / `order(labels:appearances:side:)`）を、各 Screen が
