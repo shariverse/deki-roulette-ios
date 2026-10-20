@@ -408,6 +408,8 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
 - ステルスの制約: 画像を描く View の入力は項目（id・ラベル・見た目）・結果・回転角、または並べ替え後のラベルと見た目だけで、`targetId` / `firstId` / `lastId` / 印を
   受け取る口を作らない。画像にも本文にも項目リスト・印・指定の有無・「当たり」「必ず」等の語を載せない。画面のスクリーンショットは使わず描き直すので
   `ScreenCaptureMonitor` とは干渉しない。
+- 共有シートの「画像を保存」のため、`NSPhotoLibraryAddUsageDescription` を Info.plist に持つ（`project.yml` の `info.properties`。文言は `InfoPlist.xcstrings`）。
+  写真の読み取りの権限（`NSPhotoLibraryUsageDescription`）は求めない。どちらも `InfoPlistTests` がビルドした Info.plist で確かめる。
 - 共有シートの投稿先（X・Instagram・LINE）での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。
 
 ### 並べ替えの仕組み
