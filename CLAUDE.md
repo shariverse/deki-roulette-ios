@@ -393,8 +393,10 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
 本文は結果の文（ルーレットは `ResultText.roulette(label:template:)` に `L10n.shareRouletteResult`、順番決めは `ResultText.order(_:heading:)`）・空行・ハッシュタグ（`L10n.shareHashtag`。アプリ名の行の代わり）で、
 ハッシュタグの次の行に `Config.appStoreURL`（App Store の製品ページ。国を含まない `https://apps.apple.com/app/id6814132611` で、利用者の国の Store が開く。App ID は人間が示した値で、推測した URL は入れない）を付ける。本文に絵文字は入れない。
 プレビューの題名は `L10n.appName`、画像は結果画像そのもの。「結果をコピー」のボタンは持たない（本文は共有シートの「コピー」で写せる）。Instagram の専用ボタンは置かない。
-メニューの X・LINE の項目は、確認を挟まずに本文だけを Web の投稿画面の URL（`ShareIntent.xPost` / `lineShare`、`Core/`。非予約文字以外を自前で UTF-8 の百分率符号化する）で
-`@Environment(\.openURL)` に渡して開くだけ（`LSApplicationQueriesSchemes` と `canOpenURL` は使わない。API による投稿もしない。画像は付かない）。
+メニューの X・LINE の項目は、確認を挟まずに本文だけを投稿画面の URL（`ShareIntent`、`Core/`。非予約文字以外を自前で UTF-8 の百分率符号化する）で
+`@Environment(\.openURL)` に渡して開くだけ（API による投稿はしない。画像は付かない）。X は `ShareIntent.xPostCandidates` の順に、X アプリの投稿画面
+（`xAppPost` = `twitter://post?message=`。X が文書化した仕組みではない）→ Web の投稿画面（`xPost` = `x.com/intent/post`）を開き、
+前の URL が開けなかったこと（`openURL(_:completion:)` の完了の `false`）で次へ進む。`canOpenURL` を使わないので `LSApplicationQueriesSchemes` は持たない。LINE は `lineShare`（`line.me/R/share`）。
 X に渡す本文だけは `ResultText.orderPost` が上限（`XPostLength`。twitter-text v3 の重み付きの長さ 280）に収め、収まらない並びは上位から入るだけ載せて「ほか M 件」にする（`ResultActions` の `postText`）。
 項目のアイコンは SF Symbols（`photo` / `square.and.pencil` / `paperplane`）で各社のロゴの画像は使わず、読み上げは項目の名前のまま。
 
