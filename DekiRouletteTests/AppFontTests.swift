@@ -102,3 +102,18 @@ struct AppFontTests {
         #expect(text.contains("Copyright 2021 The Zen Maru Gothic Project Authors"))
     }
 }
+
+/// タブの項目の文字は UIKit の外観の API で同梱の書体にしている（`RootView.init`）。
+@MainActor
+struct TabBarFontTests {
+    @Test func タブの項目の文字は同梱の書体() throws {
+        _ = RootView()
+        let appearance = UITabBar.appearance().standardAppearance
+        for layout in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
+            for state in [layout.normal, layout.selected] {
+                let font = try #require(state.titleTextAttributes[.font] as? UIFont)
+                #expect(font.fontName == AppFont.Face.bold.postScriptName)
+            }
+        }
+    }
+}
