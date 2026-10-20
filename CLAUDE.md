@@ -387,6 +387,8 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
 両画面の幅広の「結果を共有」（`ResultActions`、`Features/Shared/`。地を塗らない `ink600` の枠と `ivory` の文字、高さ `Theme.Layout.resultActionsHeight`（46pt）、幅の上限 `resultActionsMaxWidth`。
 開始ボタンより控えめにし、`flare` / `gold` は使わない。結果が出ても促す動きは付けない）は、`shareImage` があれば `ShareLink(item: ShareImageFile, message: 本文, preview:)` で
 結果の画像（PNG）を本体にし本文（`ResultText.share`）を添えて共有シートに渡す。無ければ今までどおり本文だけ。
+本文は結果の文（ルーレットは `ResultText.roulette(label:template:)` に `L10n.shareRouletteResult`、順番決めは `ResultText.order(_:heading:)`）・空行・ハッシュタグ（`L10n.shareHashtag`。アプリ名の行の代わり）で、
+`Config.appStoreURL`（未公開の間は nil。推測した URL は入れない）があればハッシュタグの次の行に付ける。本文に絵文字は入れない。
 プレビューの題名は `L10n.appName`、画像は結果画像そのもの。「結果をコピー」のボタンは持たない（本文は共有シートの「コピー」で写せる）。X・Instagram の専用ボタン（ディープリンク）は置かない。
 
 - 寸法とレイアウトは `ShareImageLayout`（`Core/`）が画像の一辺から決める純粋関数。基本は 1080×1080 px（`defaultSide`）、余白 8%、アプリ名の文字 3.6% で
