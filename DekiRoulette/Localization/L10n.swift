@@ -94,6 +94,7 @@ enum L10n {
     static var copyright: String { tr("copyright") }
     static var copyrightTitle: String { tr("copyrightTitle") }
     static var copyrightOwner: String { tr("copyrightOwner") }
+    static var trademarkNotice: String { tr("trademarkNotice") }
     static func addItemsButton(_ count: Int) -> String { plural("addItemsButton", count) }
     static var duplicateAddTitle: String { tr("duplicateAddTitle") }
     static var duplicateAddMessage: String { tr("duplicateAddMessage") }
