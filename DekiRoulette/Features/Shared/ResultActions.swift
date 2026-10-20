@@ -2,7 +2,7 @@ import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// 結果の下に置く「共有」。両画面で同じ見た目にする。
+/// 結果の下に置く幅広の「結果を共有」。両画面で同じ見た目・同じ高さ（`Theme.Layout.resultActionsHeight`）にする。
 /// 本文だけを写したいときは共有シートの「コピー」を使う（専用のコピーボタンは置かない）。
 /// `shareImage` があれば共有シートに本文と一緒に結果の画像（`ShareImageFile`）を渡し、無ければ本文だけを渡す（今までどおり）。
 struct ResultActions: View {
@@ -12,24 +12,31 @@ struct ResultActions: View {
     var shareImage: UIImage? = nil
 
     var body: some View {
+        // 「結果を共有」が残りの幅をすべて取る。行き先ごとのボタンを足すときはこの右に並べる
         HStack(spacing: 8) {
-            // 開始ボタンの `flare` より目立たせないため、控えめな見た目にする
-            if let shareImage {
-                // 画像を本体（X・Instagram・LINE は画像として受け取る）、本文は添える。プレビューの題名はアプリ名
-                ShareLink(
-                    item: ShareImageFile(image: shareImage),
-                    message: Text(shareText),
-                    preview: SharePreview(L10n.appName, image: Image(uiImage: shareImage))
-                ) {
-                    ResultActionLabel(title: L10n.share, systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.plain)
-            } else {
-                ShareLink(item: shareText) {
-                    ResultActionLabel(title: L10n.share, systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.plain)
+            shareButton
+                .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: Theme.Layout.resultActionsMaxWidth)
+    }
+
+    @ViewBuilder
+    private var shareButton: some View {
+        if let shareImage {
+            // 画像を本体（X・Instagram・LINE は画像として受け取る）、本文は添える。プレビューの題名はアプリ名
+            ShareLink(
+                item: ShareImageFile(image: shareImage),
+                message: Text(shareText),
+                preview: SharePreview(L10n.appName, image: Image(uiImage: shareImage))
+            ) {
+                ResultActionLabel(title: L10n.shareResult, systemImage: "square.and.arrow.up")
             }
+            .buttonStyle(.plain)
+        } else {
+            ShareLink(item: shareText) {
+                ResultActionLabel(title: L10n.shareResult, systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -52,27 +59,34 @@ enum ShareImageError: Error {
     case encodingFailed
 }
 
-/// 共有ボタンのラベル。`muted` の文字にカプセルの地と枠。
+/// 「結果を共有」のラベル。地は塗らず（ページの地のまま）、`ink600` の枠と `ivory` の文字にする。
+/// 開始ボタン（`flare` の塗りと光彩）より控えめにして主従を保ち、`flare` / `gold` は使わない。
 private struct ResultActionLabel: View {
     let title: String
     var systemImage: String?
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             if let systemImage {
                 Image(systemName: systemImage)
-                    .font(.caption2.weight(.bold))
+                    .font(.subheadline.weight(.bold))
+                    // 名前は文字から読ませる（「結果を共有」）
+                    .accessibilityHidden(true)
             }
             Text(title)
-                .font(.caption.weight(.bold))
+                .font(.subheadline.weight(.bold))
+                // アクセシビリティサイズでは省略せず 2 行まで折り返す（行の高さも `TypeLayout.growsFixedAreas` で伸びる）
+                .lineLimit(TypeLayout.labelLineLimit(for: typeSize))
+                .multilineTextAlignment(.center)
         }
-        // 省略記号で切れないようにする
-        .fixedSize()
-        .foregroundStyle(Theme.muted)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .background(Theme.ink800, in: .capsule)
-        .overlay(Capsule().strokeBorder(Theme.ink700, lineWidth: 1))
+        .foregroundStyle(Theme.ivory)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: Theme.Layout.resultActionsHeight)
+        .contentShape(.capsule)
+        .overlay(Capsule().strokeBorder(Theme.ink600, lineWidth: 1.5))
     }
 }
 

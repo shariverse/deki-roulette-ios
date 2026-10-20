@@ -106,7 +106,7 @@ enum L10n {
     static func resetItemsConfirm(_ screen: String) -> String { fmt("resetItemsConfirm", screen) }
     static var resetItemsMessage: String { tr("resetItemsMessage") }
     static var resetItemsAction: String { tr("resetItemsAction") }
-    static var share: String { tr("share") }
+    static var shareResult: String { tr("shareResult") }
     /// 共有画像で省略した順位の件数の行（「ほか 3 件」）。
     static func shareOrderOthers(_ count: Int) -> String { fmt("shareOrderOthers", count) }
     static var resultHeading: String { tr("resultHeading") }
