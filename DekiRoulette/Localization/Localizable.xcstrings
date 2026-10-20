@@ -1853,40 +1853,6 @@
         }
       }
     },
-    "copyResult" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copy result"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "結果をコピー"
-          }
-        }
-      }
-    },
-    "copied" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copied"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コピーしました"
-          }
-        }
-      }
-    },
     "share" : {
       "extractionState" : "manual",
       "localizations" : {

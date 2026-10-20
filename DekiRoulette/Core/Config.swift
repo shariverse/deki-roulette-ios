@@ -28,9 +28,6 @@ enum Config {
     /// 視差効果を減らす設定のときは 1 件ずつ出さないので、演出はこの時間で終わる。
     static let reducedMotionRevealDuration: TimeInterval = 0.2
 
-    /// コピーできたことを伝える表示を出しておく時間。
-    static let copyFeedbackDuration: TimeInterval = 1.8
-
     /// スピンのイージング（Web 版 `SPIN_EASING`）。`Theme.spinAnimation` と、触覚とクリック音の時刻の逆算で使う。
     static let spinEasing = CubicBezierCurve(0.15, 0.85, 0.3, 1)
 
