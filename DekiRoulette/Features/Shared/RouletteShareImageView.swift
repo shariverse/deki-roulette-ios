@@ -48,7 +48,7 @@ struct RouletteShareImageView: View {
             .position(layout.bandCenter)
 
             Text(L10n.appName)
-                .font(.system(size: ShareImageLayout.brandFontSize(side: side), weight: .bold))
+                .font(Theme.Typography.fixed(size: ShareImageLayout.brandFontSize(side: side), weight: .bold))
                 .foregroundStyle(Theme.shareInk)
                 .lineLimit(1)
                 .position(x: side / 2, y: ShareImageLayout.brandCenterY(side: side))
@@ -73,14 +73,14 @@ enum ShareImageRenderer {
         )
     }
 
-    /// 一辺 `side` の正方形の View を画像にする。書体はアプリ全体と同じ丸ゴシック（`ImageRenderer` はアプリの environment を継がない）。
+    /// 一辺 `side` の正方形の View を画像にする。書体は各 View が同梱の書体のトークン（`Theme.Typography.fixed`）で指定する
+    /// （`ImageRenderer` はアプリの environment を継がない。`.fontDesign(.rounded)` を掛けると同梱の書体がシステムの丸ゴシックに置き換わるので掛けない）。
     /// 地・文字・盤面は固定のトークンだが、針と帯の影（`Theme.pointerShadow`）は外観で濃さが変わるので、解決の環境をダークに固定して
     /// 端末の外観に依らず同じ画像にする。
     static func render(_ content: some View, side: Double) -> UIImage? {
         let renderer = ImageRenderer(
             content: content
                 .frame(width: side, height: side)
-                .fontDesign(.rounded)
                 .environment(\.colorScheme, .dark)
         )
         renderer.scale = 1
