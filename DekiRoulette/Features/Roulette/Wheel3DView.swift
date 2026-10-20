@@ -1747,7 +1747,7 @@ private enum WheelLabelImage {
         }
     }
 
-    /// 2D の盤面と同じ書体（アプリ全体の `.fontDesign(.rounded)` と `.bold`）。
+    /// 2D の盤面と同じ書体（`.system(size:weight: .bold, design: .rounded)`）。
     private static func roundedBold(size: Double) -> UIFont {
         let font = UIFont.systemFont(ofSize: CGFloat(size), weight: .bold)
         guard let descriptor = font.fontDescriptor.withDesign(.rounded) else { return font }

@@ -76,6 +76,14 @@ struct AppFontTests {
         #expect(abs(Theme.Typography.defaultSize(for: style) - expected) < 1e-9)
     }
 
+    #if os(visionOS)
+    /// visionOS だけのスタイルも既定の大きさを引けるよう、UIKit のスタイルに写す。
+    @Test func visionOSだけのスタイルも写す() {
+        #expect(Theme.Typography.uiTextStyle(.extraLargeTitle) == .extraLargeTitle)
+        #expect(Theme.Typography.uiTextStyle(.extraLargeTitle2) == .extraLargeTitle2)
+    }
+    #endif
+
     @Test(arguments: [
         (Font.Weight.regular, AppFont.Face.regular),
         (.bold, .bold),
@@ -92,5 +100,20 @@ struct AppFontTests {
         let text = try String(contentsOf: url, encoding: .utf8)
         #expect(text.contains("SIL OPEN FONT LICENSE Version 1.1"))
         #expect(text.contains("Copyright 2021 The Zen Maru Gothic Project Authors"))
+    }
+}
+
+/// タブの項目の文字は UIKit の外観の API で同梱の書体にしている（`RootView.init`）。
+@MainActor
+struct TabBarFontTests {
+    @Test func タブの項目の文字は同梱の書体() throws {
+        _ = RootView()
+        let appearance = UITabBar.appearance().standardAppearance
+        for layout in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
+            for state in [layout.normal, layout.selected] {
+                let font = try #require(state.titleTextAttributes[.font] as? UIFont)
+                #expect(font.fontName == AppFont.Face.bold.postScriptName)
+            }
+        }
     }
 }

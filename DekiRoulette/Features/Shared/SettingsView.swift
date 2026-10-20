@@ -30,11 +30,11 @@ struct SettingsView: View {
 
                     SettingsSection(title: L10n.soundTitle) {
                         Toggle(L10n.soundToggle, isOn: $soundEnabled)
-                            .font(.subheadline)
+                            .font(Theme.Typography.font(.subheadline))
                             .foregroundStyle(Theme.ivory)
                             .tint(Theme.ivory)
                         Text(L10n.soundNote)
-                            .font(.caption)
+                            .font(Theme.Typography.font(.caption))
                             .foregroundStyle(Theme.muted)
                     }
                     SettingsLinkRow(title: L10n.rouletteAdvancedTitle) {
@@ -48,7 +48,7 @@ struct SettingsView: View {
                     }
                     SettingsSection(title: L10n.resetItemsTitle) {
                         Text(L10n.resetItemsDescription)
-                            .font(.caption)
+                            .font(Theme.Typography.font(.caption))
                             .foregroundStyle(Theme.muted)
                             .lineSpacing(3)
                         resetButton(L10n.resetItemsRoulette, target: .roulette)
@@ -56,14 +56,14 @@ struct SettingsView: View {
                     }
                     SettingsSection(title: L10n.copyrightTitle) {
                         Text(L10n.copyrightOwner)
-                            .font(.subheadline)
+                            .font(Theme.Typography.font(.subheadline))
                             .foregroundStyle(Theme.ivory)
                             .lineSpacing(3)
                         Text(L10n.copyright)
-                            .font(.caption)
+                            .font(Theme.Typography.font(.caption))
                             .foregroundStyle(Theme.muted)
                         Text(L10n.trademarkNotice)
-                            .font(.caption)
+                            .font(Theme.Typography.font(.caption))
                             .foregroundStyle(Theme.muted)
                             .lineSpacing(3)
                     }
@@ -73,12 +73,12 @@ struct SettingsView: View {
                 .padding(.vertical, 24)
             }
             .background(Theme.ink900.ignoresSafeArea())
-            .navigationTitle(L10n.settingsTitle)
-            .navigationBarTitleDisplayMode(.inline)
+            .appNavigationTitle(L10n.settingsTitle)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.close) { dismiss() }
                         .foregroundStyle(Theme.ivory)
+                        .font(Theme.Typography.barButton)
                 }
             }
             .toolbarBackground(Theme.ink800, for: .navigationBar)
@@ -105,7 +105,7 @@ struct SettingsView: View {
         } label: {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.bold))
+                    .font(Theme.Typography.font(.subheadline, weight: .bold))
                     .foregroundStyle(Theme.ivory)
                 Spacer(minLength: 0)
                 Image(systemName: "arrow.counterclockwise")
@@ -154,7 +154,7 @@ private struct RouletteAdvancedSettingsView: View {
                 }
                 SettingsSection(title: L10n.spinEffectsTitle) {
                     Toggle(L10n.spinEffectsEnabled, isOn: spinEffects.enabledBinding)
-                        .font(.subheadline.weight(.bold))
+                        .font(Theme.Typography.font(.subheadline, weight: .bold))
                         .foregroundStyle(Theme.ivory)
                         .tint(Theme.ivory)
                     Divider()
@@ -163,12 +163,12 @@ private struct RouletteAdvancedSettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(SpinEffectItem.allCases, id: \.self) { item in
                             Toggle(L10n.spinEffectName(item), isOn: spinEffects.binding(for: item))
-                                .font(.subheadline)
+                                .font(Theme.Typography.font(.subheadline))
                                 .foregroundStyle(Theme.ivory)
                                 .tint(Theme.ivory)
                         }
                         Text(L10n.spinEffectsSoundNote)
-                            .font(.caption)
+                            .font(Theme.Typography.font(.caption))
                             .foregroundStyle(Theme.muted)
                     }
                     .disabled(!spinEffects.enabled)
@@ -191,8 +191,7 @@ private struct RouletteAdvancedSettingsView: View {
             .padding(.vertical, 24)
         }
         .background(Theme.ink900.ignoresSafeArea())
-        .navigationTitle(L10n.rouletteAdvancedTitle)
-        .navigationBarTitleDisplayMode(.inline)
+        .appNavigationTitle(L10n.rouletteAdvancedTitle)
         .toolbarBackground(Theme.ink800, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
     }
@@ -222,8 +221,7 @@ private struct AppIconSettingsView: View {
             .padding(.vertical, 24)
         }
         .background(Theme.ink900.ignoresSafeArea())
-        .navigationTitle(L10n.appIconTitle)
-        .navigationBarTitleDisplayMode(.inline)
+        .appNavigationTitle(L10n.appIconTitle)
         .toolbarBackground(Theme.ink800, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onAppear { model.refresh() }
@@ -268,7 +266,7 @@ private struct AppIconCell: View {
                     }
                     .accessibilityHidden(true)
                 Text(L10n.appIconName(choice))
-                    .font(.caption.weight(selected ? .bold : .regular))
+                    .font(Theme.Typography.font(.caption, weight: selected ? .bold : .regular))
                     .foregroundStyle(selected ? Theme.ivory : Theme.muted)
                     .multilineTextAlignment(.center)
                     .lineLimit(TypeLayout.labelLineLimit(for: typeSize))
@@ -292,7 +290,7 @@ private struct SettingsChoiceRow: View {
         Button(action: action) {
             HStack {
                 Text(title)
-                    .font(.subheadline)
+                    .font(Theme.Typography.font(.subheadline))
                     .foregroundStyle(Theme.ivory)
                 Spacer(minLength: 0)
                 Image(systemName: "checkmark")
@@ -319,7 +317,7 @@ private struct SettingsLinkRow<Destination: View>: View {
         } label: {
             HStack {
                 Text(title)
-                    .font(.callout.weight(.bold))
+                    .font(Theme.Typography.font(.callout, weight: .bold))
                     .foregroundStyle(Theme.ivory)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
@@ -348,7 +346,7 @@ private struct SettingsToggle: View {
     var body: some View {
         Toggle(isOn: $isOn) {
             Text(title)
-                .font(.callout.weight(.bold))
+                .font(Theme.Typography.font(.callout, weight: .bold))
                 .foregroundStyle(Theme.ivory)
         }
         .padding(.horizontal, 12)
@@ -369,7 +367,7 @@ private struct SettingsSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.callout.weight(.bold))
+                .font(Theme.Typography.font(.callout, weight: .bold))
                 .foregroundStyle(Theme.ivory)
                 .accessibilityAddTraits(.isHeader)
 
@@ -401,5 +399,5 @@ private struct SettingsCard<Content: View>: View {
     SettingsView()
         .environment(RouletteModel(items: ItemLabel.makeItems(L10n.defaultItems)))
         .environment(OrderModel(items: ItemLabel.makeItems(L10n.orderDefaultItems)))
-        .fontDesign(.rounded)
+        .appTypography()
 }

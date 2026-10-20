@@ -19,18 +19,19 @@ struct SavedListsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.ink900.ignoresSafeArea())
-            .navigationTitle(L10n.savedListsTitle)
-            .navigationBarTitleDisplayMode(.inline)
+            .appNavigationTitle(L10n.savedListsTitle)
             .toolbar {
                 if !savedLists.lists.isEmpty {
                     ToolbarItem(placement: .topBarLeading) {
                         EditButton()
                             .foregroundStyle(Theme.ivory)
+                            .font(Theme.Typography.barButton)
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.close) { dismiss() }
                         .foregroundStyle(Theme.ivory)
+                        .font(Theme.Typography.barButton)
                 }
             }
             .toolbarBackground(Theme.ink800, for: .navigationBar)
@@ -76,11 +77,11 @@ struct SavedListsView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(list.name)
-                        .font(.subheadline.weight(.bold))
+                        .font(Theme.Typography.font(.subheadline, weight: .bold))
                         .foregroundStyle(Theme.ivory)
                         .lineLimit(1)
                     Text(L10n.savedListItemCount(list.items.count))
-                        .font(.caption)
+                        .font(Theme.Typography.font(.caption))
                         .foregroundStyle(Theme.muted)
                 }
                 Spacer(minLength: 0)
@@ -97,7 +98,7 @@ struct SavedListsView: View {
 
     private var emptyHint: some View {
         Text(L10n.savedListsEmptyHint)
-            .font(.subheadline)
+            .font(Theme.Typography.font(.subheadline))
             .foregroundStyle(Theme.muted)
             .lineSpacing(3)
             .multilineTextAlignment(.center)
@@ -112,11 +113,11 @@ struct SavedListsView: View {
             SavedList(name: "ランチ", items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司"])),
             SavedList(name: "チーム", items: ItemLabel.makeItems(["A", "B", "C", "D"])),
         ]))
-        .fontDesign(.rounded)
+        .appTypography()
 }
 
 #Preview("Empty") {
     SavedListsView()
         .environment(SavedListsModel(lists: []))
-        .fontDesign(.rounded)
+        .appTypography()
 }

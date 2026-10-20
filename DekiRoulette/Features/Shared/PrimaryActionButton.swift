@@ -10,7 +10,7 @@ struct PrimaryActionButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.title3.weight(.black))
+                .font(Theme.Typography.font(.title3, weight: .black))
                 .tracking(0.5)
                 .foregroundStyle(enabled ? Theme.onFlare : Theme.muted)
                 .padding(.horizontal, 48)

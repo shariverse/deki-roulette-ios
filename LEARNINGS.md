@@ -157,3 +157,11 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - 「ルーレットの詳細設定」（`RouletteAdvancedSettingsView`）は `private` なので、スクリーンショットを撮るときは一時的に `private` を外し、コミットしない一時テストから
   `NavigationStack { RouletteAdvancedSettingsView() }` を present する。保存値の状態を変えて撮るときは
   `xcrun simctl spawn <SIM> defaults write <バンドル ID> <キー> -bool NO` で書いてから起動し、撮ったら `defaults delete` で戻す（2026-10-19）
+
+## 書体（同梱のフォント）
+
+- 環境に `.fontDesign(.rounded)` を置いたままだと、その下の `Font.custom(...)` の文字もシステムの丸ゴシック（日本語はヒラギノ角ゴ）で描かれ、同梱の書体が出ない（エラーも出ない）。同梱の書体を当てる View の上に `fontDesign` を置かない（2026-10-21）
+- iOS 26 の SwiftUI の `navigationTitle` の文字は、`UINavigationBar.appearance()` の `titleTextAttributes` や `UINavigationBarAppearance` を設定しても変わらない。題名を同梱の書体にするには `.principal` の `ToolbarItem` に `Text` を置く。
+  一方、ツールバーの文字のボタン（`Button("閉じる")` / `EditButton`）は環境の `.font` で描かれるので、アプリの根に本文の書体を掛けると Regular になる（ボタンに太さを明示する）。タブの項目は `UITabBarAppearance` の `titleTextAttributes` が効く（2026-10-21）
+- Zen Maru Gothic には `tnum`（等幅の数字）が無く、`.monospacedDigit()` を掛けても数字の字幅は変わる。行の高さはヒラギノより大きく、同じ文字サイズでも行が少し高くなる（2026-10-21）
+- フォントのファイルが同じものかは、`git hash-object <ファイル>` の値を GitHub の contents API（`gh api repos/<owner>/<repo>/contents/<パス>`）の `sha` と比べると確かめられる（2026-10-21）

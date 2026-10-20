@@ -361,7 +361,7 @@ struct ResultBandLabel: View {
     var body: some View {
         let scale = diameter / WheelLabel.referenceDiameter
         Text(label)
-            .font(.system(size: ResultBand.fontSize(diameter: diameter), weight: .black))
+            .font(.system(size: ResultBand.fontSize(diameter: diameter), weight: .black, design: .rounded))
             .foregroundStyle(Theme.resultBandInk)
             .lineLimit(1)
             .minimumScaleFactor(ResultBand.minimumScaleFactor)

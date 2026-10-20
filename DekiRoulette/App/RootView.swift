@@ -19,6 +19,12 @@ struct RootView: View {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(Theme.ink800)
+        // タブの項目の文字も同梱の書体にする（システムの既定と同じ 10pt の medium。タブバーの文字は Dynamic Type で拡大しない）
+        let tabTitle: [NSAttributedString.Key: Any] = [.font: Theme.Typography.uiFont(size: 10, weight: .medium)]
+        for layout in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
+            layout.normal.titleTextAttributes = tabTitle
+            layout.selected.titleTextAttributes = tabTitle
+        }
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }
@@ -41,5 +47,5 @@ struct RootView: View {
 
 #Preview {
     RootView()
-        .fontDesign(.rounded)
+        .appTypography()
 }
