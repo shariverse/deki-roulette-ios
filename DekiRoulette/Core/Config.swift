@@ -28,9 +28,6 @@ enum Config {
     /// 視差効果を減らす設定のときは 1 件ずつ出さないので、演出はこの時間で終わる。
     static let reducedMotionRevealDuration: TimeInterval = 0.2
 
-    /// コピーできたことを伝える表示を出しておく時間。
-    static let copyFeedbackDuration: TimeInterval = 1.8
-
     /// スピンのイージング（Web 版 `SPIN_EASING`）。`Theme.spinAnimation` と、触覚とクリック音の時刻の逆算で使う。
     static let spinEasing = CubicBezierCurve(0.15, 0.85, 0.3, 1)
 
@@ -40,6 +37,10 @@ enum Config {
     static let maxSavedLists = 20
     /// 保存するリストの名前の最大文字数（正規化後）。
     static let maxSavedListNameLength = 30
+
+    /// App Store の製品ページの URL。共有の本文のハッシュタグの後に付ける（`ResultText.share`）。
+    /// まだ公開していないので nil（本文にリンクは付かない）。公開したらここに URL を 1 つ入れるだけで付く。推測した URL は入れない。
+    static let appStoreURL: URL? = nil
 
     /// スピンの周回数の範囲。フリックの強さもこの範囲の中に写す。
     static let fullSpinRange: ClosedRange<Int> = 4...8

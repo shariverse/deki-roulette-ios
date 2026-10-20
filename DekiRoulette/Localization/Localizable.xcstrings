@@ -1853,53 +1853,87 @@
         }
       }
     },
-    "copyResult" : {
+    "shareToX" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copy result"
+            "value" : "X"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "結果をコピー"
+            "value" : "X"
           }
         }
       }
     },
-    "copied" : {
+    "shareToXAccessibility" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copied"
+            "value" : "Post on X"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コピーしました"
+            "value" : "X でポスト"
           }
         }
       }
     },
-    "share" : {
+    "shareToLINE" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share"
+            "value" : "LINE"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "共有"
+            "value" : "LINE"
+          }
+        }
+      }
+    },
+    "shareToLINEAccessibility" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send on LINE"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LINE で送る"
+          }
+        }
+      }
+    },
+    "shareResult" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share result"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果を共有"
           }
         }
       }
@@ -1921,19 +1955,53 @@
         }
       }
     },
-    "resultHeading" : {
+    "shareRouletteResult" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Result"
+            "value" : "The wheel picked “%@”!"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "結果"
+            "value" : "ルーレットで「%@」に決まりました！"
+          }
+        }
+      }
+    },
+    "shareOrderHeading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The order is set!"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "順番が決まりました！"
+          }
+        }
+      }
+    },
+    "shareHashtag" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "#DekiRoulette"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "#デキレーレット"
           }
         }
       }

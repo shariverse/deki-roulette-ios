@@ -3,6 +3,7 @@ import SwiftUI
 struct RouletteScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
     @AppStorage(Config.hapticsEnabledKey) private var hapticsEnabled = true
     @AppStorage(Config.soundEnabledKey) private var soundEnabled = true
     @AppStorage(Config.glowStyleKey) private var glowStyle = GlowStyle.default
@@ -145,12 +146,19 @@ struct RouletteScreen: View {
             ZStack {
                 // 結果が出ている間だけ出す。順番決めと同じ位置・同じ見た目
                 if let outcome = model.outcome, !model.spinning {
-                    let text = ResultText.roulette(label: outcome.label, heading: L10n.resultHeading)
-                    ResultActions(copyText: text, shareText: ResultText.share(text, appName: L10n.appName), shareImage: shareImage)
+                    let text = ResultText.roulette(label: outcome.label, template: L10n.shareRouletteResult)
+                    ResultActions(
+                        shareText: ResultText.share(text, hashtag: L10n.shareHashtag, appStoreURL: Config.appStoreURL),
+                        shareImage: shareImage
+                    )
                         .id(outcome.label + "\(model.spinCount)")
                 }
             }
-            .frame(height: 32)
+            // 共有ボタンの有無で上のボタンが動かないよう高さを固定する。大きい文字では最小高さだけ残す（順番決めと同じ）
+            .frame(
+                minHeight: Theme.Layout.resultActionsHeight,
+                maxHeight: TypeLayout.growsFixedAreas(for: typeSize) ? nil : Theme.Layout.resultActionsHeight
+            )
         }
         .frame(maxWidth: .infinity)
     }

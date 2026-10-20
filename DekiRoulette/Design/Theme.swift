@@ -145,6 +145,11 @@ enum Theme {
         /// ページ全体の上限。横並びの 2 列 + 間隔 + 左右の余白がちょうど収まる幅。
         /// compact の端末はこれより狭いので、縦積みの見え方には影響しない。
         static let pageMaxWidth = wheelMaxWidthRegular + columnSpacing + listWidthRegular + pageHorizontalPadding * 2
+        /// 結果の下の行（「結果を共有」）の高さ。タップ領域 44pt を満たし、開始ボタン（約 52pt）より低くして主従を保つ。
+        /// アクセシビリティサイズでは最小高さとして使い、文字に合わせて伸ばす（`TypeLayout.growsFixedAreas`）。
+        static let resultActionsHeight: CGFloat = 46
+        /// 結果の下の行の幅の上限。縦積みの盤面（`wheelMaxWidthCompact`）と同じで、横並びや iPad でも間延びさせない。
+        static let resultActionsMaxWidth = wheelMaxWidthCompact
     }
 
     // MARK: 3D の盤面
