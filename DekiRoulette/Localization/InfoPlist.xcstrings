@@ -34,6 +34,23 @@
           }
         }
       }
+    },
+    "NSPhotoLibraryAddUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Used to save the result image you share to Photos."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有する結果の画像を写真に保存するために使います。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
