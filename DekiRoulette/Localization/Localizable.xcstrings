@@ -1853,19 +1853,19 @@
         }
       }
     },
-    "share" : {
+    "shareResult" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share"
+            "value" : "Share result"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "共有"
+            "value" : "結果を共有"
           }
         }
       }

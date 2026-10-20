@@ -98,7 +98,10 @@ struct OrderScreen: View {
                 }
             }
             // 共有ボタンの有無で上のボタンが動かないよう高さを固定する。大きい文字では最小高さだけ残す
-            .frame(minHeight: 32, maxHeight: TypeLayout.growsFixedAreas(for: typeSize) ? nil : 32)
+            .frame(
+                minHeight: Theme.Layout.resultActionsHeight,
+                maxHeight: TypeLayout.growsFixedAreas(for: typeSize) ? nil : Theme.Layout.resultActionsHeight
+            )
         }
         .frame(maxWidth: .infinity)
     }
