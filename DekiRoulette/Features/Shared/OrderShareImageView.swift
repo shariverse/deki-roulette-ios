@@ -39,7 +39,7 @@ struct OrderShareImageView: View {
             }
 
             Text(L10n.appName)
-                .font(.system(size: ShareImageLayout.brandFontSize(side: side), weight: .bold))
+                .font(Theme.Typography.fixed(size: ShareImageLayout.brandFontSize(side: side), weight: .bold))
                 .foregroundStyle(Theme.shareInk)
                 .lineLimit(1)
                 .position(x: side / 2, y: ShareImageLayout.brandCenterY(side: side))
@@ -57,11 +57,11 @@ struct OrderShareImageView: View {
         let radius = layout.rowHeight * Self.cornerRatio
         return HStack(spacing: layout.rankGap) {
             Text(rank.map { "\($0)." } ?? "")
-                .font(.system(size: layout.fontSize, weight: .black).monospacedDigit())
+                .font(Theme.Typography.fixed(size: layout.fontSize, weight: .black).monospacedDigit())
                 .foregroundStyle(top ? Theme.gold : Theme.muted)
                 .frame(width: layout.rankWidth, alignment: .trailing)
             Text(text)
-                .font(.system(size: layout.fontSize, weight: .bold))
+                .font(Theme.Typography.fixed(size: layout.fontSize, weight: .bold))
                 .foregroundStyle(top ? Theme.gold : rank == nil ? Theme.muted : Theme.ivory)
                 .lineLimit(1)
             Spacer(minLength: 0)

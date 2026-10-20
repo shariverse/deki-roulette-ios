@@ -113,6 +113,7 @@ struct TabBarFontTests {
             for state in [layout.normal, layout.selected] {
                 let font = try #require(state.titleTextAttributes[.font] as? UIFont)
                 #expect(font.fontName == AppFont.Face.bold.postScriptName)
+                #expect(abs(font.pointSize - 10) < 1e-9)
             }
         }
     }
