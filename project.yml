@@ -44,6 +44,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
+        # 共有シートの「画像を保存」で結果の画像を写真に保存するため（追加だけ。写真の読み取りの権限は求めない）
+        NSPhotoLibraryAddUsageDescription: 共有する結果の画像を写真に保存するために使います。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.basekeita.roulette

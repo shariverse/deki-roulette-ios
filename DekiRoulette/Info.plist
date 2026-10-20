@@ -27,6 +27,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>共有する結果の画像を写真に保存するために使います。</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
