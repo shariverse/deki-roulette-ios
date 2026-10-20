@@ -24,6 +24,23 @@ enum ResultText {
             .joined(separator: "\n")
     }
 
+    /// X に渡す順番決めの本文。共有の本文（`share`）が X の上限（`XPostLength`）に収まればそのまま、
+    /// 超えるときは並びの末尾から削って最後の行を「ほか M 件」（`others`）にし、収まる件数まで減らす。
+    /// 1 件にしても収まらないとき（長いラベルと URL など）は 1 件のまま渡し、利用者に X で直してもらう。
+    static func orderPost(
+        _ labels: [String], heading: String, hashtag: String, appStoreURL: URL?, others: (Int) -> String
+    ) -> String {
+        let full = share(order(labels, heading: heading), hashtag: hashtag, appStoreURL: appStoreURL)
+        guard !XPostLength.fits(full), labels.count > 1 else { return full }
+        var text = full
+        for kept in stride(from: labels.count - 1, through: 1, by: -1) {
+            let body = heading + "\n" + numbered(Array(labels.prefix(kept))) + "\n" + others(labels.count - kept)
+            text = share(body, hashtag: hashtag, appStoreURL: appStoreURL)
+            if XPostLength.fits(text) { break }
+        }
+        return text
+    }
+
     /// 共有シートに渡す本文。結果の本文の後に空行を挟んでハッシュタグを 1 行足し（アプリ名の代わり）、
     /// App Store の URL があればその次の行に付ける。指定の有無など、結果以外の情報は載せない。
     static func share(_ body: String, hashtag: String, appStoreURL: URL?) -> String {

@@ -4,7 +4,7 @@ import SwiftUI
 /// しきい値は `DynamicTypeSize.accessibility1`（`isAccessibilitySize`）で、それ以上を「アクセシビリティサイズ」と呼ぶ。
 /// View は `@Environment(\.dynamicTypeSize)` の値をそのまま渡す。
 enum TypeLayout {
-    /// 項目リストの行と順番の結果行に入れる最大行数。
+    /// 項目リストの行・順番の結果行・「結果を共有」のボタンに入れる最大行数。
     /// 通常は 1 行に収めて省略するが、アクセシビリティサイズでは短い名前でも省略されてしまうため 2 行まで許す。
     static func labelLineLimit(for size: DynamicTypeSize) -> Int {
         size.isAccessibilitySize ? 2 : 1

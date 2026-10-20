@@ -389,7 +389,11 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
 結果の画像（PNG）を本体にし本文（`ResultText.share`）を添えて共有シートに渡す。無ければ今までどおり本文だけ。
 本文は結果の文（ルーレットは `ResultText.roulette(label:template:)` に `L10n.shareRouletteResult`、順番決めは `ResultText.order(_:heading:)`）・空行・ハッシュタグ（`L10n.shareHashtag`。アプリ名の行の代わり）で、
 `Config.appStoreURL`（未公開の間は nil。推測した URL は入れない）があればハッシュタグの次の行に付ける。本文に絵文字は入れない。
-プレビューの題名は `L10n.appName`、画像は結果画像そのもの。「結果をコピー」のボタンは持たない（本文は共有シートの「コピー」で写せる）。X・Instagram の専用ボタン（ディープリンク）は置かない。
+プレビューの題名は `L10n.appName`、画像は結果画像そのもの。「結果をコピー」のボタンは持たない（本文は共有シートの「コピー」で写せる）。Instagram の専用ボタンは置かない。
+「結果を共有」の右の X・LINE のボタンは、本文だけを Web の投稿画面の URL（`ShareIntent.xPost` / `lineShare`、`Core/`。非予約文字以外を自前で UTF-8 の百分率符号化する）で
+`@Environment(\.openURL)` に渡して開くだけ（`LSApplicationQueriesSchemes` と `canOpenURL` は使わない。API による投稿もしない。画像は付かない）。
+X に渡す本文だけは `ResultText.orderPost` が上限（`XPostLength`。twitter-text v3 の重み付きの長さ 280）に収め、収まらない並びは上位から入るだけ載せて「ほか M 件」にする（`ResultActions` の `postText`）。
+文字は「X」「LINE」でロゴの画像は使わず、読み上げの名前は `shareToXAccessibility` / `shareToLINEAccessibility`。
 
 - 寸法とレイアウトは `ShareImageLayout`（`Core/`）が画像の一辺から決める純粋関数。基本は 1080×1080 px（`defaultSide`）、余白 8%、アプリ名の文字 3.6% で
   下の余白のすぐ上。ルーレット（`roulette(side:)`）は盤面の直径と中心・針（基準直径での 22×26pt に比例）・帯の中心（`ResultBand.centerOffset`）、
@@ -413,7 +417,7 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
   `ScreenCaptureMonitor` とは干渉しない。
 - 共有シートの「画像を保存」のため、`NSPhotoLibraryAddUsageDescription` を Info.plist に持つ（`project.yml` の `info.properties`。文言は `InfoPlist.xcstrings`）。
   写真の読み取りの権限（`NSPhotoLibraryUsageDescription`）は求めない。どちらも `InfoPlistTests` がビルドした Info.plist で確かめる。
-- 共有シートの投稿先（X・Instagram・LINE）での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。
+- 共有シートの投稿先（X・Instagram・LINE）と、X・LINE のボタンで開く投稿画面での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。
 
 ### 並べ替えの仕組み
 

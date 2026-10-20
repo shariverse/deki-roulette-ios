@@ -71,14 +71,24 @@ struct ResultTextTests {
         let path = try #require(Bundle.main.path(forResource: language, ofType: "lproj"))
         let bundle = try #require(Bundle(path: path))
         let keys = ["shareRouletteResult", "shareOrderHeading", "shareHashtag"]
-        let banned = ["当たり", "必ず", "仕込み", "指定", "イカサマ", "win", "rig", "always", "target"]
+        let bannedJapanese = ["当たり", "必ず", "仕込み", "指定", "イカサマ"]
+        // 英語は単語で比べる（部分一致だと original・window のような無害な語にも当たる）
+        let bannedEnglish: Set<String> = ["win", "winner", "rig", "rigged", "always", "target", "fixed"]
         for key in keys {
             let text = bundle.localizedString(forKey: key, value: "<missing>", table: "Localizable")
             #expect(text != "<missing>")
-            for word in banned {
-                #expect(!text.lowercased().contains(word), "\(key) に \(word) が入っている")
+            for word in bannedJapanese {
+                #expect(!text.contains(word), "\(key) に \(word) が入っている")
             }
-            #expect(!text.unicodeScalars.contains { $0.properties.isEmojiPresentation }, "\(key) に絵文字が入っている")
+            let words = text.lowercased().split { !$0.isLetter }.map(String.init)
+            #expect(bannedEnglish.isDisjoint(with: words), "\(key) に禁じた語が入っている")
+            // 既定で絵文字のもの・U+FE0F で絵文字になるもの・ZWJ でつないだものを絵文字とみなす
+            let hasEmoji = text.contains { character in
+                let scalars = character.unicodeScalars
+                guard let first = scalars.first, first.properties.isEmoji else { return false }
+                return first.properties.isEmojiPresentation || scalars.contains { $0.value == 0xFE0F || $0.value == 0x200D }
+            }
+            #expect(!hasEmoji, "\(key) に絵文字が入っている")
         }
         // ルーレットの文にはラベルの入る場所が 1 つだけある
         let roulette = bundle.localizedString(forKey: "shareRouletteResult", value: nil, table: "Localizable")
@@ -87,5 +97,57 @@ struct ResultTextTests {
         let hashtag = bundle.localizedString(forKey: "shareHashtag", value: nil, table: "Localizable")
         #expect(hashtag.hasPrefix("#"))
         #expect(!hashtag.contains(" "))
+    }
+
+    // MARK: X に渡す順番決めの本文
+
+    private static func others(_ count: Int) -> String { "ほか \(count) 件" }
+
+    @Test func Xの上限に収まる順番決めはそのまま渡す() {
+        let labels = ["A チーム", "B チーム", "C チーム", "D チーム"]
+        let post = ResultText.orderPost(labels, heading: "順番が決まりました！", hashtag: "#デキレーレット", appStoreURL: nil, others: Self.others)
+        let full = ResultText.share(ResultText.order(labels, heading: "順番が決まりました！"), hashtag: "#デキレーレット", appStoreURL: nil)
+        #expect(post == full)
+    }
+
+    @Test func Xの上限を超える順番決めは上位から入るだけ載せてほかM件にする() {
+        // 20 文字の日本語のラベルが 24 件。全部では 280 を大きく超える
+        let labels = (1...24).map { String(repeating: "あ", count: 19) + String($0 % 10) }
+        let full = ResultText.share(ResultText.order(labels, heading: "順番が決まりました！"), hashtag: "#デキレーレット", appStoreURL: nil)
+        #expect(!XPostLength.fits(full))
+
+        let post = ResultText.orderPost(labels, heading: "順番が決まりました！", hashtag: "#デキレーレット", appStoreURL: nil, others: Self.others)
+        #expect(XPostLength.fits(post))
+        let lines = post.components(separatedBy: "\n")
+        #expect(lines.first == "順番が決まりました！")
+        #expect(lines.suffix(2) == ["", "#デキレーレット"])
+        // 見出しの次から上位が順に並び、最後に残りの件数
+        let ranked = lines.dropFirst().dropLast(3)
+        #expect(!ranked.isEmpty)
+        for (offset, line) in ranked.enumerated() {
+            #expect(line == "\(offset + 1). \(labels[offset])")
+        }
+        #expect(lines[lines.count - 3] == "ほか \(labels.count - ranked.count) 件")
+        // 載せられる件数をすべて載せている（1 件増やすと超える）
+        let oneMore = ResultText.share(
+            "順番が決まりました！\n" + ResultText.numbered(Array(labels.prefix(ranked.count + 1))) + "\n" + Self.others(labels.count - ranked.count - 1),
+            hashtag: "#デキレーレット", appStoreURL: nil
+        )
+        #expect(!XPostLength.fits(oneMore))
+    }
+
+    @Test func App_StoreのURLも数に入れて収める() {
+        let url = URL(string: "https://apps.apple.com/app/id0000000000")!
+        let labels = (1...24).map { String(repeating: "い", count: 19) + String($0 % 10) }
+        let post = ResultText.orderPost(labels, heading: "順番が決まりました！", hashtag: "#デキレーレット", appStoreURL: url, others: Self.others)
+        #expect(XPostLength.fits(post))
+        #expect(post.hasSuffix("#デキレーレット\nhttps://apps.apple.com/app/id0000000000"))
+    }
+
+    @Test func 日本語と英語の初期項目の上限の件数でも収まる() {
+        // 項目の上限（24 件）・ラベルの上限（20 文字）の英数字なら 1 字ずつなので全部載ることもある
+        let labels = (1...Config.maxItems).map { "Team \($0)" }
+        let post = ResultText.orderPost(labels, heading: "The order is set!", hashtag: "#DekiRoulette", appStoreURL: nil, others: { "+\($0) more" })
+        #expect(XPostLength.fits(post))
     }
 }

@@ -92,9 +92,15 @@ struct OrderScreen: View {
             ZStack {
                 // 演出が終わって結果が出ている間だけ出す。結果が変わると作り直す
                 if let ordered = model.ordered, !model.revealing {
-                    let text = ResultText.order(ordered.map(\.label), heading: L10n.shareOrderHeading)
+                    let labels = ordered.map(\.label)
+                    let text = ResultText.order(labels, heading: L10n.shareOrderHeading)
                     ResultActions(
                         shareText: ResultText.share(text, hashtag: L10n.shareHashtag, appStoreURL: Config.appStoreURL),
+                        // X は上限があるので、長い並びは上位から入るだけ載せて「ほか M 件」にする
+                        postText: ResultText.orderPost(
+                            labels, heading: L10n.shareOrderHeading, hashtag: L10n.shareHashtag,
+                            appStoreURL: Config.appStoreURL, others: L10n.shareOrderOthers
+                        ),
                         shareImage: shareImage
                     )
                         .id(model.resultId)
