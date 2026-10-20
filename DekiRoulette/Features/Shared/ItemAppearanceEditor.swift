@@ -20,6 +20,7 @@ struct ItemAppearanceEditor: View {
                     }
                 } footer: {
                     Text(L10n.appearanceEditorFooter)
+                        .font(Theme.Typography.listSectionFooter)
                         .foregroundStyle(Theme.muted)
                 }
             }
@@ -107,6 +108,7 @@ private struct ItemAppearanceDetail: View {
                 .listRowBackground(Theme.ink800)
             } header: {
                 Text(L10n.appearanceColorSection)
+                    .font(Theme.Typography.listSectionHeader)
                     .foregroundStyle(Theme.muted)
             }
 
@@ -128,9 +130,11 @@ private struct ItemAppearanceDetail: View {
                     }
             } header: {
                 Text(L10n.appearanceEmojiSection)
+                    .font(Theme.Typography.listSectionHeader)
                     .foregroundStyle(Theme.muted)
             } footer: {
                 Text(rejected ? L10n.appearanceEmojiInvalid : L10n.appearanceEmojiFooter)
+                    .font(Theme.Typography.listSectionFooter)
                     .foregroundStyle(Theme.muted)
             }
 

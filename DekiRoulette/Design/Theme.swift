@@ -156,6 +156,19 @@ enum Theme {
         /// iOS 26 のツールバーのボタンは環境の書体で描かれるので、付けないとアプリの既定（本文の Regular）になる。
         static var barButton: Font { font(.body, weight: .semibold) }
 
+        /// `List` のセクションの見出し。アプリの根の本文の書体を引き継がないよう、システムの見出しと同じ大きさ・太さを明示する
+        /// （iOS 26 は本文の semibold、iOS 17・18 は footnote。`UIListContentConfiguration.groupedHeader()` の値）。
+        static var listSectionHeader: Font {
+            if #available(iOS 26, *) {
+                font(.body, weight: .semibold)
+            } else {
+                font(.footnote)
+            }
+        }
+
+        /// `List` のセクションの注記（システムと同じ footnote）。
+        static var listSectionFooter: Font { font(.footnote) }
+
         /// スタイルの既定の大きさ（Dynamic Type が標準の `.large` のとき）。iOS と visionOS で違うので、数字を書き写さずシステムから引く。
         static func defaultSize(for style: Font.TextStyle) -> CGFloat {
             let traits = UITraitCollection(preferredContentSizeCategory: .large)
