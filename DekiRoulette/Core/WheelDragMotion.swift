@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// 指で盤面を動かしている間の動き。速さに連動する演出（電飾の流れ・光の尾・残像・火花）が、盤面が自分で回る動き（`TimedSpinMotion`）の
+/// 指で盤面を動かしている間の動き。速さに連動する演出（電飾の流れ・背景の光の脈動・光の尾・残像・火花）が、盤面が自分で回る動き（`TimedSpinMotion`）の
 /// 代わりに毎フレーム引く。補間中の角度と違い、ドラッグ中の角度は View の state（`WheelDragArea` の `dragRotation`）なので、
 /// 指が動くたびに位置と追従で回した角度を記録し、角速度は指を離したときのフリック（`FlickSpin.angularVelocity(samples:center:at:)`）と同じく
 /// 直前 `Config.flickSampleWindow` 秒に中心のまわりを回った角度から求め、`SpinEffectIntensity.smoothed` でならす。

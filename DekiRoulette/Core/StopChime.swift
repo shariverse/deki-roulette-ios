@@ -12,9 +12,9 @@ enum StopChime {
         case coast
     }
 
-    /// 「スピンの演出」が共通の演出を付けるスタイルで、設定の「効果音」が ON で、抽選したスピンが止まったときだけ鳴らす。
-    static func plays(style: SpinEffectStyle, soundEnabled: Bool, stop: Stop) -> Bool {
-        guard style.showsCommonEffects, soundEnabled else { return false }
+    /// 演出の効果音（`SpinEffects.sounds`）と設定の「効果音」が両方 ON で、抽選したスピンが止まったときだけ鳴らす。
+    static func plays(effects: SpinEffects, soundEnabled: Bool, stop: Stop) -> Bool {
+        guard effects.sounds, soundEnabled else { return false }
         return switch stop {
         case .spin: true
         case .coast: false

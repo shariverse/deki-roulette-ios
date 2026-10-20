@@ -101,6 +101,17 @@ struct ThemeContrastTests {
         #expect(ratio(Theme.wheelLight, on: Theme.wheelRim, style) >= 3)
     }
 
+    /// 背景の光の脈動は、いちばん明るいとき盤面の地（`ink900`）の上で見分けられ（1.5:1 以上）、電飾と同じく `gold` / `flare` を流用しない。
+    @Test(arguments: styles)
+    func 背景の光はいちばん明るいとき地から見分けられる(style: UIUserInterfaceStyle) {
+        let glow = composite(resolve(Theme.wheelBackGlow.opacity(Config.wheelBackGlowMaxOpacity), style), over: resolve(Theme.ink900, style))
+        let base = resolve(Theme.ink900, style)
+        let (a, b) = (luminance(glow), luminance(base))
+        #expect((max(a, b) + 0.05) / (min(a, b) + 0.05) >= 1.5)
+        #expect(resolve(Theme.wheelBackGlow, style) != resolve(Theme.gold, style))
+        #expect(resolve(Theme.wheelBackGlow, style) != resolve(Theme.flare, style))
+    }
+
     /// 電球は明るさを不透明度にして縁に重ねる。いちばん暗いとき（並びの間・点滅と脈動の暗いとき）でも、点いていると縁から見分けられること。
     @Test(arguments: styles)
     func 電飾のいちばん暗い電球も盤面の縁から1_5対1以上(style: UIUserInterfaceStyle) {

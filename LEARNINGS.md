@@ -126,6 +126,9 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   長さを過ぎたら nil を返すと終わる。`withAnimation` の `completion` が焦らしの終わりで呼ばれるかは実機・Simulator で未確認なので、長さから決めた保険のタイマーも残す（2026-10-18）
 - 乱数を注入できるモデルで「指定の有無で同じ動き」をテストするときは、指定があっても止まる項目の乱数を引いて捨てる。指定のときだけ引かないと、
   後に続く乱数（焦らしの入り方）の位置がずれて、同じ種でも動きが変わる（2026-10-18）
+- 焦らしの区間の速さを `humMinIntensity`（36°/秒）未満に保つときは、区間の距離 ÷ 長さに曲線の傾きの山を掛けて見積もる。`cubic-bezier(0.42, 0, 0.58, 1)` の山は
+  約 1.72 倍、`cubic-bezier(0.37, 0, 0.63, 1)`（sine）は約 1.59 倍。ただし `WheelParticlesTests` の「焦らしの区間では火花はごくわずか」は寿命 0.5 秒の窓の平均の強さで
+  粒の数が決まり（種 20 個 × 各フレームの最大を見る）、山が下限に届かなくても窓の平均が 0.039 ほどあると上限の 1/10 を超えることがある（2026-10-19）
 
 ## スピンの演出（明滅・脈動）
 
@@ -144,3 +147,13 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - `.github/workflows/build.yml` の PR 側のジョブは、同じリポジトリのブランチでは `if` で常にスキップされ、push 側だけで走る。push 側は `paths-ignore` で
   `**/*.md` と `docs/**` だけの変更では走らないので、最後のコミットがドキュメントだけだと `gh pr checks` にはスキップしか出ない。
   その前のコードのコミットの push の Build の結果を見る（2026-10-18）
+
+## 文言・設定画面
+
+- `Localizable.xcstrings` はキーが並べ替えられていない（追加順）。Python の `json.load` → `json.dump` で書き直すと、空のエントリ（`"%lld" : {}`）の書き方や並び順が変わって差分が数百行に膨らむ。
+  キーの追加・削除はテキストのまま該当の塊だけを差し替える（`json.loads` で壊れていないかだけ確かめる）（2026-10-19）
+- `@AppStorage` を束ねた `DynamicProperty` の struct を View に持たせるとき、`private var x = …` にすると View の memberwise init が private になり、
+  ほかのファイルから View を作れなくなる。`private let` にする（`DynamicProperty` は `let` でも更新を受ける）（2026-10-19）
+- 「ルーレットの詳細設定」（`RouletteAdvancedSettingsView`）は `private` なので、スクリーンショットを撮るときは一時的に `private` を外し、コミットしない一時テストから
+  `NavigationStack { RouletteAdvancedSettingsView() }` を present する。保存値の状態を変えて撮るときは
+  `xcrun simctl spawn <SIM> defaults write <バンドル ID> <キー> -bool NO` で書いてから起動し、撮ったら `defaults delete` で戻す（2026-10-19）

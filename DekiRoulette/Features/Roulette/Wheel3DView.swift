@@ -15,11 +15,12 @@ import SwiftUI
 /// 盤は端末の姿勢で傾け、動かした勢いで支点まわりに揺らす（`WheelMotionModel`）。揺れるのは待機中と回転中だけで、
 /// 結果表示中は正面へ戻して止め、姿勢の購読も止める。視差効果を減らす設定では揺らさず正面に置く。
 /// 姿勢を読むのは、この盤面が画面に出ていてアプリが前面にある間だけ。揺れは見た目だけで、回転・結果・音・触覚には影響しない。
-/// 演出は 2D と同じ「スピンの演出」（`effectStyle`）を受け取る。電飾（`showsLights`）のときは 2D と同じ外周の電飾を盤と同じ面の縁の上に出す（回らない）。明るさは 2D と共有の `WheelLightsTimeline` が
+/// 演出は 2D と同じ「スピンの演出」（`effects`）を受け取る。電飾（`lights`）のときは 2D と同じ外周の電飾を盤と同じ面の縁の上に出す（回らない）。明るさは 2D と共有の `WheelLightsTimeline` が
 /// 同じ時計（`now`）・同じ規則（`WheelLights`）で毎フレーム引き、盤の角度と同じく SceneKit のノードに写す。
-/// `showsTrails` のときは 2D と同じ光の尾と残像を盤と同じ面に出す（回らない）。2D と共有の `WheelTrailsTimeline` が同じ時計・同じ規則
+/// `trails` のときは 2D と同じ光の尾と残像を盤と同じ面に出す（回らない）。2D と共有の `WheelTrailsTimeline` が同じ時計・同じ規則
 /// （`WheelTrails`）で毎フレーム引き、`Wheel3DScene.trail(_:)` が残像の角度・濃さと光の尾の切れ端の濃さだけをノードに写す。
-/// 火花・紙吹雪（`showsParticles`）と、停止の瞬間のフラッシュ・結果表示中の光彩の余韻・結果の帯の登場演出（`showsCommonEffects`）も 2D と同じ規則で出す。
+/// 背景の光の脈動（`lights`）も 2D と共有の `WheelBackGlowTimeline` が引き、`Wheel3DScene.backGlow(_:dark:)` が盤の後ろの板の不透明度に写す。
+/// 火花・紙吹雪（`particles`）と、停止の瞬間のフラッシュ・結果表示中の光彩の余韻・結果の帯の登場演出（`stopEffects`）も 2D と同じ規則で出す。
 /// 火花・紙吹雪は 2D と共有の `WheelParticlesTimeline`、フラッシュと余韻は `WheelStopEffectsTimeline` が同じ時計で引き、
 /// `Wheel3DScene.particles(_:)` / `stopEffects(_:)` が盤と同じ面のノードに写す。停止の時刻は 2D と同じ `WheelStopMoment` で持つ。
 struct Wheel3DView: View {
@@ -33,8 +34,8 @@ struct Wheel3DView: View {
     var glowStyle = GlowStyle.default
     /// 結果の帯。結果が出ている間だけ渡す。
     var result: Wheel3DResult? = nil
-    /// 「スピンの演出」。2D の盤面（`RouletteWheelView`）と同じ値を受け取り、同じ演出を出す。「なし」なら今の盤面のまま何も足さない。
-    var effectStyle = SpinEffectStyle.none
+    /// 「スピンの演出」。2D の盤面（`RouletteWheelView`）と同じ値を受け取り、同じ演出を出す。すべて OFF（`.none`）なら今の盤面のまま何も足さない。
+    var effects = SpinEffects.none
     /// 盤面が自分で回っている動き（`RouletteModel.currentMotion`）。電飾の流れと明るさ、光の尾・残像・火花を毎フレームここから引く。
     /// 指で動かしている間は、`WheelDragArea` が記録した指の動き（`WheelDragMotion`）から引く。
     var motion: TimedSpinMotion? = nil
@@ -46,6 +47,7 @@ struct Wheel3DView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Config.tiltReferenceKey) private var tiltReference = TiltReference.default
     /// 姿勢の購読。`CMMotionManager` は使い回したいので、ビューを作り直すたびには作らず、最初に画面に出たときに作る。
@@ -67,36 +69,40 @@ struct Wheel3DView: View {
         WheelDragArea(
             count: items.count, rotation: rotation, highlightedIndex: highlightedIndex, interactive: interactive,
             onBoundaryCross: onBoundaryCross, onGrab: onGrab, onRelease: onRelease,
-            // 速さに連動する演出（電飾・光の尾・火花）を出すときだけ、指で動かしている動きを記録する（「なし」では今のまま記録しない）
-            tracksMotion: effectStyle.tracksDragMotion, now: now
+            // 速さに連動する演出（電飾・光の尾・火花）を出すときだけ、指で動かしている動きを記録する（どれも出さないときは今のまま記録しない）
+            tracksMotion: effects.tracksDragMotion, now: now
         ) { dragRotation, displacedByDrag, dragMotion in
             // 強調するスライス（結果が出たあとに指で動かしたら解く。結果の帯は残る）と、停止の演出に渡す時刻。2D と同じ関数で引く
             let cues = stop.cues(
-                style: effectStyle, reduceMotion: reduceMotion, highlightedIndex: highlightedIndex, displacedByDrag: displacedByDrag
+                effects: effects, reduceMotion: reduceMotion, highlightedIndex: highlightedIndex, displacedByDrag: displacedByDrag
             )
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
                 let canvas = side * (1 + 2 * Theme.Wheel3D.overscan)
                 // 電飾の明るさは 2D と同じ時計で毎フレーム引く。電飾を出さないときは止めたまま nil を渡す
                 WheelLightsTimeline(
-                    enabled: effectStyle.showsLights, rotation: rotation, dragRotation: dragRotation, motion: motion, drag: dragMotion,
+                    enabled: effects.lights, rotation: rotation, dragRotation: dragRotation, motion: motion, drag: dragMotion,
                     // 指で動かして強調を解いたら点滅・脈動も止める
                     stoppedAt: cues.lightsStoppedAt,
                     now: now
                 ) { lights in
                     // 光の尾・残像も 2D と同じ時計で毎フレーム引く。出さないときは止めたまま `.none` を渡す
                     WheelTrailsTimeline(
-                        enabled: effectStyle.showsTrails, sliceCount: items.count, rotation: rotation, dragRotation: dragRotation,
+                        enabled: effects.trails, sliceCount: items.count, rotation: rotation, dragRotation: dragRotation,
                         motion: motion, drag: dragMotion, now: now
                     ) { trails in
                         // 火花・紙吹雪も 2D と同じ時計・同じ規則で毎フレーム引く。出さないときは止めたまま `.none` を渡す
                         WheelParticlesTimeline(
-                            enabled: effectStyle.showsParticles, side: side, motion: motion, drag: dragMotion,
+                            enabled: effects.particles, side: side, motion: motion, drag: dragMotion,
                             burstAt: cues.confettiStart, now: now
                         ) { particles in
-                            // フラッシュと光彩の余韻も 2D と同じ時計で引く。「なし」では止めたまま `.none` を渡す
+                            // 背景の光の脈動も 2D と同じ時計・同じ規則で毎フレーム引く。電飾が OFF なら止めたまま 0 を渡す
+                            WheelBackGlowTimeline(
+                                enabled: effects.lights, motion: motion, drag: dragMotion, now: now
+                            ) { backGlow in
+                            // フラッシュと光彩の余韻も 2D と同じ時計で引く。停止の演出が OFF なら止めたまま `.none` を渡す
                             WheelStopEffectsTimeline(
-                                enabled: effectStyle.showsCommonEffects, flashStart: cues.flashStart,
+                                enabled: effects.stopEffects, flashStart: cues.flashStart,
                                 afterglowStart: cues.afterglowStart, now: now
                             ) { stopEffects in
                                 // 追従の角度は足すだけにする。ドラッグ中は `rotation` が変わらないので下の `.animation` は掛からず、指にそのまま付いてくる。
@@ -106,10 +112,11 @@ struct Wheel3DView: View {
                                     items: items, rotation: rotation + dragRotation, tilt: tilt, diameter: side,
                                     displayScale: displayScale,
                                     highlight: cues.highlight.map { Wheel3DHighlight(index: $0, glowStyle: glowStyle) },
-                                    result: result, showsCommonEffects: effectStyle.showsCommonEffects,
+                                    result: result, showsStopEffects: effects.stopEffects,
                                     lights: lights, trails: trails, particles: particles, stopEffects: stopEffects,
-                                    reduceMotion: reduceMotion
+                                    backGlow: backGlow, colorScheme: colorScheme, reduceMotion: reduceMotion
                                 )
+                            }
                             }
                         }
                     }
@@ -177,8 +184,8 @@ private struct Wheel3DSurface: View, Animatable {
     let displayScale: CGFloat
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
-    /// 「スピンの演出」が「なし」以外か。結果の帯に登場演出（小さい大きさからばね）を重ね、止まったスライスの光彩を余韻で脈打たせられる形にする。
-    let showsCommonEffects: Bool
+    /// 停止の演出（`SpinEffects.stopEffects`）が ON か。結果の帯に登場演出（小さい大きさからばね）を重ね、止まったスライスの光彩を余韻で脈打たせられる形にする。
+    let showsStopEffects: Bool
     /// 外周の電飾の場面。電飾を出さないときは nil。
     let lights: WheelLights.Scene?
     /// 光の尾と残像。出さないとき・描かない間は `.none`。
@@ -187,6 +194,10 @@ private struct Wheel3DSurface: View, Animatable {
     let particles: WheelParticles.Frame
     /// フラッシュの不透明度と光彩の余韻の倍率。出さないときは `.none`。
     let stopEffects: WheelStopEffects.Frame
+    /// 背景の光の脈動の不透明度（`WheelBackGlow.opacity`）。出さないとき・止まっている間は 0。
+    let backGlow: Double
+    /// 外観。背景の光の色（`Theme.wheelBackGlow`）は 2D と同じく外観に合わせる。
+    let colorScheme: ColorScheme
     let reduceMotion: Bool
 
     nonisolated var animatableData: Double {
@@ -197,8 +208,9 @@ private struct Wheel3DSurface: View, Animatable {
     var body: some View {
         Wheel3DSceneView(
             items: items, rotation: rotation, tilt: tilt, diameter: diameter, displayScale: displayScale,
-            highlight: highlight, result: result, showsCommonEffects: showsCommonEffects, lights: lights, trails: trails,
-            particles: particles, stopEffects: stopEffects, reduceMotion: reduceMotion
+            highlight: highlight, result: result, showsStopEffects: showsStopEffects, lights: lights, trails: trails,
+            particles: particles, stopEffects: stopEffects, backGlow: backGlow, colorScheme: colorScheme,
+            reduceMotion: reduceMotion
         )
     }
 }
@@ -211,11 +223,13 @@ private struct Wheel3DSceneView: UIViewRepresentable {
     let displayScale: CGFloat
     let highlight: Wheel3DHighlight?
     let result: Wheel3DResult?
-    let showsCommonEffects: Bool
+    let showsStopEffects: Bool
     let lights: WheelLights.Scene?
     let trails: WheelTrails.Frame
     let particles: WheelParticles.Frame
     let stopEffects: WheelStopEffects.Frame
+    let backGlow: Double
+    let colorScheme: ColorScheme
     let reduceMotion: Bool
 
     func makeCoordinator() -> Wheel3DScene {
@@ -238,12 +252,16 @@ private struct Wheel3DSceneView: UIViewRepresentable {
         context.coordinator.update(items: items, diameter: diameter, displayScale: displayScale)
         context.coordinator.spin(to: rotation)
         context.coordinator.tilt(to: tilt)
-        context.coordinator.highlight(highlight, reduceMotion: reduceMotion, afterglow: showsCommonEffects)
-        context.coordinator.show(result: result, reduceMotion: reduceMotion, popIn: showsCommonEffects)
+        context.coordinator.highlight(
+            highlight, reduceMotion: reduceMotion, afterglow: showsStopEffects,
+            pointerBounce: PointerBounce.at(stopEffects: showsStopEffects, reduceMotion: reduceMotion)
+        )
+        context.coordinator.show(result: result, reduceMotion: reduceMotion, popIn: showsStopEffects)
         context.coordinator.light(lights)
         context.coordinator.trail(trails)
         context.coordinator.stopEffects(stopEffects)
         context.coordinator.particles(particles)
+        context.coordinator.backGlow(backGlow, dark: colorScheme == .dark)
     }
 }
 
@@ -269,7 +287,7 @@ final class Wheel3DScene {
     /// 止まったスライスを余韻で脈打たせられる形（光彩の板と光彩の無い面の板の 2 枚）で出しているか。
     private var shownAfterglow = false
     private let postNode = SCNNode()
-    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は初めて出すときに作り（「なし」では作らない）、
+    /// 外周の電飾（`tiltNode` に載せ、盤と一緒に傾くが回らない）。電球は初めて出すときに作り（電飾が OFF なら作らない）、
     /// 組み直したら作り直し、出さない間は隠す。
     private let lightsNode = SCNNode()
     private var bulbNodes: [SCNNode] = []
@@ -282,7 +300,7 @@ final class Wheel3DScene {
     /// 作った電球の数（テストで、電飾を出さない間は作らないことを見る）。
     var bulbCount: Int { bulbNodes.count }
     /// 残像（`tiltNode` に載せ、盤と一緒に傾くが回らない）。遅れた角度のスライスの塗り（ハブの内側は抜く）の 1 つの形を、
-    /// 残像の枚数分のノードで共有し、毎フレーム角度と不透明度だけを変える。初めて描くときに作り（「なし」では作らない）、組み直したら作り直す。
+    /// 残像の枚数分のノードで共有し、毎フレーム角度と不透明度だけを変える。初めて描くときに作り（光の尾・残像が OFF なら作らない）、組み直したら作り直す。
     private let ghostsNode = SCNNode()
     private var ghostNodes: [SCNNode] = []
     /// 光の尾（`tiltNode` に載せ、回らない）。同じ形の弧の切れ端（芯とにじみ）を 12 時から並べ、毎フレーム濃さだけを変える。
@@ -300,7 +318,7 @@ final class Wheel3DScene {
     private(set) var trailOpacityWriteCount = 0
     /// 電球を縁の上面から浮かせる高さ（pt）。テストで差し替えて、浮かせないと止まったスライスに隠れることを確かめる。
     var lightLift = Theme.Wheel3D.lightLift
-    /// 火花と紙吹雪（`tiltNode` に載せ、盤と一緒に傾くが回らない）。粒のノードは初めて描くときに上限の数だけ作り（「なし」では作らない）、
+    /// 火花と紙吹雪（`tiltNode` に載せ、盤と一緒に傾くが回らない）。粒のノードは初めて描くときに上限の数だけ作り（火花・紙吹雪が OFF なら作らない）、
     /// 毎フレーム位置・大きさ・濃さだけを変えて使い回す。紙吹雪は盤面の枠に収まるよう、浮かせた分の遠近の広がりを `confettiNode` の縮みで打ち消す。
     private let particlesNode = SCNNode()
     private let confettiNode = SCNNode()
@@ -315,22 +333,41 @@ final class Wheel3DScene {
     /// 出している火花・紙吹雪の数（テストで、2D と同じ数を出すことを見る）。
     var visibleSparkCount: Int { particlesNode.isHidden ? 0 : sparkNodes.filter { !$0.isHidden }.count }
     var visibleConfettiCount: Int { particlesNode.isHidden ? 0 : confettiNodes.filter { !$0.isHidden }.count }
-    /// 停止の瞬間のフラッシュ（`tiltNode` に載せる、盤面の枠の丸い光の板）。初めて光らせるときに作る（「なし」では作らない）。
+    /// 停止の瞬間のフラッシュ（`tiltNode` に載せる、盤面の枠の丸い光の板）。初めて光らせるときに作る（停止の演出が OFF なら作らない）。
     private var flashNode: SCNNode?
     /// 止まったスライスの光彩の板（余韻で不透明度を脈打たせる）。強調を出している間だけ。
     private var stoppedGlowNode: SCNNode?
     private var shownStopEffects = WheelStopEffects.Frame.none
-    /// フラッシュの板を作ったか（テストで、「なし」では作らないことを見る）。
+    /// 背景の光の脈動の板（`tiltNode` に載せ、盤と一緒に傾くが回らない）。初めて光らせるときに作る（電飾が OFF なら作らない）。
+    private var backGlowNode: SCNNode?
+    private struct BackGlowState: Equatable {
+        var opacity: Double
+        var dark: Bool
+    }
+    private var shownBackGlow = BackGlowState(opacity: 0, dark: true)
+    /// 背景の光の板を焼いたときの外観（板が無ければ nil）。
+    private var backGlowBakedDark: Bool?
+    /// 背景の光の板を作ったか・今の不透明度（テストで、電飾が OFF なら作らないこと・2D と同じ不透明度を写すことを見る）。
+    var hasBackGlowNode: Bool { backGlowNode != nil }
+    var backGlowOpacity: Double? {
+        guard let node = backGlowNode, !node.isHidden else { return nil }
+        return node.geometry?.firstMaterial?.value(forKey: Self.backGlowOpacityKey) as? Double
+    }
+    /// 背景の光の板を焼いたときの外観（テストで、外観を変えたら焼き直すことを見る）。
+    var backGlowBakedAppearanceIsDark: Bool? { backGlowBakedDark }
+    /// フラッシュの板を作ったか（テストで、停止の演出が OFF なら作らないことを見る）。
     var hasFlashNode: Bool { flashNode != nil }
     /// フラッシュの板の一辺・縮め・盤の表面からの高さ（テストで、正面から見た半径が盤面の枠の半径になることを確かめる）。
     var flashPlacement: (side: Double, scale: Double, z: Double)? {
         guard let node = flashNode, let plane = node.geometry as? SCNPlane else { return nil }
         return (Double(plane.width), Double(node.scale.x), Double(node.position.z))
     }
-    /// 止まったスライスに貼った画像の板の数（テストで、「なし」は 1 枚・余韻を出すときは 2 枚であることを見る）。
+    /// 止まったスライスに貼った画像の板の数（テストで、余韻を出さないときは 1 枚・余韻を出すときは 2 枚であることを見る）。
     var stoppedImagePlaneCount: Int {
         stoppedNode?.childNodes.filter { $0.geometry is SCNPlane }.count ?? 0
     }
+    /// 最後に止まったときに針を沈めた量（pt。テストで、停止の演出が ON なら 2 倍沈めることを見る）。
+    private(set) var pointerBounceDepth: Double = 0
     /// 結果の帯の登場演出（小さい大きさからばね）を流した回数。
     private(set) var bandPopCount = 0
 
@@ -415,7 +452,7 @@ final class Wheel3DScene {
     }
 
     /// 結果の帯を出す・消す。`id` が変わったときだけ焼き直し、2D の `revealOnAppear` と同じ動きで現れる
-    /// （動きを減らす設定では即座に出す）。`popIn` のとき（「スピンの演出」が「なし」以外）は、2D の `ResultBandPopIn` と同じく
+    /// （動きを減らす設定では即座に出す）。`popIn` のとき（停止の演出が ON）は、2D の `ResultBandPopIn` と同じく
     /// 帯の中心を軸に `ResultBand.popInStartScale` からばね（`popInDuration` / `popInBounce`）で 1 倍に収める動きを重ねる。
     /// 消すときは 2D と同じく即座に消す。
     /// 同じ結果のまま文字や枠の色が変わった（結果を出したまま項目の見た目を変えた）ときは、動かさずに焼き直す。
@@ -468,7 +505,9 @@ final class Wheel3DScene {
     /// 止まったスライスは縁の高さまで持ち上げ、側面の付いた板として前に出す（隣に隠れず、傾けても浮いて見える）。
     /// 動きを減らす設定では大きさも高さも変えず、暗くする・縁取り・光彩だけを即座に出す。
     /// 大きさが変わって盤を組み直したときは、動かさずに出し直す。
-    func highlight(_ highlight: Wheel3DHighlight?, reduceMotion: Bool, afterglow: Bool = false) {
+    func highlight(
+        _ highlight: Wheel3DHighlight?, reduceMotion: Bool, afterglow: Bool = false, pointerBounce: PointerBounce = .normal
+    ) {
         let pulsesGlow = afterglow && !reduceMotion
         let changed = highlight != shownHighlight
         // 結果を出したまま「スピンの演出」を切り替えた（余韻の有無が変わった）ときは、動かさずに出し直す
@@ -503,9 +542,12 @@ final class Wheel3DScene {
         SCNTransaction.commit()
         Self.pulse(stopped, keyPath: .scale, from: Self.planeScale(1), peak: Self.planeScale(Theme.stopPulseScale),
                    rest: Self.planeScale(Theme.stopHoldScale))
-        // 針は沈んでから戻る（y は上向きなので、2D で下へ沈むのは -）
+        // 針は沈んでから戻る（y は上向きなので、2D で下へ沈むのは -）。停止の演出が ON なら 2D と同じく 2 倍沈める
+        let depth = Theme.pointerBounceOffset(pointerBounce)
+        pointerBounceDepth = Double(depth)
+        guard depth > 0 else { return }
         Self.pulse(pointerNode, keyPath: .position, from: SCNVector3Zero,
-                   peak: SCNVector3(0, -Float(Theme.pointerBounceOffset), 0), rest: SCNVector3Zero)
+                   peak: SCNVector3(0, -Float(depth), 0), rest: SCNVector3Zero)
     }
 
     private func build(_ shape: Shape) {
@@ -571,8 +613,11 @@ final class Wheel3DScene {
         if shownStopEffects.flashOpacity > 0 { addFlash(shape) }
         removeParticles()
         if !shownParticles.isEmpty { addParticles(shape) }
+        removeBackGlow()
+        if shownBackGlow.opacity > 0 { addBackGlow(shape) }
         applyStopEffects()
         applyParticles()
+        applyBackGlow()
     }
 
     // MARK: 光の尾・残像
@@ -587,6 +632,9 @@ final class Wheel3DScene {
     /// 光の尾のにじみと芯。残像より後、電飾のにじみ（10）と電球（11）より前に描き、電球の奥にする。
     private static let trailGlowRenderingOrder = 8
     private static let trailCoreRenderingOrder = 9
+    /// 背景の光の脈動。盤・縁と同じ 0 で、SceneKit が半透明のものを不透明な盤・縁より後に描くのに任せる。強調の層（1）・残像より前
+    /// （縁の外の環だけで、盤の面には重ならない。深度を書かないので、後に描く半透明のノードはどれも上に重なる）。
+    private static let backGlowRenderingOrder = 0
     /// 停止の瞬間のフラッシュ。電飾（10・11）より後に描いて電球の上に重ね、深度は読むので手前の針には隠れる。
     private static let flashRenderingOrder = 15
     /// 紙吹雪、火花の尾、火花の順（2D の `WheelParticlesView` と同じく紙吹雪の上に火花）。深度を読まずにフラッシュより後に描き、
@@ -1133,6 +1181,101 @@ final class Wheel3DScene {
         }
     }()
 
+    // MARK: 背景の光の脈動
+
+    /// 背景の光の脈動を出す・消す。`opacity` は 2D と同じ `WheelBackGlow.opacity`（0 なら隠す）、`dark` は外観（色を 2D と同じく外観に合わせる）。
+    /// 板は初めて光らせるときに作り（電飾が OFF なら作らない）、大きさが変わって組み直したら作り直す。毎フレームは不透明度だけを書く。
+    func backGlow(_ opacity: Double, dark: Bool) {
+        let next = BackGlowState(opacity: opacity, dark: dark)
+        guard next != shownBackGlow else { return }
+        shownBackGlow = next
+        // 外観は板を焼いたときのものと比べる（光っていない待機中に外観を変えても、次に光らせるときに焼き直す）
+        if let shape = built, opacity > 0, backGlowNode == nil || backGlowBakedDark != dark { addBackGlow(shape) }
+        applyBackGlow()
+    }
+
+    private func applyBackGlow() {
+        guard let node = backGlowNode else { return }
+        let opacity = shownBackGlow.opacity
+        node.isHidden = opacity <= 0
+        if opacity > 0 { node.geometry?.firstMaterial?.setValue(opacity, forKey: Self.backGlowOpacityKey) }
+    }
+
+    /// 背景の光の不透明度・色を渡すシェーダの引数の名前。
+    private static let backGlowOpacityKey = "backGlowOpacity"
+    private static let backGlowColorKey = "backGlowColor"
+
+    /// 背景の光の色の出し方。SceneKit は線形の色空間で重ねてから sRGB に戻し、`SCNView`（背景は透明）はその色とアルファ値で
+    /// ページの地の上に重ねられる。2D と同じ見え方（地の上に sRGB の色 c を不透明度 a で重ねる = c·a + 地·(1 − a)）にするため、
+    /// アルファ値は a のまま、乗算済みの色は sRGB に戻したときに c·a になる値（冪 2.2 で近似した線形の値）を書く。
+    /// a は焼いた環の不透明度（2D と同じ、内側の 1 から外側の 0 への線形）× `WheelBackGlow.opacity`。
+    private static let backGlowShader = """
+    #pragma arguments
+    float backGlowOpacity;
+    float3 backGlowColor;
+    #pragma body
+    float coverage = clamp(_output.color.a * backGlowOpacity, 0.0, 1.0);
+    _output.color = float4(pow(backGlowColor * coverage, float3(2.2)), coverage);
+    """
+
+    /// 背景の光の板。2D の `WheelBackGlowView` と同じく、外周の縁の外周（`Theme.BackGlow.innerRadius`）でいちばん明るく、
+    /// 盤面の枠（`outerRadius` = 直径 ÷ 2）で 0 になる環を焼いた一辺 = 直径の板を、盤の表面のわずかに奥（`backGlowDepth`）に置く。
+    /// 深度は読むが書かないので、盤を傾けると盤の側面・縁に隠れる（盤の後ろの光に見える）。奥へ置いた分の遠近の縮みは広げて打ち消す。
+    private func addBackGlow(_ shape: Shape) {
+        removeBackGlow()
+        let diameter = Double(shape.diameter)
+        let plane = SCNPlane(width: diameter, height: diameter)
+        let material = Self.material(.white, lit: false)
+        material.diffuse.contents = Self.backGlowImage(diameter: diameter)
+        material.writesToDepthBuffer = false
+        material.shaderModifiers = [.fragment: Self.backGlowShader]
+        let color = UIColor(Theme.wheelBackGlow).resolvedColor(with: UITraitCollection(userInterfaceStyle: shownBackGlow.dark ? .dark : .light))
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        material.setValue(NSValue(scnVector3: SCNVector3(Float(r), Float(g), Float(b))), forKey: Self.backGlowColorKey)
+        material.setValue(0.0, forKey: Self.backGlowOpacityKey)
+        plane.materials = [material]
+        let node = SCNNode(geometry: plane)
+        let z = -Self.backGlowDepth
+        node.position.z = Float(z)
+        let grow = Float(Self.perspectiveShrink(z: z, diameter: diameter))
+        node.scale = SCNVector3(grow, grow, 1)
+        node.renderingOrder = Self.backGlowRenderingOrder
+        node.isHidden = true
+        tiltNode.addChildNode(node)
+        backGlowNode = node
+        backGlowBakedDark = shownBackGlow.dark
+    }
+
+    private func removeBackGlow() {
+        backGlowNode?.removeFromParentNode()
+        backGlowNode = nil
+        backGlowBakedDark = nil
+    }
+
+    /// 背景の光の板を盤の表面から奥へ置く距離（pt）。表面と同じ高さだと、傾けたときに盤の縁と重なってちらつくため。
+    private static let backGlowDepth = 0.5
+
+    /// 背景の光の環の不透明度（白で焼く。色と `WheelBackGlow.opacity` はシェーダ `backGlowShader` で掛ける）。
+    private static func backGlowImage(diameter: Double) -> UIImage {
+        let side: CGFloat = 512
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let ratio = side / CGFloat(diameter)
+        let inner = Theme.BackGlow.innerRadius(diameter: CGFloat(diameter)) * ratio
+        let outer = Theme.BackGlow.outerRadius(diameter: CGFloat(diameter)) * ratio
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { renderer in
+            // 2D と同じく、内側の 1 から外側の 0 へ不透明度を線形に落とす
+            let colors = [UIColor.white.cgColor, UIColor.white.withAlphaComponent(0).cgColor] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: [0, 1])
+            else { return }
+            let center = CGPoint(x: side / 2, y: side / 2)
+            // 始まりの円の内側は塗らない（盤の面には重ねない）
+            renderer.cgContext.drawRadialGradient(gradient, startCenter: center, startRadius: inner, endCenter: center, endRadius: outer, options: [])
+        }
+    }
+
     /// 盤の表面から `z` だけ浮かせた面を正面から見たとき、表面と同じ大きさに見せる縮み（カメラまでの距離の比）。
     private static func perspectiveShrink(z: Double, diameter: Double) -> Double {
         let canvas = diameter * (1 + 2 * Double(Theme.Wheel3D.overscan))
@@ -1238,9 +1381,9 @@ final class Wheel3DScene {
     }
 
     /// 前に出した止まったスライス。側面の付いた板（塗りの色）の上に、2D と同じ塗り・ラベル・縁取り・光彩を焼いた画像を貼る。
-    /// `afterglow`（「なし」以外で余韻を出すとき）は光彩を脈打たせるので、光彩ごと焼いた画像の板（返す `glow`。不透明度を余韻の倍率にする）の上に、
+    /// `afterglow`（停止の演出が ON で余韻を出すとき）は光彩を脈打たせるので、光彩ごと焼いた画像の板（返す `glow`。不透明度を余韻の倍率にする）の上に、
     /// 光彩の無い同じ面の画像の板を重ねる（スライスの中は不透明な塗りなので、外側にはみ出した光彩だけが倍率で薄くなる。倍率 1 なら 1 枚と同じ見た目）。
-    /// 「なし」・動きを減らす設定では光彩ごと焼いた 1 枚だけにする（`glow` は nil。消すときに半透明の塗りが 2 枚重なって濃く残らない）。
+    /// 停止の演出が OFF・動きを減らす設定では光彩ごと焼いた 1 枚だけにする（`glow` は nil。消すときに半透明の塗りが 2 枚重なって濃く残らない）。
     /// 盤の中心を原点に置くので、`scale` は 2D の `scaleEffect` と同じく盤の中心から広がる。
     private func makeStopped(
         _ highlight: Wheel3DHighlight, shape: Shape, lifted: Bool, afterglow: Bool
@@ -1634,7 +1777,7 @@ private enum WheelLabelImage {
 
 #Preview("Trails") {
     Wheel3DView(
-        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effectStyle: .trails,
+        items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司", "焼肉"]), rotation: 0, effects: SpinEffects(lights: false, trails: true, particles: false, tease: true, stopEffects: true, sounds: true),
         motion: TimedSpinMotion(
             motion: SpinMotion(from: 0, to: 360 * 1200, duration: 600, easing: CubicBezierCurve(0.33, 0.33, 0.67, 0.67)),
             start: ProcessInfo.processInfo.systemUptime

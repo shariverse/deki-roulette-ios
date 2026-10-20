@@ -11,10 +11,10 @@ final class SpinSoundPlayer {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private var click: (samples: [Float], format: AVAudioFormat)?
-    /// 決まり音を流すノードと音源。「スピンの演出」が「なし」のときは読み込まない（`prepare(chime:)` か最初の `playChime()` で読む）。
+    /// 決まり音を流すノードと音源。演出の効果音が OFF のときは読み込まない（`prepare(chime:)` か最初の `playChime()` で読む）。
     private let chimePlayer = AVAudioPlayerNode()
     private var chime: AVAudioPCMBuffer?
-    /// うなりを流すノードと 1 打ちの音源。決まり音と同じく「なし」のときは読み込まない（`prepare(effects:)` か最初の `playHum(_:)` で読む）。
+    /// うなりを流すノードと 1 打ちの音源。決まり音と同じく演出の効果音が OFF のときは読み込まない（`prepare(effects:)` か最初の `playHum(_:)` で読む）。
     private let humPlayer = AVAudioPlayerNode()
     private var humStroke: (samples: [Float], format: AVAudioFormat)?
     /// セッションを `.ambient` にして有効化する処理。成功したかを返す。

@@ -9,7 +9,7 @@ struct SpinHumTests {
         RouletteModel(items: ItemLabel.makeItems(labels))
     }
 
-    /// 焦らしを入れたスピンの動き（4.5 秒の主の区間 + 1.2 秒の焦らし）。
+    /// 焦らしを入れたスピンの動き（4.5 秒の主の区間 + 2 秒の焦らし）。
     private func teasedPath(_ tease: SpinTease, count: Int = 8, releaseVelocity: Double? = nil) -> SpinPath {
         var rng = SeededGenerator(seed: 5)
         let to = RouletteMath.nextRotation(current: 0, targetIndex: 2, count: count, direction: .clockwise, using: &rng)
@@ -19,19 +19,29 @@ struct SpinHumTests {
     // MARK: 鳴らす条件
 
     @Test func なしでは付けない() {
-        #expect(!SpinHum.plays(style: .none, reducedMotion: false))
-        #expect(!SpinHum.plays(style: .none, reducedMotion: true))
+        #expect(!SpinHum.plays(effects: .none, reducedMotion: false))
+        #expect(!SpinHum.plays(effects: .none, reducedMotion: true))
     }
 
     @Test func 演出があれば付ける() {
-        for style in SpinEffectStyle.allCases where style != .none {
-            #expect(SpinHum.plays(style: style, reducedMotion: false))
+        for effects in SpinEffectsFixtures.withCommon {
+            #expect(SpinHum.plays(effects: effects, reducedMotion: false))
         }
     }
 
+    /// うなりは演出の効果音（`sounds`）のフラグだけで決まり、ほかの演出のフラグには依らない。
+    @Test func 演出の効果音のフラグだけで付けるか決まる() {
+        var soundsOnly = SpinEffects.none
+        soundsOnly.sounds = true
+        var allButSounds = SpinEffects.all
+        allButSounds.sounds = false
+        #expect(SpinHum.plays(effects: soundsOnly, reducedMotion: false))
+        #expect(!SpinHum.plays(effects: allButSounds, reducedMotion: false))
+    }
+
     @Test func 動きを減らす設定では付けない() {
-        for style in SpinEffectStyle.allCases {
-            #expect(!SpinHum.plays(style: style, reducedMotion: true))
+        for effects in SpinEffectsFixtures.combinations {
+            #expect(!SpinHum.plays(effects: effects, reducedMotion: true))
         }
     }
 
@@ -158,18 +168,18 @@ struct SpinHumTests {
 
     // MARK: モデル
 
-    @Test(arguments: [SpinEffectStyle.lights, .trails, .confetti, .all])
-    func 演出ありのスピンでうなりの打ちを用意する(style: SpinEffectStyle) throws {
+    @Test(arguments: SpinEffectsFixtures.withCommon)
+    func 演出ありのスピンでうなりの打ちを用意する(effects: SpinEffects) throws {
         let model = makeModel()
         model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 9))
-        _ = try #require(model.beginSpin(reducedMotion: false, style: style))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: effects))
         #expect(!model.humStrokes.isEmpty)
         #expect(model.humStrokes == SpinHum.strokes(along: model.rotationPath))
     }
 
     @Test func なしのスピンではうなりを付けない() throws {
         let model = makeModel()
-        _ = try #require(model.beginSpin(reducedMotion: false, style: SpinEffectStyle.none))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: .none))
         #expect(model.humStrokes.isEmpty)
         // 回転音は今のまま
         #expect(!model.clickTimes.isEmpty)
@@ -177,13 +187,13 @@ struct SpinHumTests {
 
     @Test func 動きを減らす設定のスピンではうなりを付けない() throws {
         let model = makeModel()
-        _ = try #require(model.beginSpin(reducedMotion: true, style: .all))
+        _ = try #require(model.beginSpin(reducedMotion: true, effects: .all))
         #expect(model.humStrokes.isEmpty)
     }
 
     @Test func 惰性ではうなりを付けず前のスピンの打ちも捨てる() throws {
         let model = makeModel()
-        _ = try #require(model.beginSpin(reducedMotion: false, style: .all))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: .all))
         #expect(!model.humStrokes.isEmpty)
         model.finishSpin()
         _ = try #require(model.beginCoast(angularVelocity: 300, reducedMotion: false))
@@ -195,14 +205,14 @@ struct SpinHumTests {
         for seed: UInt64 in [1, 7, 42] {
             let free = makeModel()
             free.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
-            _ = try #require(free.beginSpin(reducedMotion: false, style: .all))
+            _ = try #require(free.beginSpin(reducedMotion: false, effects: .all))
             free.finishSpin()
             let index = try #require(free.outcome?.index)
 
             let aimed = makeModel()
             aimed.toggleTarget(id: aimed.items[index].id)
             aimed.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
-            _ = try #require(aimed.beginSpin(reducedMotion: false, style: .all))
+            _ = try #require(aimed.beginSpin(reducedMotion: false, effects: .all))
 
             #expect(aimed.rotationPath == free.rotationPath)
             #expect(aimed.humStrokes == free.humStrokes)

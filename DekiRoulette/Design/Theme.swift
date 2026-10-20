@@ -114,7 +114,7 @@ enum Theme {
         .timingCurve(easing.x1, easing.y1, easing.x2, easing.y2, duration: duration)
     }
 
-    /// 盤面の動き（`RouletteModel.rotationPath`）の補間。区間 1 つ（演出「なし」のスピン・惰性）は今までどおり
+    /// 盤面の動き（`RouletteModel.rotationPath`）の補間。区間 1 つ（焦らしを入れないスピン・惰性）は今までどおり
     /// `spinAnimation(easing:duration:)` の `timingCurve` で、焦らしを入れた区間の列は `SpinPathAnimation` で補間する。
     static func spinAnimation(path: SpinPath) -> Animation {
         guard path.segments.count > 1 else {
@@ -226,8 +226,19 @@ enum Theme {
     static let stopPulseScale: CGFloat = 1.10
     /// 結果が出ている間、止まったスライスを前に出しておく倍率。
     static let stopHoldScale: CGFloat = 1.07
-    /// 停止の瞬間に針が沈む量（pt）。
+    /// 停止の瞬間に針が沈む量（pt）。停止の演出が ON のときは 2 倍（`pointerBounceOffset(_:)`）。
     static let pointerBounceOffset: CGFloat = 4
+    /// 停止の演出が ON のとき、針を大きく弾く倍率（沈む量を `pointerBounceOffset` の何倍にするか）。
+    static let pointerBigBounceFactor: CGFloat = 2
+
+    /// 停止の瞬間に針が沈む量（pt）。動きを減らす設定では沈めない（0）。
+    static func pointerBounceOffset(_ bounce: PointerBounce) -> CGFloat {
+        switch bounce {
+        case .none: 0
+        case .normal: pointerBounceOffset
+        case .big: pointerBounceOffset * pointerBigBounceFactor
+        }
+    }
     /// 押し出し・沈み込みの行き。
     static let stopPulseAnimation = Animation.easeOut(duration: 0.14)
     /// 押し出し・沈み込みの戻り。少し弾ませる。強調が解けてスライスが元の大きさに戻るときにも使う。
@@ -244,6 +255,33 @@ enum Theme {
     /// 電球の色。明るさ（`WheelLights.Bulb.brightness`）を不透明度にして縁の上に重ねる。縁（`wheelRim`）に対して 3:1 以上、
     /// いちばん暗いときに重ねた色でも縁から見分けられること（`ThemeContrastTests`）。
     static let wheelLight = Color(hex: 0xFFE7B0)
+    /// 背景の光の脈動（`WheelBackGlow`）の色。盤面の外（ページの地 `ink900` の上）に重ねるので外観に合わせ、ダークは電飾（`wheelLight`）より淡い
+    /// 暖かい白系、ライトは淡い地に溶けないよう琥珀色にする。`gold` / `flare` は使わない。
+    static let wheelBackGlow = Color(light: 0xE8892A, dark: 0xFFF1D6)
+
+    /// 背景の光の脈動の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。直径に比例させる）。
+    /// 光は外周の縁の外周（スライスの円の外 11pt。`Wheel3D.rimWidth` と同じ）から盤面の枠（外 `outerOffset`）までの環に置き、
+    /// 縁の外周でいちばん明るく枠で 0 になるよう放射状にぼかす。盤面の面には重ねない（盤面の後ろから漏れる光に見せる）。
+    enum BackGlow {
+        /// 光の環の内側（いちばん明るいところ）の、スライスの円の半径からの出幅。外周の縁の外周（11pt）。
+        static let innerOffset: CGFloat = 11
+        /// 光の環の外側（0 になるところ）の、スライスの円の半径からの出幅。盤面の枠（16pt）。
+        static let outerOffset: CGFloat = 16
+
+        /// 直径 `diameter`（pt）の盤面での、光の環の内側の半径（pt）。
+        static func innerRadius(diameter: CGFloat) -> CGFloat {
+            CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + innerOffset * scale(diameter)
+        }
+
+        /// 直径 `diameter`（pt）の盤面での、光の環の外側の半径（pt）。
+        static func outerRadius(diameter: CGFloat) -> CGFloat {
+            CGFloat(WheelGeometry.sliceRadius(diameter: Double(diameter))) + outerOffset * scale(diameter)
+        }
+
+        private static func scale(_ diameter: CGFloat) -> CGFloat {
+            max(diameter, 0) / CGFloat(WheelLabel.referenceDiameter)
+        }
+    }
 
     /// 電飾の寸法（基準直径 `WheelLabel.referenceDiameter` での pt。盤面の大きさに比例させる）。
     enum LightRing {
@@ -356,7 +394,7 @@ enum Theme {
     static let resultBandInk = onSlice
     /// 帯の影。止まったスライスと沈めた盤面から浮かせる。
     static let resultBandShadow = pointerShadow
-    /// 「スピンの演出」が「なし」以外のときの帯の登場（小さい大きさから少し行き過ぎて収まる。`ResultBand.popIn*`）。
+    /// 停止の演出（`SpinEffects.stopEffects`）が ON のときの帯の登場（小さい大きさから少し行き過ぎて収まる。`ResultBand.popIn*`）。
     static let resultBandPopAnimation = Animation.spring(duration: ResultBand.popInDuration, bounce: ResultBand.popInBounce)
 
     /// 削除を元に戻すトーストの出入り。

@@ -123,17 +123,17 @@ struct WheelParticlesTests {
     // MARK: 焦らしの動き（区間の列）
 
     @Test func 区間の列では全体の長さまで生まれうる() {
-        // 主の区間（4.5 秒）のあとの区間も速ければ火花が出る（焦らしの 5.7 秒まで生まれうる時刻がある）
+        // 主の区間（4.5 秒）のあとの区間も速ければ火花が出る（焦らしの 6.5 秒まで生まれうる時刻がある）
         let path = SpinPath(segments: [
             SpinMotion(from: 0, to: 4.5 * velocity(intensity: 1), duration: Config.spinDuration, easing: Self.linear),
             SpinMotion(
-                from: 4.5 * velocity(intensity: 1), to: 5.7 * velocity(intensity: 1),
+                from: 4.5 * velocity(intensity: 1), to: 6.5 * velocity(intensity: 1),
                 duration: Config.spinTeaseDuration, easing: Self.linear
             ),
         ])
         let motion = TimedSpinMotion(path: path, start: 0)
-        #expect(abs(path.duration - 5.7) < 1e-9)
-        #expect(!sparks(motion, now: 5.6).isEmpty)
+        #expect(abs(path.duration - 6.5) < 1e-9)
+        #expect(!sparks(motion, now: 6.4).isEmpty)
         // 止まり切ってから寿命が過ぎたら出ない
         #expect(sparks(motion, now: path.duration + Config.wheelSparkLifetime).isEmpty)
     }
@@ -159,10 +159,10 @@ struct WheelParticlesTests {
 
     @Test(arguments: [2, 8, 24])
     func 焦らしで戻る区間の火花は逆向きに飛ぶ(count: Int) {
-        // 時計回りのスピンの、戻りかけの戻る区間（主の区間のあと 0.4 秒）と、行き過ぎの戻る区間（焦らしの区間すべて）
+        // 時計回りのスピンの、戻りかけの戻る区間（主の区間のあとの 0.5 秒）の終わりと、行き過ぎの戻り過ぎる区間（主の区間のあとの 1 秒）の中ほど
         let probes: [(SpinTease, TimeInterval)] = [
-            (.rollBack, Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseRollBackShare),
-            (.overshoot, Config.spinDuration + 0.8),
+            (.rollBack, Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseRollBackShares[0]),
+            (.overshoot, Config.spinDuration + Config.spinTeaseDuration * Config.spinTeaseSwingShares[0] * 0.8),
         ]
         for (tease, now) in probes {
             let path = SpinPath.teased(tease, from: 30, to: 30 + 360 * 5 + 200, count: count)
