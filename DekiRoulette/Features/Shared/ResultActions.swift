@@ -65,6 +65,8 @@ private struct ResultActionLabel: View {
     let title: String
     var systemImage: String?
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         HStack(spacing: 8) {
             if let systemImage {
@@ -75,11 +77,13 @@ private struct ResultActionLabel: View {
             }
             Text(title)
                 .font(.subheadline.weight(.bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                // アクセシビリティサイズでは省略せず 2 行まで折り返す（行の高さも `TypeLayout.growsFixedAreas` で伸びる）
+                .lineLimit(TypeLayout.labelLineLimit(for: typeSize))
+                .multilineTextAlignment(.center)
         }
         .foregroundStyle(Theme.ivory)
         .padding(.horizontal, 20)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: Theme.Layout.resultActionsHeight)
         .contentShape(.capsule)
         .overlay(Capsule().strokeBorder(Theme.ink600, lineWidth: 1.5))
