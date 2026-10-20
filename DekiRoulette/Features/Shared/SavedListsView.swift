@@ -76,11 +76,11 @@ struct SavedListsView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(list.name)
-                        .font(.subheadline.weight(.bold))
+                        .font(Theme.Typography.font(.subheadline, weight: .bold))
                         .foregroundStyle(Theme.ivory)
                         .lineLimit(1)
                     Text(L10n.savedListItemCount(list.items.count))
-                        .font(.caption)
+                        .font(Theme.Typography.font(.caption))
                         .foregroundStyle(Theme.muted)
                 }
                 Spacer(minLength: 0)
@@ -97,7 +97,7 @@ struct SavedListsView: View {
 
     private var emptyHint: some View {
         Text(L10n.savedListsEmptyHint)
-            .font(.subheadline)
+            .font(Theme.Typography.font(.subheadline))
             .foregroundStyle(Theme.muted)
             .lineSpacing(3)
             .multilineTextAlignment(.center)

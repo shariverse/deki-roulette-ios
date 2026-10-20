@@ -60,12 +60,12 @@ private struct ItemAppearanceRow: View {
                     .accessibilityHidden(true)
             }
             Text(item.label)
-                .font(.subheadline)
+                .font(Theme.Typography.font(.subheadline))
                 .foregroundStyle(Theme.ivory)
                 .lineLimit(1)
             Spacer(minLength: 8)
             Text(L10n.appearanceDescription(item.appearance))
-                .font(.caption)
+                .font(Theme.Typography.font(.caption))
                 .foregroundStyle(Theme.muted)
                 .lineLimit(1)
         }
