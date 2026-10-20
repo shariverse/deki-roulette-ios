@@ -2,28 +2,18 @@ import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// 結果の下に置く「結果をコピー」と「共有」。両画面で同じ見た目にする。
-/// 「コピーしました」の表示は `Config.copyFeedbackDuration` の間だけ出す。
+/// 結果の下に置く「共有」。両画面で同じ見た目にする。
+/// 本文だけを写したいときは共有シートの「コピー」を使う（専用のコピーボタンは置かない）。
 /// `shareImage` があれば共有シートに本文と一緒に結果の画像（`ShareImageFile`）を渡し、無ければ本文だけを渡す（今までどおり）。
 struct ResultActions: View {
-    /// クリップボードに書き込む本文。
-    let copyText: String
     /// 共有シートに渡す本文（アプリ名入り）。
     let shareText: String
     /// 共有シートに本文と一緒に渡す結果の画像。nil なら本文だけを共有する。
     var shareImage: UIImage? = nil
 
-    @State private var copied = false
-    @State private var copyTask: Task<Void, Never>?
-
     var body: some View {
         HStack(spacing: 8) {
-            Button(action: copy) {
-                ResultActionLabel(title: copied ? L10n.copied : L10n.copyResult)
-            }
-            .buttonStyle(.plain)
-
-            // 開始ボタンの `flare` より目立たせないため、コピーと同じ控えめな見た目にする
+            // 開始ボタンの `flare` より目立たせないため、控えめな見た目にする
             if let shareImage {
                 // 画像を本体（X・Instagram・LINE は画像として受け取る）、本文は添える。プレビューの題名はアプリ名
                 ShareLink(
@@ -40,18 +30,6 @@ struct ResultActions: View {
                 }
                 .buttonStyle(.plain)
             }
-        }
-        .onDisappear { copyTask?.cancel() }
-    }
-
-    private func copy() {
-        UIPasteboard.general.string = copyText
-        copied = true
-        copyTask?.cancel()
-        copyTask = Task {
-            try? await Task.sleep(for: .seconds(Config.copyFeedbackDuration))
-            guard !Task.isCancelled else { return }
-            copied = false
         }
     }
 }
@@ -74,7 +52,7 @@ enum ShareImageError: Error {
     case encodingFailed
 }
 
-/// コピー・共有ボタンのラベル。`muted` の文字にカプセルの地と枠。
+/// 共有ボタンのラベル。`muted` の文字にカプセルの地と枠。
 private struct ResultActionLabel: View {
     let title: String
     var systemImage: String?
@@ -88,7 +66,7 @@ private struct ResultActionLabel: View {
             Text(title)
                 .font(.caption.weight(.bold))
         }
-        // 隣のラベルが「コピーしました」に変わって幅が動いても、こちらが省略記号で切れないようにする
+        // 省略記号で切れないようにする
         .fixedSize()
         .foregroundStyle(Theme.muted)
         .padding(.horizontal, 16)
@@ -99,7 +77,7 @@ private struct ResultActionLabel: View {
 }
 
 #Preview {
-    ResultActions(copyText: "結果: ラーメン", shareText: "結果: ラーメン\n\nデキレーレット")
+    ResultActions(shareText: "結果: ラーメン\n\nデキレーレット")
         .padding()
         .background(Theme.ink900)
 }

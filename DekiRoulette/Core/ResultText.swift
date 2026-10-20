@@ -1,6 +1,6 @@
 import Foundation
 
-/// コピー・共有に載せる結果の本文。Web 版には無い iOS 固有の機能で、両画面で共有する。
+/// 共有に載せる結果の本文。Web 版には無い iOS 固有の機能で、両画面で共有する。
 /// 文言そのものは `L10n` から渡し、ここでは組み立てだけを担う。
 enum ResultText {
     /// ルーレットの結果 1 行。「結果: ラーメン」の形にする。
@@ -16,7 +16,7 @@ enum ResultText {
             .joined(separator: "\n")
     }
 
-    /// 共有シートに渡す本文。コピー用の本文の後に空行を挟んでアプリ名を 1 行足す。
+    /// 共有シートに渡す本文。結果の本文の後に空行を挟んでアプリ名を 1 行足す。
     /// 指定の有無など、結果以外の情報は載せない。
     static func share(_ body: String, appName: String) -> String {
         "\(body)\n\n\(appName)"

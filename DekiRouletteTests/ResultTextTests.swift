@@ -22,7 +22,7 @@ struct ResultTextTests {
         #expect(ResultText.share("Result: Ramen", appName: "DekiRoulette") == "Result: Ramen\n\nDekiRoulette")
     }
 
-    @Test func 共有本文はコピー本文で始まりアプリ名で終わる() {
+    @Test func 共有本文は結果の本文で始まりアプリ名で終わる() {
         let body = ResultText.roulette(label: "寿司", heading: "結果")
         let shared = ResultText.share(body, appName: "デキレーレット")
         #expect(shared.hasPrefix(body))

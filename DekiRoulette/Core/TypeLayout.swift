@@ -10,7 +10,7 @@ enum TypeLayout {
         size.isAccessibilitySize ? 2 : 1
     }
 
-    /// 順番決めのコピーボタンの領域を内容に合わせて伸ばすか。
+    /// 順番決めの共有ボタンの領域を内容に合わせて伸ばすか。
     /// 通常は高さを固定して、結果の有無で下の要素の位置が動かないようにする。
     /// アクセシビリティサイズでは固定のままだと文字が枠からはみ出るため、最小高さだけ残して伸ばす。
     static func growsFixedAreas(for size: DynamicTypeSize) -> Bool {
