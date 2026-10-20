@@ -10,7 +10,8 @@ enum ShareIntent {
     }
 
     /// X アプリのネイティブの投稿画面。`message` に本文を入れる（画像は付かない）。
-    /// X が文書化した仕組みではないので、X アプリの更新で開かなくなることがある（そのときは `xPost(text:)` に落ちる）。
+    /// X が文書化した仕組みではないので、X アプリの更新で投稿画面に進まなくなることがある。
+    /// `xPost(text:)` に落ちるのは `twitter` のスキームを受けるアプリが無い（開けない）ときだけで、アプリが開けば落ちない。
     static func xAppPost(text: String) -> URL {
         url(base: "twitter://post?message=", text: text)
     }

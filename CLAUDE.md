@@ -396,7 +396,7 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
 メニューの X・LINE の項目は、確認を挟まずに本文だけを投稿画面の URL（`ShareIntent`、`Core/`。非予約文字以外を自前で UTF-8 の百分率符号化する）で
 `@Environment(\.openURL)` に渡して開くだけ（API による投稿はしない。画像は付かない）。X は `ShareIntent.xPostCandidates` の順に、X アプリの投稿画面
 （`xAppPost` = `twitter://post?message=`。X が文書化した仕組みではない）→ Web の投稿画面（`xPost` = `x.com/intent/post`）を開き、
-前の URL が開けなかったこと（`openURL(_:completion:)` の完了の `false`）で次へ進む。`canOpenURL` を使わないので `LSApplicationQueriesSchemes` は持たない。LINE は `lineShare`（`line.me/R/share`）。
+前の URL が開けなかったこと（`openURL(_:completion:)` の完了の `false`。`twitter` のスキームを受けるアプリが無いとき）で次へ進む（X アプリが開いてから投稿画面に進まなかった場合は Web に落ちない）。`canOpenURL` を使わないので `LSApplicationQueriesSchemes` は持たない。LINE は `lineShare`（`line.me/R/share`）。
 X に渡す本文だけは `ResultText.orderPost` が上限（`XPostLength`。twitter-text v3 の重み付きの長さ 280）に収め、収まらない並びは上位から入るだけ載せて「ほか M 件」にする（`ResultActions` の `postText`）。
 項目のアイコンは SF Symbols（`photo` / `square.and.pencil` / `paperplane`）で各社のロゴの画像は使わず、読み上げは項目の名前のまま。
 
