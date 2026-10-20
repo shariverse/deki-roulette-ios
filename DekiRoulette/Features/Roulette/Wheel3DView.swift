@@ -1440,7 +1440,7 @@ final class Wheel3DScene {
 
     /// SwiftUI のビューを画像に焼き、盤の平面に置く正方形の板にする（中心が盤の中心）。
     private static func imagePlane(_ content: some View, side: Double, displayScale: CGFloat) -> SCNNode {
-        let renderer = ImageRenderer(content: content.frame(width: side, height: side).fontDesign(.rounded))
+        let renderer = ImageRenderer(content: content.frame(width: side, height: side))
         renderer.scale = displayScale
         let plane = SCNPlane(width: side, height: side)
         let face = material(.white, lit: false)
@@ -1492,7 +1492,6 @@ final class Wheel3DScene {
         let margin = 8 * scale
         let content = ResultBandLabel(label: result.label, accent: result.accent, diameter: diameter)
             .padding(margin)
-            .fontDesign(.rounded)
         let renderer = ImageRenderer(content: content)
         renderer.scale = shape.displayScale
         renderer.proposedSize = ProposedViewSize(width: ResultBand.maxWidth(diameter: diameter) + margin * 2, height: nil)
@@ -1670,7 +1669,7 @@ private struct StoppedSlice: View {
         let count = items.count
         let color = Theme.sliceColor(in: items, at: index)
         let limit = WheelLabel.limit(count: count, diameter: diameter)
-        let font = Font.system(size: WheelLabel.fontSize(count: count, diameter: diameter), weight: .bold)
+        let font = Theme.Typography.fixed(size: WheelLabel.fontSize(count: count, diameter: diameter), weight: .bold)
         ZStack {
             if count == 1 {
                 Circle().fill(color)
@@ -1721,7 +1720,7 @@ private enum WheelLabelImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = displayScale
         format.opaque = false
-        let font = roundedBold(size: WheelLabel.fontSize(count: count, diameter: diameter))
+        let font = Theme.Typography.uiFont(size: WheelLabel.fontSize(count: count, diameter: diameter), weight: .bold)
         let limit = WheelLabel.limit(count: count, diameter: diameter)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor(Theme.onSlice)]
         return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { renderer in
@@ -1745,13 +1744,6 @@ private enum WheelLabelImage {
                 context.restoreGState()
             }
         }
-    }
-
-    /// 2D の盤面と同じ書体（`.system(size:weight: .bold, design: .rounded)`）。
-    private static func roundedBold(size: Double) -> UIFont {
-        let font = UIFont.systemFont(ofSize: CGFloat(size), weight: .bold)
-        guard let descriptor = font.fontDescriptor.withDesign(.rounded) else { return font }
-        return UIFont(descriptor: descriptor, size: CGFloat(size))
     }
 }
 
