@@ -1921,40 +1921,6 @@
         }
       }
     },
-    "shareWithImage" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share with Image…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像付きで共有…"
-          }
-        }
-      }
-    },
-    "shareTextOnly" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "共有…"
-          }
-        }
-      }
-    },
     "shareOrderOthers" : {
       "extractionState" : "manual",
       "localizations" : {

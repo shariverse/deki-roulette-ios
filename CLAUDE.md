@@ -385,21 +385,24 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
 ### 共有画像の仕組み
 
 両画面の幅広の「結果を共有」（`ResultActions`、`Features/Shared/`。地を塗らない `ink600` の枠と `ivory` の文字、高さ `Theme.Layout.resultActionsHeight`（46pt）、幅の上限 `resultActionsMaxWidth`。
-開始ボタンより控えめにし、`flare` / `gold` は使わない。結果が出ても促す動きは付けない）は SwiftUI の `Menu`（`primaryAction` なし・`menuOrder(.fixed)`。文字の後ろに `chevron.down`）で、
-押すと上から「画像付きで共有…」（`shareWithImage`。画像を描き終える前は `shareTextOnly` の「共有…」）・「X でポスト」（`shareToX`）・「LINE で送る」（`shareToLINE`）を選ばせる
-（「X」1 文字のボタンを閉じるボタンと思って押す誤タップがあったので、単独の X・LINE のボタンは置かず、項目名にも 1 語だけの名前を使わない。`ShareMenuTextTests`）。
-共有シートの項目は `Menu` の中の `ShareLink` で、`shareImage` があれば `ShareLink(item: ShareImageFile, message: 本文, preview:)` で
+開始ボタンより控えめにし、`flare` / `gold` は使わない。結果が出ても促す動きは付けない）は押すと直接共有シートを開く `ShareLink` で、残りの幅を取り、
+その右に X・LINE のロゴのボタン（直径 `resultActionsHeight` の `ink600` の枠の円）を 1 つずつ置く（#347 の並び。アクセシビリティサイズ（`TypeLayout.growsFixedAreas`）では下の段に回す）。
+「X」1 文字の文字のボタンを閉じるボタンと思って押す誤タップがあった（Discussion #351）ので、文字ではなく各社の公式ロゴを元の色のまま枠の中に置く（Discussion #358）。
+ロゴは Asset Catalog の `ShareLogoX`（Any に黒、Dark に白。外観で切り替える）・`ShareLogoLINE`（緑のブランドアイコン。外観に依らない）で、`renderingMode(.original)` で描き、
+`Theme` のトークンにしたり塗り替えたりしない。素材は X のブランドツールキット（`x-logo.zip` の `logo-black.png` / `logo-white.png`）と LINE の LINE APP ICON GUIDELINE（`LINE_Brand_icon.zip` の
+`LINE_Brand_icon.png`）から取得し、比率・色を変えずに @2x・@3x の大きさに縮めただけ。大きさは `Theme.Layout.shareLogoXSize` / `shareLogoLINESize`。
+ロゴの画像は読み上げから外し、ボタンの名前は `L10n.shareToX`（「X でポスト」）・`shareToLINE`（「LINE で送る」）。1 語だけの名前は使わない（`ShareLogoButtonTests`）。
+`shareImage` があれば `ShareLink(item: ShareImageFile, message: 本文, preview:)` で
 結果の画像（PNG）を本体にし本文（`ResultText.share`）を添えて共有シートに渡す。無ければ今までどおり本文だけ。
 本文は結果の文（ルーレットは `ResultText.roulette(label:template:)` に `L10n.shareRouletteResult`、順番決めは `ResultText.order(_:heading:)`）・空行・ハッシュタグ（`L10n.shareHashtag`。アプリ名の行の代わり）で、
 ハッシュタグの次の行に `Config.appStoreURL`（App Store の製品ページ。国を含まない `https://apps.apple.com/app/id6814132611` で、利用者の国の Store が開く。App ID は人間が示した値で、推測した URL は入れない）を付ける。本文に絵文字は入れない。
 プレビューの題名は `L10n.appName`、画像は結果画像そのもの。「結果をコピー」のボタンは持たない（本文は共有シートの「コピー」で写せる）。Instagram の専用ボタンは置かない。
-メニューの X・LINE の項目は、確認を挟まずに本文だけを投稿画面の URL（`ShareIntent`、`Core/`。非予約文字以外を自前で UTF-8 の百分率符号化する）で
+X・LINE のボタンは、確認を挟まずに本文だけを投稿画面の URL（`ShareIntent`、`Core/`。非予約文字以外を自前で UTF-8 の百分率符号化する）で
 `@Environment(\.openURL)` に渡して開くだけ（API による投稿はしない。画像は付かない）。X は `ShareIntent.xPostCandidates` の順に、X アプリの投稿画面
 （`xAppPost` = `twitter://post?message=`。X が文書化した仕組みではない）→ Web の投稿画面（`xPost` = `x.com/intent/post`）を開き、
 前の URL が開けなかったこと（`openURL(_:completion:)` の完了の `false`。`twitter` のスキームを受けるアプリが無いとき）で次へ進む（X アプリが開いてから投稿画面に進まなかった場合は Web に落ちない）。`canOpenURL` を使わないので `LSApplicationQueriesSchemes` は持たない。LINE は `lineShare`（`line.me/R/share`）。
 X に渡す本文だけは `ResultText.orderPost` が上限（`XPostLength`。twitter-text v3 の重み付きの長さ 280）に収め、収まらない並びは上位から入るだけ載せて「ほか M 件」にする（`ResultActions` の `postText`）。
-項目のアイコンは SF Symbols（`photo` / `square.and.pencil` / `paperplane`）で各社のロゴの画像は使わず、読み上げは項目の名前のまま。
-設定シートの「著作権」には、`©` の行の下に X・LINE の商標の注記（`L10n.trademarkNotice`。X Corp.・LY Corporation の商標で、提携・承認の関係に無いこと）を同じ `.caption`・`muted` で置く。
+設定シートの「著作権」には、`©` の行の下に X・LINE の商標の注記（`L10n.trademarkNotice`。X Corp.・LY Corporation の商標で、提携・承認の関係に無いこと）を同じ `.caption`・`muted` で置く（ロゴのボタンを置くため）。
 
 - 寸法とレイアウトは `ShareImageLayout`（`Core/`）が画像の一辺から決める純粋関数。基本は 1080×1080 px（`defaultSide`）、余白 8%、アプリ名の文字 3.6% で
   下の余白のすぐ上。ルーレット（`roulette(side:)`）は盤面の直径と中心・針（基準直径での 22×26pt に比例）・帯の中心（`ResultBand.centerOffset`）、
@@ -423,7 +426,7 @@ X に渡す本文だけは `ResultText.orderPost` が上限（`XPostLength`。tw
   `ScreenCaptureMonitor` とは干渉しない。
 - 共有シートの「画像を保存」のため、`NSPhotoLibraryAddUsageDescription` を Info.plist に持つ（`project.yml` の `info.properties`。文言は `InfoPlist.xcstrings`）。
   写真の読み取りの権限（`NSPhotoLibraryUsageDescription`）は求めない。どちらも `InfoPlistTests` がビルドした Info.plist で確かめる。
-- 共有シートの投稿先（X・Instagram・LINE）と、メニューの X・LINE で開く投稿画面での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。
+- 共有シートの投稿先（X・Instagram・LINE）と、X・LINE のボタンで開く投稿画面での見え方は Simulator で確かめられないので、実機確認は Issue（`needs-verify`）に切り出す。
 
 ### 並べ替えの仕組み
 
