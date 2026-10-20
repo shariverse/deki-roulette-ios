@@ -127,6 +127,66 @@ enum Theme {
     /// 結果が現れる演出。両画面で使い回す。
     static let revealAnimation = Animation.timingCurve(0.2, 0.9, 0.3, 1, duration: Config.revealAnimationDuration)
 
+    // MARK: 書体
+
+    /// 同梱の書体（`AppFont`）のトークン。文字の `.font` はここから引く（SF Symbols の `Image(systemName:)` の `.font` は記号の大きさ・太さなのでシステムのまま）。
+    /// 太さはフェイスで出すので、返した `Font` に `.weight(_:)` / `.bold()` を掛けない。
+    enum Typography {
+        /// テキストスタイルの文字。Dynamic Type でスタイルと同じ割合で拡大する。`weight` を省くとスタイルの既定の太さ（`AppFont.defaultWeight(for:)`）。
+        static func font(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> Font {
+            let face = AppFont.face(for: weight ?? AppFont.defaultWeight(for: style))
+            return .custom(face.postScriptName, size: defaultSize(for: style), relativeTo: style)
+        }
+
+        /// 固定の大きさの文字（盤面・結果の帯・共有画像）。Dynamic Type で大きくしない。
+        static func fixed(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+            .custom(AppFont.face(for: weight).postScriptName, fixedSize: size)
+        }
+
+        /// UIKit で描く文字（3D のラベル画像など）。読めなかったら丸ゴシックのシステムの書体に戻す。
+        static func uiFont(size: CGFloat, weight: Font.Weight = .regular) -> UIFont {
+            let face = AppFont.face(for: weight)
+            if let font = UIFont(name: face.postScriptName, size: size) { return font }
+            let system = UIFont.systemFont(ofSize: size, weight: systemWeight(of: face))
+            guard let descriptor = system.fontDescriptor.withDesign(.rounded) else { return system }
+            return UIFont(descriptor: descriptor, size: size)
+        }
+
+        /// スタイルの既定の大きさ（Dynamic Type が標準の `.large` のとき）。iOS と visionOS で違うので、数字を書き写さずシステムから引く。
+        static func defaultSize(for style: Font.TextStyle) -> CGFloat {
+            let traits = UITraitCollection(preferredContentSizeCategory: .large)
+            return UIFont.preferredFont(forTextStyle: uiTextStyle(style), compatibleWith: traits).pointSize
+        }
+
+        static func uiTextStyle(_ style: Font.TextStyle) -> UIFont.TextStyle {
+            switch style {
+            case .largeTitle: .largeTitle
+            case .title: .title1
+            case .title2: .title2
+            case .title3: .title3
+            case .headline: .headline
+            case .subheadline: .subheadline
+            case .callout: .callout
+            case .footnote: .footnote
+            case .caption: .caption1
+            case .caption2: .caption2
+            #if os(visionOS)
+            case .extraLargeTitle: .extraLargeTitle
+            case .extraLargeTitle2: .extraLargeTitle2
+            #endif
+            default: .body
+            }
+        }
+
+        private static func systemWeight(of face: AppFont.Face) -> UIFont.Weight {
+            switch face {
+            case .regular: .regular
+            case .bold: .bold
+            case .black: .black
+            }
+        }
+    }
+
     // MARK: レイアウト
 
     /// 画面の寸法。Web 版では Tailwind のユーティリティ（`max-w-3xl` / `w-[min(320px,78vw)]`）だったもの。
