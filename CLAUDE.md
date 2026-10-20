@@ -46,6 +46,12 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
   盤面の塗り・光彩（`WheelFaceView`）・行の色見本（`ItemListView`）・結果の帯の枠（`RouletteScreen`）・共有画像は同じ関数で引く。
   3D の盤面（`Wheel3DView`）の塗り・停止の強調・ラベル画像も同じ関数と `WheelLabel.display` で引く。
   例外はスピンの演出の紙吹雪だけで、特定のスライスを指さないので項目の見た目・件数に依らない固定の 10 色（`Theme.confettiColors` = `sliceColors`）を使う。
+- 書体は同梱の Zen Maru Gothic（SIL Open Font License 1.1。`Resources/Fonts` の Regular / Bold / Black と、ライセンス文 `ZenMaruGothic-OFL.txt`）。
+  Google Fonts の配布（`google/fonts` の `ofl/zenmarugothic`）のファイルを改変せずに置き（サブセット化・名前の変更をしない）、`project.yml` の `UIAppFonts` で登録する。
+  フェイスと太さの対応は `AppFont`（`Core/`。regular 以下 → Regular、medium・semibold・bold → Bold、heavy・black → Black。`.headline` の既定は semibold）で、
+  文字の `.font` は `Theme.Typography` から引く: テキストスタイルは `font(_:weight:)`（`Font.custom(_:size:relativeTo:)`。既定の大きさはシステムの `.large` の値で、Dynamic Type に追従）、
+  盤面・結果の帯・共有画像は `fixed(size:weight:)`（`fixedSize`。拡大しない）、UIKit で描く文字は `uiFont(size:weight:)`（読めなければ丸ゴシックのシステムの書体）。
+  太さはフェイスで出すので `.weight(_:)` / `.bold()` を掛けない。SF Symbols（`Image(systemName:)`）の `.font` は記号の大きさ・太さなのでシステムのテキストスタイルのまま。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
   絵文字の項目は `WheelLabel.display` が絵文字ぶん 1 文字短く省略して前に絵文字を付け、結果の帯（2D・3D・共有画像）は `WheelLabel.decorated` の全文を出す（読み上げと共有の本文はラベルのまま）。

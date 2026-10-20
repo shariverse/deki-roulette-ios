@@ -46,6 +46,11 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # 共有シートの「画像を保存」で結果の画像を写真に保存するため（追加だけ。写真の読み取りの権限は求めない）
         NSPhotoLibraryAddUsageDescription: 共有する結果の画像を写真に保存するために使います。
+        # 同梱の書体（DekiRoulette/Resources/Fonts。.app の直下にコピーされる）。ファイル名は Core/AppFont.swift の AppFont.Face と合わせる
+        UIAppFonts:
+          - ZenMaruGothic-Regular.ttf
+          - ZenMaruGothic-Bold.ttf
+          - ZenMaruGothic-Black.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.basekeita.roulette
