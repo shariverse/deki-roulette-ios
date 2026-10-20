@@ -29,6 +29,12 @@
 	<false/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>共有する結果の画像を写真に保存するために使います。</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>ZenMaruGothic-Regular.ttf</string>
+		<string>ZenMaruGothic-Bold.ttf</string>
+		<string>ZenMaruGothic-Black.ttf</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
