@@ -45,9 +45,41 @@ struct ResultTextTests {
         #expect(shared.hasSuffix("#デキレーレット"))
     }
 
-    @Test func 公開前はApp_StoreのURLを持たない() {
-        // 推測した URL を入れない。公開したらこのテストごと直す
-        #expect(Config.appStoreURL == nil)
+    @Test func App_StoreのURLは国を含まない製品ページ() throws {
+        let url = try #require(Config.appStoreURL)
+        #expect(url.scheme == "https")
+        #expect(url.host() == "apps.apple.com")
+        #expect(url.lastPathComponent == "id6814132611")
+        // 国のパス（/us/・/jp/ など）を付けず、利用者の国の Store で開かせる
+        #expect(url.pathComponents == ["/", "app", "id6814132611"])
+        #expect(url.query() == nil)
+    }
+
+    @Test(arguments: [("ja", "あ"), ("en", "W")])
+    func ルーレットの本文はApp_StoreのURL入りでもXの上限に収まる(language: String, letter: String) throws {
+        let path = try #require(Bundle.main.path(forResource: language, ofType: "lproj"))
+        let bundle = try #require(Bundle(path: path))
+        let template = bundle.localizedString(forKey: "shareRouletteResult", value: nil, table: "Localizable")
+        let hashtag = bundle.localizedString(forKey: "shareHashtag", value: nil, table: "Localizable")
+        // ラベルの上限の長さ
+        let label = String(repeating: letter, count: Config.maxLabelLength)
+        let shared = ResultText.share(
+            ResultText.roulette(label: label, template: template), hashtag: hashtag, appStoreURL: Config.appStoreURL
+        )
+        #expect(XPostLength.fits(shared))
+        #expect(shared.hasSuffix("\(hashtag)\n\(try #require(Config.appStoreURL).absoluteString)"))
+    }
+
+    @Test func 順番決めの本文はApp_StoreのURL入りでもXの上限に収める() throws {
+        let url = try #require(Config.appStoreURL)
+        // 上限の件数・上限の長さの日本語のラベル
+        let labels = (1...Config.maxItems).map { String(repeating: "う", count: Config.maxLabelLength - 1) + String($0 % 10) }
+        let post = ResultText.orderPost(
+            labels, heading: "順番が決まりました！", hashtag: "#デキレーレット", appStoreURL: url, others: Self.others
+        )
+        #expect(XPostLength.fits(post))
+        #expect(post.contains("ほか "))
+        #expect(post.hasSuffix("#デキレーレット\n\(url.absoluteString)"))
     }
 
     @Test func ルーレットの共有本文は結果の文とハッシュタグの3行だけ() {

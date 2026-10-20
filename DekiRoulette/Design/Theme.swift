@@ -150,6 +150,11 @@ enum Theme {
         static let resultActionsHeight: CGFloat = 46
         /// 結果の下の行の幅の上限。縦積みの盤面（`wheelMaxWidthCompact`）と同じで、横並びや iPad でも間延びさせない。
         static let resultActionsMaxWidth = wheelMaxWidthCompact
+        /// 結果の下の X・LINE のボタンの円（直径 `resultActionsHeight`）に置くロゴの一辺。
+        /// X は文字のような細い形なので小さめ、LINE は角丸の四角の地を含むアイコンなので大きめにして、見た目の重さをそろえる。
+        /// LINE はガイドラインの最小サイズ（モバイルで 40px）を @2x でも上回る。
+        static let shareLogoXSize: CGFloat = 18
+        static let shareLogoLINESize: CGFloat = 26
     }
 
     // MARK: 3D の盤面

@@ -123,6 +123,23 @@
         }
       }
     },
+    "trademarkNotice" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X is a trademark of X Corp. LINE is a trademark of LY Corporation. This app is not affiliated with or endorsed by these companies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X は X Corp. の商標です。LINE は LY Corporation の商標です。本アプリはこれらの企業と提携・承認の関係にありません。"
+          }
+        }
+      }
+    },
     "copyrightTitle" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1900,40 +1917,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "結果を共有"
-          }
-        }
-      }
-    },
-    "shareWithImage" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share with Image…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像付きで共有…"
-          }
-        }
-      }
-    },
-    "shareTextOnly" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "共有…"
           }
         }
       }

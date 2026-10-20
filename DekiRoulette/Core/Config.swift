@@ -39,8 +39,8 @@ enum Config {
     static let maxSavedListNameLength = 30
 
     /// App Store の製品ページの URL。共有の本文のハッシュタグの後に付ける（`ResultText.share`）。
-    /// まだ公開していないので nil（本文にリンクは付かない）。公開したらここに URL を 1 つ入れるだけで付く。推測した URL は入れない。
-    static let appStoreURL: URL? = nil
+    /// 国を含まない形にして、利用者の国の Store で開かせる（表示の言語は Store と端末に従う）。App ID は App Store Connect の値で、推測しない。
+    static let appStoreURL: URL? = URL(string: "https://apps.apple.com/app/id6814132611")
 
     /// スピンの周回数の範囲。フリックの強さもこの範囲の中に写す。
     static let fullSpinRange: ClosedRange<Int> = 4...8
