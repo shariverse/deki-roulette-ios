@@ -729,6 +729,8 @@ iOS 版は添字を `i % 10` ではなく件数つきで決める（§5.1、§12
 
 丸ゴシック系を優先: `ui-rounded`, Hiragino Maru Gothic ProN, Zen Maru Gothic, M PLUS Rounded 1c, … `system-ui`, `sans-serif`。
 
+iOS 版は同梱した Zen Maru Gothic（SIL Open Font License 1.1）を使う（§12）。
+
 ### 9.3 アニメーション
 
 - `reveal`: `opacity 0→1`, `translateY(6px) scale(0.96) → 0 / 1`、360ms、`cubic-bezier(0.2, 0.9, 0.3, 1)`。両画面で使い回し、キーフレームは増やさない。
