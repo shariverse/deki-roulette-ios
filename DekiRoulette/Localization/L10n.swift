@@ -108,10 +108,7 @@ enum L10n {
     static var resetItemsMessage: String { tr("resetItemsMessage") }
     static var resetItemsAction: String { tr("resetItemsAction") }
     static var shareResult: String { tr("shareResult") }
-    /// 「結果を共有」のメニューの項目。共有シートを開く項目は、画像があれば「画像付きで共有…」、描き終える前は「共有…」。
-    static var shareWithImage: String { tr("shareWithImage") }
-    static var shareTextOnly: String { tr("shareTextOnly") }
-    /// 「結果を共有」のメニューの X・LINE の項目。行き先と動作が分かる名前にする（「X」1 文字は閉じるボタンと間違えられる）。
+    /// 結果の下の X・LINE のロゴのボタンの読み上げの名前。行き先と動作が分かる名前にする（「X」1 文字は閉じるボタンと間違えられる）。
     static var shareToX: String { tr("shareToX") }
     static var shareToLINE: String { tr("shareToLINE") }
     /// 共有画像で省略した順位の件数の行（「ほか 3 件」）。
