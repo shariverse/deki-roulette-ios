@@ -152,6 +152,10 @@ enum Theme {
             return UIFont(descriptor: descriptor, size: size)
         }
 
+        /// シートのツールバーの文字のボタン（「閉じる」「編集」）。システムの既定と同じ semibold の太さ（Bold のフェイス）にする。
+        /// iOS 26 のツールバーのボタンは環境の書体で描かれるので、付けないとアプリの既定（本文の Regular）になる。
+        static var barButton: Font { font(.body, weight: .semibold) }
+
         /// スタイルの既定の大きさ（Dynamic Type が標準の `.large` のとき）。iOS と visionOS で違うので、数字を書き写さずシステムから引く。
         static func defaultSize(for style: Font.TextStyle) -> CGFloat {
             let traits = UITraitCollection(preferredContentSizeCategory: .large)
@@ -553,6 +557,29 @@ struct RevealOnAppear: ViewModifier {
 }
 
 extension View {
+    /// アプリの既定の書体。`.font` を持たない文字（`Toggle` / `Button` / `TextField` のラベルなど）も同梱の書体の本文にする。
+    /// シートは環境を引き継ぐので、アプリの根に 1 回掛ければよい。
+    /// `.fontDesign(.rounded)` は掛けない（環境に置くと `Font.custom` の文字までシステムの丸ゴシックに置き換わり、同梱の書体が出ない）。
+    func appTypography() -> some View {
+        font(Theme.Typography.font(.body))
+    }
+
+    /// シートの画面の題名（ナビゲーションバーの中央・インライン）。`navigationTitle` の文字は UIKit の外観の API でも同梱の書体にならないので、
+    /// 同じ題名を `.principal` の `Text` で同梱の書体で出す（`navigationTitle` も残し、戻るボタンと読み上げの画面名に使わせる）。
+    func appNavigationTitle(_ title: String) -> some View {
+        navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .font(Theme.Typography.font(.headline))
+                        .foregroundStyle(Theme.ivory)
+                        .lineLimit(1)
+                        .accessibilityAddTraits(.isHeader)
+                }
+            }
+    }
+
     func revealOnAppear(delay: TimeInterval = 0, reducedMotion: Bool) -> some View {
         modifier(RevealOnAppear(delay: delay, reducedMotion: reducedMotion))
     }

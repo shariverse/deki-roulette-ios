@@ -73,12 +73,12 @@ struct SettingsView: View {
                 .padding(.vertical, 24)
             }
             .background(Theme.ink900.ignoresSafeArea())
-            .navigationTitle(L10n.settingsTitle)
-            .navigationBarTitleDisplayMode(.inline)
+            .appNavigationTitle(L10n.settingsTitle)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.close) { dismiss() }
                         .foregroundStyle(Theme.ivory)
+                        .font(Theme.Typography.barButton)
                 }
             }
             .toolbarBackground(Theme.ink800, for: .navigationBar)
@@ -191,8 +191,7 @@ private struct RouletteAdvancedSettingsView: View {
             .padding(.vertical, 24)
         }
         .background(Theme.ink900.ignoresSafeArea())
-        .navigationTitle(L10n.rouletteAdvancedTitle)
-        .navigationBarTitleDisplayMode(.inline)
+        .appNavigationTitle(L10n.rouletteAdvancedTitle)
         .toolbarBackground(Theme.ink800, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
     }
@@ -222,8 +221,7 @@ private struct AppIconSettingsView: View {
             .padding(.vertical, 24)
         }
         .background(Theme.ink900.ignoresSafeArea())
-        .navigationTitle(L10n.appIconTitle)
-        .navigationBarTitleDisplayMode(.inline)
+        .appNavigationTitle(L10n.appIconTitle)
         .toolbarBackground(Theme.ink800, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onAppear { model.refresh() }
@@ -401,5 +399,5 @@ private struct SettingsCard<Content: View>: View {
     SettingsView()
         .environment(RouletteModel(items: ItemLabel.makeItems(L10n.defaultItems)))
         .environment(OrderModel(items: ItemLabel.makeItems(L10n.orderDefaultItems)))
-        .fontDesign(.rounded)
+        .appTypography()
 }

@@ -25,8 +25,7 @@ struct ItemAppearanceEditor: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.ink900.ignoresSafeArea())
-            .navigationTitle(L10n.appearanceEditorTitle)
-            .navigationBarTitleDisplayMode(.inline)
+            .appNavigationTitle(L10n.appearanceEditorTitle)
             .navigationDestination(for: UUID.self) { id in
                 ItemAppearanceDetail(
                     item: items.first { $0.id == id },
@@ -37,6 +36,7 @@ struct ItemAppearanceEditor: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.close) { dismiss() }
                         .foregroundStyle(Theme.ivory)
+                        .font(Theme.Typography.barButton)
                 }
             }
             .toolbarBackground(Theme.ink800, for: .navigationBar)
@@ -149,8 +149,7 @@ private struct ItemAppearanceDetail: View {
         }
         .scrollContentBackground(.hidden)
         .background(Theme.ink900.ignoresSafeArea())
-        .navigationTitle(item?.label ?? "")
-        .navigationBarTitleDisplayMode(.inline)
+        .appNavigationTitle(item?.label ?? "")
         .onAppear { emojiText = currentEmoji }
         // 確定せずに一覧へ戻った・シートを閉じたときも、入力した絵文字を残す
         .onDisappear(perform: commitEmoji)
@@ -215,5 +214,5 @@ private struct ItemAppearanceDetail: View {
         ],
         onChange: { _, _ in }
     )
-    .fontDesign(.rounded)
+    .appTypography()
 }

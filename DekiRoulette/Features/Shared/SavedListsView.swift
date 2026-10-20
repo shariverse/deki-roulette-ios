@@ -19,18 +19,19 @@ struct SavedListsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.ink900.ignoresSafeArea())
-            .navigationTitle(L10n.savedListsTitle)
-            .navigationBarTitleDisplayMode(.inline)
+            .appNavigationTitle(L10n.savedListsTitle)
             .toolbar {
                 if !savedLists.lists.isEmpty {
                     ToolbarItem(placement: .topBarLeading) {
                         EditButton()
                             .foregroundStyle(Theme.ivory)
+                            .font(Theme.Typography.barButton)
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.close) { dismiss() }
                         .foregroundStyle(Theme.ivory)
+                        .font(Theme.Typography.barButton)
                 }
             }
             .toolbarBackground(Theme.ink800, for: .navigationBar)
@@ -112,11 +113,11 @@ struct SavedListsView: View {
             SavedList(name: "ランチ", items: ItemLabel.makeItems(["ラーメン", "カレー", "寿司"])),
             SavedList(name: "チーム", items: ItemLabel.makeItems(["A", "B", "C", "D"])),
         ]))
-        .fontDesign(.rounded)
+        .appTypography()
 }
 
 #Preview("Empty") {
     SavedListsView()
         .environment(SavedListsModel(lists: []))
-        .fontDesign(.rounded)
+        .appTypography()
 }
