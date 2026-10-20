@@ -67,6 +67,9 @@ struct SettingsView: View {
                             .foregroundStyle(Theme.muted)
                             .lineSpacing(3)
                     }
+                    SettingsLinkRow(title: L10n.licensesTitle) {
+                        LicensesView()
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
@@ -230,6 +233,118 @@ private struct AppIconSettingsView: View {
         } message: {
             Text(L10n.appIconFailedMessage)
         }
+    }
+}
+
+/// 設定から進む「ライセンス」。同梱したもの（`Licenses.all`）を並べ、行から全文に進む。指定・印は受け取らない。
+private struct LicensesView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L10n.licensesDescription)
+                    .font(Theme.Typography.font(.caption))
+                    .foregroundStyle(Theme.muted)
+                ForEach(Licenses.all) { entry in
+                    LicenseRow(entry: entry)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
+        }
+        .background(Theme.ink900.ignoresSafeArea())
+        .appNavigationTitle(L10n.licensesTitle)
+        .toolbarBackground(Theme.ink800, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
+/// ライセンスの一覧の 1 行。名前とライセンスの名前を並べ、全文の画面に進む（`SettingsLinkRow` と同じ枠）。
+private struct LicenseRow: View {
+    let entry: LicenseEntry
+
+    var body: some View {
+        NavigationLink {
+            LicenseDetailView(entry: entry)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.name)
+                        .font(Theme.Typography.font(.callout, weight: .bold))
+                        .foregroundStyle(Theme.ivory)
+                    Text(entry.licenseName)
+                        .font(Theme.Typography.font(.caption))
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .background(Theme.ink800, in: .rect(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Theme.ink700, lineWidth: 1)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 1 件のライセンスの全文。名前・著作権・ライセンスの名前と、バンドルの全文を原文の語句のまま出す（訳さない）。全文は選んでコピーできる。
+private struct LicenseDetailView: View {
+    let entry: LicenseEntry
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                SettingsCard {
+                    Text(entry.name)
+                        .font(Theme.Typography.font(.callout, weight: .bold))
+                        .foregroundStyle(Theme.ivory)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(entry.copyright)
+                        .font(Theme.Typography.font(.caption))
+                        .foregroundStyle(Theme.muted)
+                    Text(entry.licenseName)
+                        .font(Theme.Typography.font(.caption))
+                        .foregroundStyle(Theme.muted)
+                }
+                if let text = entry.text() {
+                    // 原文の固定の改行のまま折り返すと行がばらばらに切れるので、段落ごとに組み直して画面の幅で折り返す（語句は変えない）
+                    SettingsCard {
+                        ForEach(Array(LicenseText.paragraphs(text).enumerated()), id: \.offset) { _, paragraph in
+                            if LicenseText.isRule(paragraph) {
+                                // 区切りの線は折り返さず、幅に収まるよう縮める（線の文字は原文のまま）
+                                Text(paragraph)
+                                    .font(Theme.Typography.font(.caption))
+                                    .foregroundStyle(Theme.muted)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.3)
+                            } else {
+                                Text(paragraph)
+                                    .font(Theme.Typography.font(.caption))
+                                    .foregroundStyle(Theme.ivory)
+                                    .lineSpacing(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .textSelection(.enabled)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
+        }
+        .background(Theme.ink900.ignoresSafeArea())
+        .appNavigationTitle(entry.name)
+        .toolbarBackground(Theme.ink800, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
     }
 }
 
