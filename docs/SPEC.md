@@ -249,9 +249,11 @@ Web 版には無い。項目ごとに「自動」「色」「絵文字」のど�
     ルーレットで「ラーメン」に決まりました！
 
     #デキレーレット
+    https://apps.apple.com/app/id6814132611
     ```
     英語は `The wheel picked “Ramen”!` と `#DekiRoulette`。結果の文の型は `shareRouletteResult`（`%@` にラベル）、ハッシュタグは `shareHashtag`。
-    App Store の URL（`Config.appStoreURL`）があるときだけ、ハッシュタグの次の行に付ける。未公開の間は nil で、リンクは付かない。
+    ハッシュタグの次の行に App Store の製品ページの URL（`Config.appStoreURL` = `https://apps.apple.com/app/id6814132611`）を付ける。国のパス（`/us/`・`/jp/` など）を含めず、利用者の国の Store で開かせる（表示の言語は Store と端末に従う）。
+    共有シート・X・LINE の本文すべてに付き、X の上限の判定では 23 字と数える。
     本文に絵文字は入れない（項目の絵文字も入れない。§4.7）。「当たり」「必ず」等の語・指定の有無・項目リストも入れない（§6.5）。
   - iOS 版のみ: 共有シートには本文と一緒に結果の画像（PNG、1080×1080 px の正方形）を渡す。画像を本体にし本文を添えるので、X・LINE には画像と本文、Instagram には画像が届く。
     画像には 2D の盤面（止まったスライスの強調と針を含む）・結果の帯・アプリ名の文字だけを描く。項目リスト・印・指定の有無は載せず、「当たり」「必ず」等の語も置かない（§6.5）。
@@ -634,6 +636,7 @@ Web 版には無い。項目ごとに「自動」「色」「絵文字」のど�
   3. B チーム
 
   #デキレーレット
+  https://apps.apple.com/app/id6814132611
   ```
 - iOS 版のみ: 「結果を共有」は横幅いっぱい（上限 320pt）の、地を塗らない枠線（`ink600`）のカプセルで、文字は `ivory`、共有のアイコン付き。
   高さは 46pt（タップ領域 44pt を満たす。`Theme.Layout.resultActionsHeight`）で両画面とも同じ。開始ボタン（`flare` の塗りと光彩）より控えめにして主従を保ち、`flare` / `gold` は使わない。
@@ -644,7 +647,7 @@ Web 版には無い。項目ごとに「自動」「色」「絵文字」のど�
   項目リスト・印・先頭・末尾の指定は載せない。画像は結果が出て演出が終わった後に 1 回だけ描き、並べ替え直すと作り直す。画像を作れなかったときは本文だけを共有する。
 - iOS 版のみ: 「結果を共有」のメニューから X・LINE に送れる（§5.3 と同じ）。LINE には共有シートと同じ本文を渡す。X は上限（全角を 2 字と数えて 280 字。数え方は twitter-text v3 で、URL は 23 字、絵文字は 1 つで 2 字）があるので、
   本文が収まらないときは並びを上位から入るだけ載せ、残りを「ほか M 件」の 1 行にする（見出しとハッシュタグは残す。1 件でも収まらないときは 1 件のまま渡し、利用者に X で直してもらう）。
-- Web 版でコピーする本文は結果の並びだけ、iOS 版で共有する本文（共有シート・X・LINE）は見出し・並び・ハッシュタグ（App Store の URL があればそれも）だけ、画像は並びとアプリ名だけを載せる。
+- Web 版でコピーする本文は結果の並びだけ、iOS 版で共有する本文（共有シート・X・LINE）は見出し・並び・ハッシュタグ・App Store の URL だけ、画像は並びとアプリ名だけを載せる。
   どれにも「当たり」「必ず」等の語や指定の有無を示す情報は含めない（§6.5）。
 
 ### 7.4 先頭・末尾指定
@@ -823,7 +826,7 @@ iOS 版には対応物が無い、または OS が代替する項目。
 | （無し） | 項目リストに名前を付けて保存・読み込み・管理する（§4.6、`SavedListStore` / `SavedListsModel`） | 保存先は両画面で共通で、`RootView` が `SavedListsModel` を 1 つ生成して environment で配る。項目の永続化と同じ `ItemStorage` / `StoredItem` を使い、指定は含めない。上限は `Config.maxSavedLists`（20）、名前の上限は `Config.maxSavedListNameLength`（30） |
 | （無し） | 項目ごとに見た目（自動・10 色・絵文字 1 文字）を選べる（§4.7、`ItemAppearance` / `ItemAppearanceEditor`） | 入口は項目リストの見出し行のメニューだけ（行本体・スワイプ・色見本には置かない）。色は `SlicePalette.index(for:at:count:paletteSize:)` / `Theme.sliceColor(in:at:)`、絵文字の盤面ラベルは `WheelLabel.display`、帯は `WheelLabel.decorated`。両モデルの `setAppearance(_:for:)` で変え（演出中は変えない）、`ItemStore` / `SavedListStore` に保存する。指定・印の仕組み（§6）は変えず、絵文字の項目も色見本で印を出す |
 | 状態は永続化しない（§1.3） | 項目リストを画面ごとに `UserDefaults` へ保存し、次の起動で復元する（`ItemStore`） | ホームに置いて繰り返し使うため。保存するのは項目の `id`・`label` と見た目（色・絵文字。`{"kind": "color", "value": "blue"}` の形で、色は並びの添字ではなく名前で持つ。自動のときはキーごと書かないので、見た目が入る前の保存データもそのまま読め、見た目の無い項目は自動になる。知らない種類・色・絵文字でない値も自動として読む）だけで、当たり・先頭・末尾の指定は保存しない（端末を人に渡したあとで前回の仕込みが残っていると、次のスピンが意図せず同じ結果になるため。指定は起動のたびにまっさら）。追加・削除のたびに保存し、保存データが無い・読めないときだけ初期項目（§4.1、そのときの言語）を使う。一度も編集していなければ言語の切替に追従し、編集済みなら維持される。設定シートの「項目を初期状態に戻す」から画面ごとに戻せる（確認ダイアログ付き。保存データも消す） |
-| 「結果をコピー」は順番決めだけ（§7.3）。共有は無い | 両画面に幅広の「結果を共有」（`ShareLink`）だけを置き、「結果をコピー」は持たない（共有シートの「コピー」で写せる）。共有シートには本文と一緒に結果の画像を渡す | 結果があり演出が終わった後だけ、開始ボタンの下に出す。ルーレットの結果の本文は「ルーレットで「{ラベル}」に決まりました！」の 1 行（`shareRouletteResult`）、順番決めは見出し「順番が決まりました！」（`shareOrderHeading`）の下に §7.3 の並び。共有本文は結果の本文に空行を挟んでハッシュタグ（`shareHashtag`: 「#デキレーレット」／「#DekiRoulette」）を 1 行足したもの（アプリ名の行の代わり）で、App Store の URL（`Config.appStoreURL`。未公開の間は nil）があればその次の行に付ける。本文の組み立ては `ResultText`（`Core/`）、ボタンは `ResultActions`（`Features/Shared/`）で両画面共通。ボタンは地を塗らない `ink600` の枠と `ivory` の文字で、開始ボタンの `flare` の塗りより控えめにする（`flare` / `gold` は使わない）。画像は 1080×1080 px の PNG（`ShareImageFile`）で、`ShareLink(item: 画像, message: 本文, preview:)` と渡し、プレビューの題名はアプリ名。寸法は `ShareImageLayout`（`Core/`）、描画は `RouletteShareImageView` / `OrderShareImageView`、画像化は `ShareImageRenderer`（`Features/Shared/`）。ルーレットは 2D の盤面（3D 表示 ON でも）＋結果の帯＋アプリ名、順番決めは順位のカード（10 行まで。超えると「ほか M 件」）＋アプリ名で、項目リスト・印・指定は載せない。「結果を共有」は押すとメニューを開き（「画像付きで共有…」・「X でポスト」・「LINE で送る」）、X・LINE は本文だけを Web の投稿画面の URL（`ShareIntent`、`Core/`）で開く（X は `ResultText.orderPost` で上限に収める。数え方は `XPostLength`）。Instagram の専用ボタンは置かない。共有シートの「画像を保存」のため Info.plist に `NSPhotoLibraryAddUsageDescription`（写真への追加の利用目的）を持ち、写真の読み取りの権限は求めない |
+| 「結果をコピー」は順番決めだけ（§7.3）。共有は無い | 両画面に幅広の「結果を共有」（`ShareLink`）だけを置き、「結果をコピー」は持たない（共有シートの「コピー」で写せる）。共有シートには本文と一緒に結果の画像を渡す | 結果があり演出が終わった後だけ、開始ボタンの下に出す。ルーレットの結果の本文は「ルーレットで「{ラベル}」に決まりました！」の 1 行（`shareRouletteResult`）、順番決めは見出し「順番が決まりました！」（`shareOrderHeading`）の下に §7.3 の並び。共有本文は結果の本文に空行を挟んでハッシュタグ（`shareHashtag`: 「#デキレーレット」／「#DekiRoulette」）を 1 行足したもの（アプリ名の行の代わり）で、その次の行に App Store の製品ページの URL（`Config.appStoreURL`。国を含まない `https://apps.apple.com/app/id6814132611`）を付ける。本文の組み立ては `ResultText`（`Core/`）、ボタンは `ResultActions`（`Features/Shared/`）で両画面共通。ボタンは地を塗らない `ink600` の枠と `ivory` の文字で、開始ボタンの `flare` の塗りより控えめにする（`flare` / `gold` は使わない）。画像は 1080×1080 px の PNG（`ShareImageFile`）で、`ShareLink(item: 画像, message: 本文, preview:)` と渡し、プレビューの題名はアプリ名。寸法は `ShareImageLayout`（`Core/`）、描画は `RouletteShareImageView` / `OrderShareImageView`、画像化は `ShareImageRenderer`（`Features/Shared/`）。ルーレットは 2D の盤面（3D 表示 ON でも）＋結果の帯＋アプリ名、順番決めは順位のカード（10 行まで。超えると「ほか M 件」）＋アプリ名で、項目リスト・印・指定は載せない。「結果を共有」は押すとメニューを開き（「画像付きで共有…」・「X でポスト」・「LINE で送る」）、X・LINE は本文だけを Web の投稿画面の URL（`ShareIntent`、`Core/`）で開く（X は `ResultText.orderPost` で上限に収める。数え方は `XPostLength`）。Instagram の専用ボタンは置かない。共有シートの「画像を保存」のため Info.plist に `NSPhotoLibraryAddUsageDescription`（写真への追加の利用目的）を持ち、写真の読み取りの権限は求めない |
 | ブラウザの文字サイズ設定（固定 px のレイアウト） | Dynamic Type に追従（§10） | しきい値の判定は `TypeLayout`（`accessibility1` 以上でラベル 2 行・固定高さを緩める）。追加フォームは `ViewThatFits` で入力欄の最小幅（`@ScaledMetric` 160pt）を確保できなければ縦積み。盤面は追従させず、印の大きさも変えない |
 | 盤面 320px、ページ幅 `max-w-3xl`（768px）、`lg` 以上で横並び（§5.1, §9.3） | `horizontalSizeClass == .regular` で横並び。盤面は最大 480pt、項目リストは 360pt、ページ幅は 928pt（`Theme.Layout`）。compact では盤面 320pt のまま | 盤面の線幅・縁・ハブは直径に比例。ラベルは基準 320pt より大きい盤面で、倍率の平方根ずつ文字サイズと最大表示文字数を増やす（`WheelLabel`。480pt では 12 / 8 / 6 文字）。文字サイズも比例させると文字数を増やした分が縁からはみ出すため。横並びの 2 列は上下中央で揃える。iPhone の横向きは非対応のまま（`UISupportedInterfaceOrientations`）。Split View や Stage Manager で幅が狭まると compact の縦積みになる |
 | 画面キャプチャの考慮は無い | 画面がキャプチャされている間は印を伏せる（§6.3 の条件 3） | `UIScreen.isCaptured` と `UIScreen.capturedDidChangeNotification` で判定する。状態は `ScreenCaptureMonitor`（`@Observable`）が持ち、`Environment` で両画面の `ItemListView` に届く。取得元は `ScreenCaptureSource` プロトコルで差し替え可能（`UIScreen.main` は使わず接続中のシーンの画面を読む）。印を出す判定は `MarkVisibility.reveals`。「使い方」の隠し操作の説明に「画面を共有・収録している間は出ない」旨を足しており、本文には表示しない。visionOS では `UIWindowScene` の trait から読む（§13） |
