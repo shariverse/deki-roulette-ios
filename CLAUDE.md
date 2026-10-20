@@ -56,7 +56,9 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
   `List` のセクションの見出し・注記は本文を引き継がないよう `Theme.Typography.listSectionHeader` / `listSectionFooter` を明示する。
   `.fontDesign(.rounded)` を同梱の書体の上の環境に置かない（`Font.custom` の文字までシステムの丸ゴシックに置き換わる）。`ImageRenderer` で焼く View（共有画像・3D の強調と帯）にも掛けない。
   盤面のラベル・結果の帯・共有画像・3D のラベル画像も同梱の書体（Bold / Black）。同梱の書体は全角が 1em（SF Rounded + ヒラギノは約 0.94em）・英数字は狭く、1 行の高さが文字サイズの約 1.45 倍なので、
-  `ResultBand.lineHeightRatio` は 1.45。いちばん広い文字で上限の文字数のラベルがハブ・外枠・帯・共有画像の欄に収まることは `FixedTextFitTests` が実際の字幅で確かめる。
+  `ResultBand.lineHeightRatio` は 1.45（共有画像のアプリ名の行の見積もり `ShareImageLayout.brandLineHeightRatio` も同じ値なので、共有画像の盤面は 1080px で約 10px 小さい）。
+  2〜5 件の盤面のラベルは 11.5pt（§5.1 の表の 13 から下げた。`WheelLabel.baseFontSize`）。いちばん広い文字で上限の文字数のラベル（絵文字付き・左右どちらの向きも）がハブと縁の外周の間・帯・共有画像の欄に収まることは
+  `FixedTextFitTests` が実際の字幅で確かめる。
   シートの題名は `appNavigationTitle(_:)`（`navigationTitle` と、同じ題名を `.principal` の `Text` で出す。`UINavigationBar` の外観の API は SwiftUI の題名に効かない）、
   ツールバーの文字のボタンは `.font(Theme.Typography.barButton)`（付けないと環境の本文の Regular で描かれる）、タブの項目は `RootView.init` の `UITabBarAppearance` の文字の属性で当てる。
   Zen Maru Gothic には `tnum` が無いので `.monospacedDigit()` は効かない。
