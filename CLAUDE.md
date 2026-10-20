@@ -397,6 +397,7 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
 `@Environment(\.openURL)` に渡して開くだけ（`LSApplicationQueriesSchemes` と `canOpenURL` は使わない。API による投稿もしない。画像は付かない）。
 X に渡す本文だけは `ResultText.orderPost` が上限（`XPostLength`。twitter-text v3 の重み付きの長さ 280）に収め、収まらない並びは上位から入るだけ載せて「ほか M 件」にする（`ResultActions` の `postText`）。
 項目のアイコンは SF Symbols（`photo` / `square.and.pencil` / `paperplane`）で各社のロゴの画像は使わず、読み上げは項目の名前のまま。
+設定シートの「著作権」には、`©` の行の下に X・LINE の商標の注記（`L10n.trademarkNotice`。X Corp.・LY Corporation の商標で、提携・承認の関係に無いこと）を同じ `.caption`・`muted` で置く。
 
 - 寸法とレイアウトは `ShareImageLayout`（`Core/`）が画像の一辺から決める純粋関数。基本は 1080×1080 px（`defaultSide`）、余白 8%、アプリ名の文字 3.6% で
   下の余白のすぐ上。ルーレット（`roulette(side:)`）は盤面の直径と中心・針（基準直径での 22×26pt に比例）・帯の中心（`ResultBand.centerOffset`）、
