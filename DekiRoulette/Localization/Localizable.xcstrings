@@ -123,6 +123,57 @@
         }
       }
     },
+    "trademarkNotice" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X is a trademark of X Corp. LINE is a trademark of LY Corporation. This app is not affiliated with or endorsed by these companies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X は X Corp. の商標です。LINE は LY Corporation の商標です。本アプリはこれらの企業と提携・承認の関係にありません。"
+          }
+        }
+      }
+    },
+    "licensesTitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンス"
+          }
+        }
+      }
+    },
+    "licensesDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenses for the fonts used in this app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリが使っているフォントのライセンスです。"
+          }
+        }
+      }
+    },
     "copyrightTitle" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1240,6 +1291,159 @@
         }
       }
     },
+    "spinEffectsTitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spin effects"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スピンの演出"
+          }
+        }
+      }
+    },
+    "spinEffectsEnabled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show effects"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出を付ける"
+          }
+        }
+      }
+    },
+    "spinEffectLights" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lights"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "電飾"
+          }
+        }
+      }
+    },
+    "spinEffectTrails" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light trails"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "光の尾・残像"
+          }
+        }
+      }
+    },
+    "spinEffectParticles" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sparks and confetti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "火花・紙吹雪"
+          }
+        }
+      }
+    },
+    "spinEffectTease" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspense before stopping"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止まり際の焦らし"
+          }
+        }
+      }
+    },
+    "spinEffectStopEffects" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop flourish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止の演出"
+          }
+        }
+      }
+    },
+    "spinEffectSounds" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effect sounds"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出の効果音"
+          }
+        }
+      }
+    },
+    "spinEffectsSoundNote" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effect sounds play only when the spin sound is also on."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出の効果音は、ルーレットの回転音も ON のときだけ鳴ります。"
+          }
+        }
+      }
+    },
     "rouletteAdvancedTitle" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1700,53 +1904,53 @@
         }
       }
     },
-    "copyResult" : {
+    "shareToX" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copy result"
+            "value" : "Post on X"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "結果をコピー"
+            "value" : "X でポスト"
           }
         }
       }
     },
-    "copied" : {
+    "shareToLINE" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copied"
+            "value" : "Send on LINE"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コピーしました"
+            "value" : "LINE で送る"
           }
         }
       }
     },
-    "share" : {
+    "shareResult" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share"
+            "value" : "Share result"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "共有"
+            "value" : "結果を共有"
           }
         }
       }
@@ -1768,19 +1972,53 @@
         }
       }
     },
-    "resultHeading" : {
+    "shareRouletteResult" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Result"
+            "value" : "The wheel picked “%@”!"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "結果"
+            "value" : "ルーレットで「%@」に決まりました！"
+          }
+        }
+      }
+    },
+    "shareOrderHeading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The order is set!"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "順番が決まりました！"
+          }
+        }
+      }
+    },
+    "shareHashtag" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "#DekiRoulette"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "#デキレーレット"
           }
         }
       }

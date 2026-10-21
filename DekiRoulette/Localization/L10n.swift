@@ -55,6 +55,19 @@ enum L10n {
         case .rainbow: tr("glowStyleRainbow")
         }
     }
+    static var spinEffectsTitle: String { tr("spinEffectsTitle") }
+    static var spinEffectsEnabled: String { tr("spinEffectsEnabled") }
+    static func spinEffectName(_ item: SpinEffectItem) -> String {
+        switch item {
+        case .lights: tr("spinEffectLights")
+        case .trails: tr("spinEffectTrails")
+        case .particles: tr("spinEffectParticles")
+        case .tease: tr("spinEffectTease")
+        case .stopEffects: tr("spinEffectStopEffects")
+        case .sounds: tr("spinEffectSounds")
+        }
+    }
+    static var spinEffectsSoundNote: String { tr("spinEffectsSoundNote") }
     static var wheel3DTitle: String { tr("wheel3DTitle") }
     static var tiltReferenceTitle: String { tr("tiltReferenceTitle") }
     static func tiltReferenceName(_ reference: TiltReference) -> String {
@@ -81,6 +94,9 @@ enum L10n {
     static var copyright: String { tr("copyright") }
     static var copyrightTitle: String { tr("copyrightTitle") }
     static var copyrightOwner: String { tr("copyrightOwner") }
+    static var trademarkNotice: String { tr("trademarkNotice") }
+    static var licensesTitle: String { tr("licensesTitle") }
+    static var licensesDescription: String { tr("licensesDescription") }
     static func addItemsButton(_ count: Int) -> String { plural("addItemsButton", count) }
     static var duplicateAddTitle: String { tr("duplicateAddTitle") }
     static var duplicateAddMessage: String { tr("duplicateAddMessage") }
@@ -93,12 +109,18 @@ enum L10n {
     static func resetItemsConfirm(_ screen: String) -> String { fmt("resetItemsConfirm", screen) }
     static var resetItemsMessage: String { tr("resetItemsMessage") }
     static var resetItemsAction: String { tr("resetItemsAction") }
-    static var copyResult: String { tr("copyResult") }
-    static var copied: String { tr("copied") }
-    static var share: String { tr("share") }
+    static var shareResult: String { tr("shareResult") }
+    /// 結果の下の X・LINE のロゴのボタンの読み上げの名前。行き先と動作が分かる名前にする（「X」1 文字は閉じるボタンと間違えられる）。
+    static var shareToX: String { tr("shareToX") }
+    static var shareToLINE: String { tr("shareToLINE") }
     /// 共有画像で省略した順位の件数の行（「ほか 3 件」）。
     static func shareOrderOthers(_ count: Int) -> String { fmt("shareOrderOthers", count) }
-    static var resultHeading: String { tr("resultHeading") }
+    /// 共有の本文のルーレットの結果の文。`%@` にラベルが入る（`ResultText.roulette(label:template:)`）。
+    static var shareRouletteResult: String { tr("shareRouletteResult") }
+    /// 共有の本文の順番決めの見出し（並びの前の 1 行）。
+    static var shareOrderHeading: String { tr("shareOrderHeading") }
+    /// 共有の本文の末尾のハッシュタグ。アプリ名の代わりに置く。
+    static var shareHashtag: String { tr("shareHashtag") }
     static var appName: String { tr("appName") }
     static var listMenuLabel: String { tr("listMenuLabel") }
     static var saveListAction: String { tr("saveListAction") }

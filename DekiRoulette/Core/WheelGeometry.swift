@@ -3,6 +3,16 @@ import Foundation
 /// 3D の盤面の形の計算。3D 空間は手前から見て x が右・y が上・z が手前で、盤は xy 平面に置いて手前（+z）へ向ける。
 /// 角度は 2D と同じく 12 時を 0 度として、手前から見て時計回りに数える。
 enum WheelGeometry {
+    /// 盤面の枠からスライスの円までの距離（基準直径 `WheelLabel.referenceDiameter` での pt）。外周の縁（スライスの円の外 5〜11pt）と
+    /// 枠までの余白はこの中に収まる。2D の `WheelFaceView`・3D の盤・電飾の環・光の尾・結果の帯（`ResultBand`）で同じ値を使う。
+    static let sliceInset: Double = 16
+
+    /// 直径 `diameter`（pt）の盤面のスライスの円の半径（pt）。
+    static func sliceRadius(diameter: Double) -> Double {
+        let diameter = max(diameter, 0)
+        return diameter / 2 - sliceInset * diameter / WheelLabel.referenceDiameter
+    }
+
     /// 盤面の角度 `angle`（度）・中心からの距離 `radius` の点を、盤の平面（xy）上の座標に写す。
     static func point(angle: Double, radius: Double) -> SIMD2<Double> {
         let rad = angle * .pi / 180
@@ -51,6 +61,25 @@ enum WheelGeometry {
                 let previousTop = top - 2, previousBottom = top - 1
                 // 外から見て反時計回り（前の上・今の上・前の下、今の上・今の下・前の下）
                 mesh.side += [previousTop, top, previousBottom, top, bottom, previousBottom]
+            }
+        }
+        return mesh
+    }
+
+    /// `start` 度から `end` 度までの、内径 `inner`・外径 `outer` の平らな扇形の帯（z = 0、手前向き）。側面は無い（`side` は空）。
+    /// 3D の盤面の残像（ハブの内側を抜いたスライスの塗り）と光の尾の弧に使う。三角形は表から見て反時計回りに頂点を並べる。
+    static func annulusMesh(start: Double, end: Double, inner: Double, outer: Double, segmentsPerTurn: Int = 96) -> SliceMesh {
+        let outerArc = arc(start: start, end: end, radius: outer, segmentsPerTurn: segmentsPerTurn)
+        let innerArc = arc(start: start, end: end, radius: max(inner, 0), segmentsPerTurn: segmentsPerTurn)
+        var mesh = SliceMesh(vertices: [], normals: [], top: [], side: [])
+        for (offset, (o, i)) in zip(outerArc, innerArc).enumerated() {
+            mesh.vertices += [SIMD3(o.x, o.y, 0), SIMD3(i.x, i.y, 0)]
+            mesh.normals += [SIMD3(0, 0, 1), SIMD3(0, 0, 1)]
+            if offset > 0 {
+                let outerNow = Int32(offset * 2), innerNow = outerNow + 1
+                let outerBefore = outerNow - 2, innerBefore = outerNow - 1
+                // 外周の点は手前から見て時計回りに進むので、前の内・今の外・前の外、前の内・今の内・今の外の順で反時計回りになる
+                mesh.top += [innerBefore, outerNow, outerBefore, innerBefore, innerNow, outerNow]
             }
         }
         return mesh

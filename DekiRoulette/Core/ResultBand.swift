@@ -17,11 +17,29 @@ enum ResultBand {
     static let baseHorizontalPadding: Double = 14
     static let baseVerticalPadding: Double = 5
     /// 1 行の高さの見積もり（文字サイズに対する割合）。ハブ・円との重なりの確認に使う。
-    static let lineHeightRatio: Double = 1.2
+    /// 同梱の書体（Zen Maru Gothic）の 1 行の高さは文字サイズの約 1.448 倍（SF Rounded は約 1.19 倍）で、それを下回らない値にする（`FixedTextFitTests`）。
+    static let lineHeightRatio: Double = 1.45
     /// 中心のハブの直径（基準の直径での pt）。`RouletteWheelView` のハブと同じ。
     static let baseHubDiameter: Double = 38
-    /// 盤面の外枠からスライスの円までの距離（基準の直径での pt）。`RouletteWheelView` と同じ。
-    static let baseSliceInset: Double = 16
+    /// 盤面の外枠からスライスの円までの距離（基準の直径での pt）。`RouletteWheelView` と同じ（`WheelGeometry.sliceInset`）。
+    static let baseSliceInset: Double = WheelGeometry.sliceInset
+
+    // MARK: 登場演出（停止の演出が ON のとき）
+
+    /// 帯が現れ始める大きさ（倍率）。ここからばね（`popInDuration` / `popInBounce`）で少し行き過ぎて 1 に収まる。
+    static let popInStartScale: Double = 0.6
+    /// 登場のばねの長さ（秒）と弾み（SwiftUI の `Animation.spring(duration:bounce:)` の値）。
+    static let popInDuration: Double = 0.45
+    static let popInBounce: Double = 0.35
+
+    /// 登場のばねがいちばん行き過ぎたときの大きさ（倍率）。弾み b のばねの減衰比は 1 - b で、行き過ぎは
+    /// 動く幅 × e^(-ζπ/√(1-ζ²))。帯がこの大きさでもスライスの円からはみ出さないことをテストで確かめる。
+    static var popInPeakScale: Double {
+        let damping = 1 - popInBounce
+        guard damping < 1 else { return 1 }
+        let overshoot = exp(-damping * .pi / (1 - damping * damping).squareRoot())
+        return 1 + (1 - popInStartScale) * overshoot
+    }
 
     private static func ratio(_ diameter: Double) -> Double {
         max(0, diameter) / WheelLabel.referenceDiameter

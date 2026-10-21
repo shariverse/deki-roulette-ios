@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 @testable import DekiRoulette
 
@@ -294,8 +295,9 @@ struct RouletteModelTests {
         let next = try #require(model.beginCoast(angularVelocity: 120, reducedMotion: false))
         let coast = try #require(FlickCoast.coast(angularVelocity: 120))
         #expect(abs(next - (before + coast.distance)) < 1e-9)
-        #expect(model.spinEasing == FlickCoast.easing)
-        #expect(abs(model.rotationDuration - coast.duration) < 1e-9)
+        #expect(model.rotationPath == SpinPath(coast.motion(from: before)))
+        #expect(model.rotationPath.segments.first?.easing == FlickCoast.easing)
+        #expect(abs(model.rotationPath.duration - coast.duration) < 1e-9)
         #expect(model.outcome == outcome)
         #expect(model.spinCount == count)
         #expect(model.lastDirection == .counterclockwise)
@@ -307,15 +309,14 @@ struct RouletteModelTests {
         let model = makeModel()
         #expect(model.beginCoast(angularVelocity: 120, reducedMotion: true) == nil)
         #expect(model.beginCoast(angularVelocity: 0, reducedMotion: false) == nil)
-        #expect(model.rotationDuration == Config.spinDuration)
-        #expect(model.spinEasing == Config.spinEasing)
+        #expect(model.rotationPath == SpinPath.idle)
     }
 
     @Test func 演出中は惰性を付けない() {
         let model = makeModel()
         _ = model.beginSpin(reducedMotion: false)
         #expect(model.beginCoast(angularVelocity: 120, reducedMotion: false) == nil)
-        #expect(model.rotationDuration == Config.spinDuration)
+        #expect(model.rotationPath.duration == Config.spinDuration)
     }
 
     @Test func 惰性の途中で触れたら今の角度で止める() throws {
@@ -355,8 +356,9 @@ struct RouletteModelTests {
         clock += 0.01
         let target = try #require(model.beginSpin(reducedMotion: false))
         #expect(target > next)
-        #expect(model.rotationDuration == Config.spinDuration)
-        #expect(model.spinEasing == Config.spinEasing)
+        #expect(model.rotationPath == SpinPath(SpinMotion(
+            from: next, to: target, duration: Config.spinDuration, easing: Config.spinEasing
+        )))
         #expect(model.stopCoast() == nil)
     }
 
@@ -494,7 +496,9 @@ struct RouletteModelTests {
                 reducedMotion: false, fullSpins: 5, direction: direction, releaseVelocity: velocity
             ))
             let easing = FlickSpin.easing(angularVelocity: velocity, distance: abs(next - from), duration: Config.spinDuration)
-            #expect(model.spinEasing == easing)
+            #expect(model.rotationPath == SpinPath(SpinMotion(
+                from: from, to: next, duration: Config.spinDuration, easing: easing
+            )))
             // 回転音の時刻も同じ曲線から逆算する（見た目とずれない）
             #expect(model.clickTimes == SpinTicks.boundaryCrossings(
                 from: from, to: next, count: 4, duration: Config.spinDuration,
@@ -511,9 +515,95 @@ struct RouletteModelTests {
         let model = makeModel()
         model.rotation = try #require(model.beginSpin(reducedMotion: false, fullSpins: 4, releaseVelocity: 1500))
         model.finishSpin()
-        #expect(model.spinEasing != Config.spinEasing)
+        #expect(model.rotationPath.segments.first?.easing != Config.spinEasing)
         _ = try #require(model.beginSpin(reducedMotion: false))
-        #expect(model.spinEasing == Config.spinEasing)
+        #expect(model.rotationPath.segments.first?.easing == Config.spinEasing)
+    }
+
+    // MARK: 今の動き（演出が時刻から角度・角速度を引く）
+
+    @Test func スピンを始めると今の動きと開始時刻を持ち終わると捨てる() throws {
+        let model = makeModel()
+        model.now = { 50 }
+        model.rotation = 20
+        #expect(model.currentMotion == nil)
+        let next = try #require(model.beginSpin(reducedMotion: false, fullSpins: 5, direction: .counterclockwise, releaseVelocity: -1500))
+        let current = try #require(model.currentMotion)
+        #expect(current.start == 50)
+        #expect(current.path == model.rotationPath)
+        #expect(current.path.segments.count == 1)
+        #expect(current.path.from == 20)
+        #expect(current.path.to == next)
+        // 初速は離した角速度につながる
+        #expect(abs(current.angularVelocity(now: 50) + 1500) < 1e-6)
+        model.rotation = next
+        model.finishSpin()
+        #expect(model.currentMotion == nil)
+    }
+
+    @Test func 動きを減らす設定のスピンは今の動きを持たない() throws {
+        let model = makeModel()
+        _ = try #require(model.beginSpin(reducedMotion: true))
+        #expect(model.currentMotion == nil)
+    }
+
+    @Test func 惰性の動きを持ち触れたら捨てる() throws {
+        let model = makeModel()
+        var clock = 10.0
+        model.now = { clock }
+        model.rotation = 30
+        let next = try #require(model.beginCoast(angularVelocity: -200, reducedMotion: false))
+        let coast = try #require(FlickCoast.coast(angularVelocity: -200))
+        let current = try #require(model.currentMotion)
+        #expect(current.start == 10)
+        #expect(current.path == SpinPath(coast.motion(from: 30)))
+        #expect(abs(current.path.to - next) < 1e-9)
+        #expect(abs(current.angularVelocity(now: 10) + 200) < 1e-6)
+        model.rotation = next
+        clock += coast.duration / 2
+        _ = try #require(model.stopCoast())
+        #expect(model.currentMotion == nil)
+    }
+
+    @Test func 惰性の間は演出が惰性の動きから強さを引き_触れたら指の動きに替わる() throws {
+        let model = makeModel()
+        var clock = 10.0
+        model.now = { clock }
+        let next = try #require(model.beginCoast(angularVelocity: 230, reducedMotion: false))
+        model.rotation = next
+        let coast = try #require(FlickCoast.coast(angularVelocity: 230))
+        let effect = try #require(WheelEffectMotion.current(spin: model.currentMotion, drag: nil, now: clock))
+        // 抽選しないが、盤面が自分で回っている間は速さに連動する演出が出る（強さは離した角速度から減速につれて下がる）
+        #expect(abs(effect.intensity(now: clock) - 230 / Config.effectFullIntensityVelocity) < 1e-6)
+        #expect(effect.intensity(now: clock + coast.duration / 2) < effect.intensity(now: clock))
+        #expect(effect.isMoving(now: clock + coast.duration / 2))
+        #expect(!effect.isMoving(now: clock + coast.duration))
+        #expect(model.outcome == nil)
+        #expect(!model.spinning)
+        // 途中で触れたら惰性を止め、演出は指で動かしている動きから引く
+        clock += coast.duration / 2
+        _ = try #require(model.stopCoast())
+        let drag = WheelDragMotion(center: CGPoint(x: 160, y: 160), time: clock, location: CGPoint(x: 160, y: 40), angle: 0)
+        #expect(WheelEffectMotion.current(spin: model.currentMotion, drag: drag, now: clock) == .drag(drag))
+    }
+
+    @Test func 惰性の途中でスピンを始めたら今の動きをスピンのものにする() throws {
+        let model = makeModel()
+        model.now = { 0 }
+        let coastTo = try #require(model.beginCoast(angularVelocity: 100, reducedMotion: false))
+        model.rotation = coastTo
+        let next = try #require(model.beginSpin(reducedMotion: false))
+        let current = try #require(model.currentMotion)
+        #expect(current.path == SpinPath(SpinMotion(from: coastTo, to: next, duration: Config.spinDuration, easing: Config.spinEasing)))
+    }
+
+    @Test func 指で回したら今の動きを捨てる() throws {
+        let model = makeModel()
+        let next = try #require(model.beginCoast(angularVelocity: 100, reducedMotion: false))
+        model.rotation = next
+        #expect(model.currentMotion != nil)
+        model.rotate(by: 15)
+        #expect(model.currentMotion == nil)
     }
 
     @Test func 指で動かして境目を越えると強い触覚の刻みが進む() {
@@ -683,5 +773,162 @@ struct RouletteModelTests {
         let model = makeModel(["A", "B"])
         model.resetItems()
         #expect(model.items.map(\.label) == ["A", "B"])
+    }
+
+    // MARK: 止まり際の焦らし
+
+    @Test func 演出なしのスピンは今の曲線と長さと音と触覚の時刻のまま() throws {
+        for (seed, release) in [(UInt64(1), nil), (2, 1500), (3, -900)] as [(UInt64, Double?)] {
+            // 何も付けない（`.none`）を渡したときと、省いたとき（既定）
+            for passesStyle in [true, false] {
+                let model = makeModel()
+                model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
+                model.rotation = 40
+                let direction: SpinDirection? = release.map { $0 < 0 ? .counterclockwise : .clockwise }
+                let started = if passesStyle {
+                    model.beginSpin(
+                        reducedMotion: false, effects: .none, fullSpins: 5, direction: direction, releaseVelocity: release
+                    )
+                } else {
+                    model.beginSpin(reducedMotion: false, fullSpins: 5, direction: direction, releaseVelocity: release)
+                }
+                let next = try #require(started)
+                let easing = if let release {
+                    FlickSpin.easing(angularVelocity: release, distance: abs(next - 40), duration: Config.spinDuration)
+                } else {
+                    Config.spinEasing
+                }
+                #expect(model.rotationPath == SpinPath(SpinMotion(from: 40, to: next, duration: Config.spinDuration, easing: easing)))
+                #expect(model.rotationPath.tease == nil)
+                #expect(model.rotationPath.duration == Config.spinDuration)
+                #expect(abs(model.rotationPath.fallback - Config.spinFallback) < 1e-9)
+                #expect(model.clickTimes == SpinTicks.boundaryCrossings(
+                    from: 40, to: next, count: 4, duration: Config.spinDuration,
+                    easing: easing, minInterval: Config.clickMinInterval
+                ))
+                #expect(HapticSchedule.boundaryCrossings(along: model.rotationPath, count: 4, minInterval: Config.hapticMinInterval)
+                    == HapticSchedule.boundaryCrossings(
+                        from: 40, to: next, count: 4, duration: Config.spinDuration,
+                        easing: easing, minInterval: Config.hapticMinInterval
+                    ))
+                #expect(model.currentMotion?.path == model.rotationPath)
+                // 盤面の補間も今の `timingCurve` のまま
+                #expect(Theme.spinAnimation(path: model.rotationPath) == Theme.spinAnimation(easing: easing))
+            }
+        }
+    }
+
+    @Test(arguments: SpinEffectsFixtures.withCommon)
+    func 演出ありのスピンは焦らしを入れても止まる位置と結果は変わらない(effects: SpinEffects) throws {
+        let model = makeModel()
+        model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 11))
+        model.toggleTarget(id: model.items[2].id)
+        for round in 0..<30 {
+            let from = model.rotation
+            let direction: SpinDirection = round.isMultiple(of: 2) ? .clockwise : .counterclockwise
+            let next = try #require(model.beginSpin(reducedMotion: false, effects: effects, direction: direction))
+            let path = model.rotationPath
+            #expect(path.tease != nil)
+            #expect(path.from == from)
+            #expect(path.to == next)
+            #expect(abs(path.duration - (Config.spinDuration + Config.spinTeaseDuration)) < 1e-9)
+            #expect(abs(path.fallback - Config.spinTeaseFallback) < 1e-9)
+            #expect(abs(next - from) >= Double(Config.fullSpinRange.lowerBound) * 360 + 10)
+            // 回転音と触覚の時刻は往復とも数えた境目から
+            #expect(model.clickTimes == path.boundaryCrossings(count: 4, minInterval: Config.clickMinInterval))
+            #expect(model.clickTimes.last! <= path.duration)
+            #expect(model.currentMotion?.path == path)
+            #expect(Theme.spinAnimation(path: path) != Theme.spinAnimation(easing: Config.spinEasing))
+            model.rotation = next
+            model.finishSpin()
+            #expect(model.outcome == SpinOutcome(index: 2, label: "C"))
+            #expect(RouletteMath.indexUnderPointer(rotation: model.rotation, count: 4) == 2)
+        }
+    }
+
+    @Test(arguments: SpinEffectsFixtures.withCommon)
+    func 焦らしの動きは指定の有無で変わらない(effects: SpinEffects) throws {
+        for seed in UInt64(1)...20 {
+            for release: Double? in [nil, 1800, -2400] {
+                let direction: SpinDirection? = release.map { $0 < 0 ? .counterclockwise : .clockwise }
+                let fullSpins = release.map { _ in 6 }
+                // 指定なし: 乱数で止まる項目が決まる
+                let free = makeModel(["A", "B", "C", "D", "E"])
+                free.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
+                free.rotation = 25
+                let freeNext = try #require(free.beginSpin(
+                    reducedMotion: false, effects: effects, fullSpins: fullSpins, direction: direction, releaseVelocity: release
+                ))
+                free.rotation = freeNext
+                free.finishSpin()
+                let index = try #require(free.outcome?.index)
+
+                // 指定あり: 同じ項目を指定し、同じ乱数の列で回す
+                let aimed = makeModel(["A", "B", "C", "D", "E"])
+                aimed.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: seed))
+                aimed.rotation = 25
+                aimed.toggleTarget(id: aimed.items[index].id)
+                let aimedNext = try #require(aimed.beginSpin(
+                    reducedMotion: false, effects: effects, fullSpins: fullSpins, direction: direction, releaseVelocity: release
+                ))
+                #expect(aimedNext == freeNext)
+                #expect(aimed.rotationPath == free.rotationPath)
+                #expect(aimed.rotationPath.tease == free.rotationPath.tease)
+                #expect(aimed.clickTimes == free.clickTimes)
+                #expect(HapticSchedule.boundaryCrossings(along: aimed.rotationPath, count: 5, minInterval: Config.hapticMinInterval)
+                    == HapticSchedule.boundaryCrossings(along: free.rotationPath, count: 5, minInterval: Config.hapticMinInterval))
+            }
+        }
+    }
+
+    @Test func フリックの焦らしは主の区間の初速を離した角速度に合わせる() throws {
+        for release in [1500.0, -1500] {
+            let model = makeModel()
+            model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 4))
+            model.now = { 30 }
+            let direction: SpinDirection = release < 0 ? .counterclockwise : .clockwise
+            let next = try #require(model.beginSpin(
+                reducedMotion: false, effects: .all, fullSpins: 5, direction: direction, releaseVelocity: release
+            ))
+            let path = model.rotationPath
+            let tease = try #require(path.tease)
+            #expect(path == SpinPath.teased(tease, from: 0, to: next, count: 4, releaseVelocity: release))
+            let current = try #require(model.currentMotion)
+            #expect(abs(current.angularVelocity(now: 30) - release) < 1e-6)
+        }
+    }
+
+    @Test func 動きを減らす設定では焦らしを入れない() throws {
+        let model = makeModel()
+        let next = try #require(model.beginSpin(reducedMotion: true, effects: .all))
+        #expect(model.rotationPath.tease == nil)
+        #expect(model.rotationPath.segments.count == 1)
+        #expect(model.rotationPath.to == next)
+        #expect(model.currentMotion == nil)
+        #expect(model.clickTimes.isEmpty)
+    }
+
+    @Test func 演出なしの保険は今の長さで止める() async throws {
+        let model = makeModel()
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: .none))
+        try await Task.sleep(for: .seconds(Config.spinFallback + 0.4))
+        #expect(!model.spinning)
+        #expect(model.result != nil)
+    }
+
+    @Test func 焦らしのスピンは焦らしを含めた長さまで止めず境目ごとに刻む() async throws {
+        let model = makeModel()
+        model.randomSource = AnyRandomNumberGenerator(SeededGenerator(seed: 9))
+        _ = try #require(model.beginSpin(reducedMotion: false, effects: SpinEffectsFixtures.lights))
+        let expected = HapticSchedule.boundaryCrossings(along: model.rotationPath, count: 4, minInterval: Config.hapticMinInterval)
+        #expect(!expected.isEmpty)
+        // 焦らし無しの保険の時刻を過ぎてもまだ止めない
+        try await Task.sleep(for: .seconds(Config.spinFallback + 0.2))
+        #expect(model.spinning)
+        #expect(model.result == nil)
+        try await Task.sleep(for: .seconds(Config.spinTeaseFallback - Config.spinFallback + 0.4))
+        #expect(!model.spinning)
+        #expect(model.result != nil)
+        #expect(model.boundaryTick == expected.count)
     }
 }

@@ -48,12 +48,12 @@ struct PageFrame<Content: View, Help: View>: View {
             VStack(alignment: .leading, spacing: 10) {
                 // 既定サイズでは従来の 34pt と同じ。Dynamic Type に追従させるためテキストスタイルで指定する
                 Text(title)
-                    .font(.largeTitle.weight(.black))
+                    .font(Theme.Typography.font(.largeTitle, weight: .black))
                     .tracking(-1)
                     .foregroundStyle(Theme.ivory)
                     .accessibilityAddTraits(.isHeader)
                 Text(tagline)
-                    .font(.subheadline)
+                    .font(Theme.Typography.font(.subheadline))
                     .foregroundStyle(Theme.muted)
             }
             Spacer(minLength: 0)
@@ -91,7 +91,7 @@ struct PageFrame<Content: View, Help: View>: View {
                 Text(L10n.notice)
             }
         }
-        .font(.subheadline)
+        .font(Theme.Typography.font(.subheadline))
         .foregroundStyle(Theme.muted)
     }
 }
@@ -118,7 +118,7 @@ private struct FooterDisclosure<Body: View>: View {
                         .foregroundStyle(Theme.muted)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     Text(title)
-                        .font(.callout.weight(.bold))
+                        .font(Theme.Typography.font(.callout, weight: .bold))
                         .foregroundStyle(Theme.ivory)
                 }
                 .contentShape(Rectangle())
@@ -143,7 +143,7 @@ struct HelpHeading: View {
 
     var body: some View {
         Text(text)
-            .font(.subheadline.weight(.bold))
+            .font(Theme.Typography.font(.subheadline, weight: .bold))
             .foregroundStyle(Theme.ivory)
             .padding(.top, 6)
     }

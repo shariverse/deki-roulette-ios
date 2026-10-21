@@ -142,18 +142,18 @@ struct ItemListView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 8) {
             Text(L10n.itemListTitle)
-                .font(.callout.weight(.bold))
+                .font(Theme.Typography.font(.callout, weight: .bold))
                 .foregroundStyle(Theme.ivory)
             Spacer()
             if !items.isEmpty && !busy {
                 Button(L10n.removeAll) { confirmingRemoveAll = true }
-                    .font(.caption.weight(.bold))
+                    .font(Theme.Typography.font(.caption, weight: .bold))
                     .foregroundStyle(Theme.muted)
                     .buttonStyle(.plain)
                     .padding(.trailing, 4)
             }
             Text(L10n.itemCount(items.count, Config.maxItems))
-                .font(.caption.monospacedDigit())
+                .font(Theme.Typography.font(.caption).monospacedDigit())
                 .foregroundStyle(Theme.muted)
             listMenu
         }
@@ -248,7 +248,7 @@ struct ItemListView: View {
                 if clamped != newValue { input = clamped }
             }
             .disabled(inputDisabled)
-            .font(.subheadline)
+            .font(Theme.Typography.font(.subheadline))
             .foregroundStyle(Theme.ivory)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -263,7 +263,7 @@ struct ItemListView: View {
     private var addButton: some View {
         Button(action: handleAdd) {
             Text(lines.count > 1 ? L10n.addItemsButton(lines.count) : L10n.addButton)
-                .font(.subheadline.weight(.bold))
+                .font(Theme.Typography.font(.subheadline, weight: .bold))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
         }
@@ -275,7 +275,7 @@ struct ItemListView: View {
 
     private var emptyState: some View {
         Text(L10n.emptyList)
-            .font(.subheadline)
+            .font(Theme.Typography.font(.subheadline))
             .foregroundStyle(Theme.muted)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
@@ -323,13 +323,13 @@ struct ItemListView: View {
     private func undoToast(for removed: RemovedItem) -> some View {
         HStack(spacing: 12) {
             Text(L10n.removedToast(removed.item.label))
-                .font(.caption)
+                .font(Theme.Typography.font(.caption))
                 .foregroundStyle(Theme.muted)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 0)
             Button(L10n.undo) { restorePending() }
-                .font(.caption.weight(.bold))
+                .font(Theme.Typography.font(.caption, weight: .bold))
                 .foregroundStyle(Theme.ivory)
                 .buttonStyle(.plain)
         }
@@ -346,12 +346,12 @@ struct ItemListView: View {
     private var footnotes: some View {
         if items.count < Config.minItems {
             Text(L10n.needMoreItems)
-                .font(.caption)
+                .font(Theme.Typography.font(.caption))
                 .foregroundStyle(Theme.flareText)
         }
         if atCapacity {
             Text(L10n.atCapacity(Config.maxItems))
-                .font(.caption)
+                .font(Theme.Typography.font(.caption))
                 .foregroundStyle(Theme.muted)
         }
     }
@@ -490,12 +490,12 @@ private struct ItemRow: View {
                 // 絵文字の項目は色見本（印）を残したまま、その右に絵文字を置く。読み上げはラベルだけにする
                 if case .emoji(let emoji) = item.appearance {
                     Text(String(emoji))
-                        .font(.subheadline)
+                        .font(Theme.Typography.font(.subheadline))
                         .accessibilityHidden(true)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.label)
-                        .font(.subheadline)
+                        .font(Theme.Typography.font(.subheadline))
                         .foregroundStyle(Theme.ivory)
                         .lineLimit(TypeLayout.labelLineLimit(for: typeSize))
                         .truncationMode(.tail)
@@ -556,7 +556,7 @@ private struct ItemRow: View {
     /// 同名の項目があることの注意。ラベルの下に置き、行の読み上げにも含める。
     private var duplicateNotice: some View {
         Label(L10n.duplicateLabelNotice, systemImage: "exclamationmark.triangle")
-            .font(.caption)
+            .font(Theme.Typography.font(.caption))
             .foregroundStyle(Theme.muted)
             .labelStyle(DuplicateNoticeLabelStyle())
     }
@@ -566,7 +566,7 @@ private struct ItemRow: View {
     private var deleteAction: some View {
         Button(action: onRemove) {
             Text(L10n.delete)
-                .font(.subheadline.weight(.bold))
+                .font(Theme.Typography.font(.subheadline, weight: .bold))
                 .foregroundStyle(Theme.onDestructive)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)

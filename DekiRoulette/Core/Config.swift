@@ -28,9 +28,6 @@ enum Config {
     /// 視差効果を減らす設定のときは 1 件ずつ出さないので、演出はこの時間で終わる。
     static let reducedMotionRevealDuration: TimeInterval = 0.2
 
-    /// コピーできたことを伝える表示を出しておく時間。
-    static let copyFeedbackDuration: TimeInterval = 1.8
-
     /// スピンのイージング（Web 版 `SPIN_EASING`）。`Theme.spinAnimation` と、触覚とクリック音の時刻の逆算で使う。
     static let spinEasing = CubicBezierCurve(0.15, 0.85, 0.3, 1)
 
@@ -40,6 +37,10 @@ enum Config {
     static let maxSavedLists = 20
     /// 保存するリストの名前の最大文字数（正規化後）。
     static let maxSavedListNameLength = 30
+
+    /// App Store の製品ページの URL。共有の本文のハッシュタグの後に付ける（`ResultText.share`）。
+    /// 国を含まない形にして、利用者の国の Store で開かせる（表示の言語は Store と端末に従う）。App ID は App Store Connect の値で、推測しない。
+    static let appStoreURL: URL? = URL(string: "https://apps.apple.com/app/id6814132611")
 
     /// スピンの周回数の範囲。フリックの強さもこの範囲の中に写す。
     static let fullSpinRange: ClosedRange<Int> = 4...8
@@ -65,6 +66,141 @@ enum Config {
 
     /// フリックの角速度を、指を離す直前のこの時間（秒）に回った角度から求める。
     static let flickSampleWindow: TimeInterval = 0.15
+
+    // MARK: スピンの演出
+
+    /// 速さに連動する演出の強さが 1（最大）になる角速度（度/秒）。これ未満は角速度に比例して弱める（`SpinEffectIntensity`）。
+    static let effectFullIntensityVelocity: Double = 720
+
+    /// 演出用にドラッグ中の角速度を滑らかにする時定数（秒）。フレームごとに新しい値へこの時間で約 63% 寄せる。
+    static let effectSmoothingTime: TimeInterval = 0.08
+
+    /// 指で盤面を動かしている間の演出（`WheelDragMotion`）で、最後に指が動いてからこの時間（秒）がたったら止まり切ったとみなす。
+    /// 角速度は窓（`flickSampleWindow`）の 0.15 秒で 0 に落ち、平滑の残り（時定数 0.08 秒）も 0.35 秒で約 1% になる。
+    /// 火花の寿命の最大（`wheelSparkLifetime`）と同じなので、最後に生まれた火花も消え切る。
+    static let dragEffectSettleTime: TimeInterval = 0.5
+
+    /// 指で盤面を動かしている間の演出で、指の位置の記録を残す長さ（秒）。演出が引く過去の時刻（火花の寿命 + 窓）より長くする。
+    static let dragEffectHistory: TimeInterval = 1.0
+
+    /// 2D の盤面の外周に並べる電飾の数（`WheelLights`）。12 時から時計回りに等間隔に置く。
+    static let wheelLightCount = 24
+
+    /// 電飾の光の並びが流れる角度の、盤面の回転角に対する比（`WheelLights.phase`）。並びは盤面の 1/4 の速さで同じ向きに流れる。
+    /// 盤面が 1 周したとき並びが元に戻るよう、`wheelLightCount` × これは `WheelLights.litStride` の倍数にする（24 × 0.25 = 6）。
+    static let wheelLightFlowFactor = 0.25
+
+    /// 電飾の光の並びが 1 フレームに進む上限（電球の個数）。速く回すと並びが 1 フレームに大きく飛び、流れではなく明滅に見えるので抑える
+    /// （並びは 3 個おきなので、1.5 個で向きが分からなくなる）。上限を超える速さでは並びが盤面より遅れて流れる（`WheelLights.Flow`）。
+    static let wheelLightMaxFlowPerFrame = 0.5
+
+    /// 電飾の光の並びが盤面より遅れてよい上限（電球の個数）。1 フレームの上限で流し切れなかった分はここまで次の描き直しに持ち越して追いつかせ、
+    /// 超える分は捨てる。指で動かしている間は指の動き（親の描き直し）と `TimelineView` の描き直しの時刻がずれ、角度が変わった描き直しの
+    /// 経過時間が短くなるので、持ち越さないと上限より遅い動きでも流れを捨ててしまう。1 個（盤面で 60 度）は上限の速さの 2 フレーム分で、
+    /// 速く回したあとも 2 フレームで追いつく（`WheelLights.Flow`）。
+    static let wheelLightMaxFlowLag = 1.0
+
+    /// 演出の上限を時間あたりに直すときの 1 フレームの長さ（秒）。iPhone のアプリは 60Hz で描くので 1/60 秒
+    /// （120Hz・90Hz の画面では 1 フレームあたりはもっと小さくなる）。
+    static let effectReferenceFrameInterval: TimeInterval = 1.0 / 60
+
+    /// 停止の瞬間の電飾の全灯の点滅の周期（秒）と回数。0.6 秒周期の 2 回（停止の瞬間と 0.6 秒後が明るい）で、
+    /// 停止の瞬間のフラッシュと 1 回目を重ねるので、合わせても 1 秒に 3 回未満の明滅に収まる。
+    static let wheelLightBlinkPeriod: TimeInterval = 0.6
+    static let wheelLightBlinkCount = 2
+
+    /// 結果表示中に電飾の全灯がゆっくり脈打つ周期（秒）。止まったスライスの光彩の余韻（`WheelStopEffects`）も同じ周期・同じ位相で脈打つ。
+    static let wheelLightAfterglowPeriod: TimeInterval = 2.4
+
+    /// 停止の瞬間のフラッシュ（`WheelStopEffects.flashOpacity`）が消えるまでの長さ（秒）。1 回だけ光らせる。
+    static let stopFlashDuration: TimeInterval = 0.25
+
+    /// 脈動だけを描いている間（電飾の点滅の後・光彩の余韻）の描き直しの最短間隔（秒）。周期 2.4 秒のゆっくりした変化なので、
+    /// 毎フレームでなくても段差は見えない（1 回の変化は不透明度で 0.04 未満）。
+    static let effectPulseFrameInterval: TimeInterval = 1.0 / 20
+
+    /// 止まり際の焦らし（`SpinTease`）でスピンに足す長さ（秒）。焦らしを入れるスピンは入り方に依らず
+    /// `spinDuration + spinTeaseDuration`（6.5 秒）で、主の区間は `spinDuration` のまま。
+    static let spinTeaseDuration: TimeInterval = 2.0
+
+    /// 焦らしを入れたスピンの完了の保険（`spinFallback` と同じく、長さの 0.6 秒後）。
+    static let spinTeaseFallback: TimeInterval = spinDuration + spinTeaseDuration + 0.6
+
+    /// 焦らしの区間の曲線（ease-in-out の sine。`cubic-bezier(0.37, 0, 0.63, 1)`）。始点・終点の傾きが 0 なので、主の区間（終点の傾きが 0 の
+    /// `spinEasing`）や前後の焦らしの区間と角速度 0 でつながる。振り子の揺れ（正弦波）に近い形で、中ほどの傾き（約 1.59 倍）が
+    /// `CubicBezierCurve(0.42, 0, 0.58, 1)`（約 1.72 倍）より小さいので、同じ振れ幅でも速さの山が低い。
+    static let spinTeaseEasing = CubicBezierCurve(0.37, 0, 0.63, 1)
+
+    /// ためらい・戻りかけで主の区間を止める、止まるスライスに入る境目の手前の距離。スライス幅に対する割合と上限（度）の小さい方。
+    /// 止まりかける角度は 1 つ前のスライス（隣）の中に収まる。
+    static let spinTeaseApproachFraction: Double = 0.25
+    static let spinTeaseApproachMax: Double = 8
+
+    /// ためらい・戻りかけで、止まりかけた角度から止まる角度までの距離の上限（度）。広いスライスの奥で止まるときも、
+    /// 止まりかけてから加速し直して大きく回らないようにする（`docs/SPEC.md` §5.5）。止まりかけてから止まる角度を越えて揺れるまで
+    /// （これ + 戻る角度 + 揺れ）を 1 つの区間で進んでも、演出の強さが 0.05（うなりの下限 `humMinIntensity`）に届かない大きさに抑える。
+    static let spinTeaseCreepMax: Double = 10
+
+    /// 戻りかけで戻る角度。スライス幅に対する割合と上限（度）の小さい方。止まるスライスの中で止まりかけたときは
+    /// 止まるスライスに入る境目を越えて隣（1 つ前）のスライスまで戻ることがある。手前の距離と足してもスライス幅（の 75%）に収まり、
+    /// 隣の 1 つ先のスライスには入らない。
+    static let spinTeaseRollBackFraction: Double = 0.5
+    static let spinTeaseRollBackMax: Double = 7
+
+    /// 行き過ぎで止まる角度を越える角度（最初の振れ）。スライス幅に対する割合と上限（度）の小さい方。スライス幅（の 60%）未満なので、
+    /// 隣のスライスに入ることはあってもその次には入らない。そのあと `spinTeaseSwingDecay` ずつ縮めて戻り過ぎ・少し行き過ぎてから止まる。
+    static let spinTeaseOvershootFraction: Double = 0.6
+    static let spinTeaseOvershootMax: Double = 14
+
+    /// ためらいで止まりかけたあと、止まる角度を越えて揺れる最初の振れ幅。スライス幅に対する割合と上限（度）の小さい方。
+    /// そのあと `spinTeaseSwingDecay` 倍だけ戻り過ぎてから止まる。戻りかけは戻ったあとにこれの `spinTeaseSwingDecay` 倍だけ行き過ぎてから止まる。
+    static let spinTeaseSwingFraction: Double = 0.4
+    static let spinTeaseSwingMax: Double = 8
+
+    /// 止まる角度のまわりの揺れが 1 回折り返すごとに縮む割合（振り子の減衰）。行き過ぎの o → 戻り過ぎ 0.4 o → 少し行き過ぎ 0.16 o。
+    static let spinTeaseSwingDecay: Double = 0.4
+
+    /// 焦らしの区間（3 つ）の長さの割合（`spinTeaseDuration` に掛ける）。ためらい・行き過ぎは、止まる角度を越える最初の大きな振れを
+    /// いちばん長くし、振れが小さくなるほど短くする（1.0 → 0.6 → 0.4 秒）。
+    static let spinTeaseSwingShares: [Double] = [0.5, 0.3, 0.2]
+
+    /// 戻りかけの焦らしの区間（戻る → 進み直して少し行き過ぎる → 止まる）の長さの割合。進み直す区間は距離（止まりかけた角度からの
+    /// 距離 + 戻る角度 + 揺れ）がいちばん長いので、いちばん長くする（0.5 → 1.2 → 0.3 秒）。
+    static let spinTeaseRollBackShares: [Double] = [0.25, 0.6, 0.15]
+
+    /// 背景の光の脈動（`WheelBackGlow`）の、演出の強さが 1 のときの不透明度。強さに比例して 0 からここまで明るくする。
+    static let wheelBackGlowMaxOpacity = 0.6
+
+    /// 光の尾・残像（`WheelTrails`）を出し始める演出の強さ（0...1）。これ未満では出さず、ここから 1 まで比例して濃くする。
+    static let wheelTrailThreshold = 0.35
+
+    /// 盤面の残像の枚数の上限と、低電力モードでの枚数。
+    static let wheelTrailMaxGhostCount = 3
+    static let wheelTrailLowPowerGhostCount = 1
+
+    /// いちばん後ろの残像が今から何秒前の盤面か。手前の残像はこれを枚数で等分した時刻（3 枚なら約 17・33・50 ミリ秒前）。
+    static let wheelTrailGhostWindow: TimeInterval = 0.05
+
+    /// いちばん後ろの残像をずらす角度の上限（度）と、スライス 1 枚の角度に対する上限の比。小さい方を使い、
+    /// 最高速（2000°/秒を超える）でも残像が隣のスライスを越えてずれないようにする。
+    static let wheelTrailMaxGhostOffset: Double = 18
+    static let wheelTrailMaxGhostSliceFraction = 0.6
+
+    /// 光の尾の長さの最大（度、強さ 1 のとき）。
+    static let wheelTrailMaxLength: Double = 120
+
+    /// 針の先の火花（`WheelParticles`）と停止の瞬間の紙吹雪の、同時に出す粒子の数の上限。
+    static let wheelSparkMaxCount = 60
+    static let wheelConfettiMaxCount = 80
+
+    /// 低電力モードで粒子の数の上限を割る数（上限の 1/3。火花 20・紙吹雪 26）。
+    static let wheelParticleLowPowerDivisor = 3
+
+    /// 火花 1 粒の寿命の最大（秒）。この間に生まれた分だけが同時に出ているので、生まれる間隔は これ ÷ 上限（`WheelParticles.sparkSlotInterval`）。
+    static let wheelSparkLifetime: TimeInterval = 0.5
+
+    /// 紙吹雪がはじけてから消え切るまでの長さ（秒）。粒ごとの寿命はこれ以下。
+    static let wheelConfettiDuration: TimeInterval = 1.6
 
     /// 削除した項目を「元に戻す」で戻せる時間。過ぎると削除が確定する。
     static let undoDuration: TimeInterval = 5
@@ -99,6 +235,17 @@ enum Config {
     /// 止まったスライスの光彩の色（`GlowStyle.rawValue`）を保存する `UserDefaults` のキー。未設定なら `GlowStyle.default`。
     static let glowStyleKey = "glowStyle"
 
+    // MARK: スピンの演出
+
+    /// 「スピンの演出」全体の ON / OFF を保存する `UserDefaults` のキー。未設定なら ON。
+    /// 以前の 5 択の保存値（`spinEffectStyle`）は読まない（移行しない。全員が全部入りから始まる）。
+    static let spinEffectsEnabledKey = "spinEffects.enabled"
+
+    /// 「スピンの演出」の個別のトグル（`SpinEffectItem`）の ON / OFF を保存する `UserDefaults` のキー。未設定なら `SpinEffects.default`（ON）。
+    static func spinEffectKey(_ item: SpinEffectItem) -> String {
+        "spinEffects.\(item.rawValue)"
+    }
+
     // MARK: 3D 表示
 
     /// 盤面を 3D で描くかを保存する `UserDefaults` のキー。未設定なら OFF（今の 2D の盤面）。
@@ -132,6 +279,29 @@ enum Config {
 
     /// クリック音の音量。密に重なっても耳に刺さらないところまで下げてある。
     static let clickGain: Float = 0.7
+
+    /// 停止時の決まり音（`StopChime`）の音量。音源は最大振幅 0.8 で書き出してあり、伸びる音なのでクリックより下げて
+    /// 結果の読み上げや周りの会話の邪魔にならないところに置く。クリックの最後の音と重なっても割れない。
+    static let chimeGain: Float = 0.5
+
+    /// スピン中のうなり（`SpinHum`）の音量。回転音（`clickGain`）より小さくして、カチカチの粒立ちを埋めない。
+    /// 音源は最大振幅 0.8 で書き出してあり、速いときは打ちが重なるので、さらに下げておく。
+    static let humGain: Float = 0.35
+
+    /// うなりを打つ最小の演出の強さ（`SpinEffectIntensity`）。これ以下（既定では 36°/秒以下）では打たない。
+    /// 止まり際と焦らしの区間はこれを下回るので、うなりは止まる前に消える。
+    static let humMinIntensity = 0.05
+
+    /// うなりを打つ間隔（秒）。強さ 1 で `humFastInterval`（1 秒に約 18 打ちのロール）、強さ 0 に近づくほど `humSlowInterval` に広げる。
+    static let humFastInterval: TimeInterval = 0.055
+    static let humSlowInterval: TimeInterval = 0.16
+
+    /// うなりの 1 打ちの再生の速さ（ピッチ）。強さ 0 で `humMinRate`、強さ 1 で `humMaxRate`。速いほど高く、遅くなるにつれて低く沈む。
+    static let humMinRate = 0.85
+    static let humMaxRate = 1.15
+
+    /// ドラムロールの左右の手の強弱。1 打ちおきにこの割合で弱める。
+    static let humAccent = 0.8
 
     // MARK: 3D の盤の傾き
 

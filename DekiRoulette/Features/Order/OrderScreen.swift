@@ -91,21 +91,28 @@ struct OrderScreen: View {
             .accessibilityIdentifier("order.shuffle")
 
             ZStack {
-                // 演出が終わって結果が出ている間だけ出す。結果が変わると作り直されるので
-                // 「コピーしました」も自然に戻る
+                // 演出が終わって結果が出ている間だけ出す。結果が変わると作り直す
                 if let ordered = model.ordered, !model.revealing {
-                    let text = ResultText.order(ordered.map(\.label))
+                    let labels = ordered.map(\.label)
+                    let text = ResultText.order(labels, heading: L10n.shareOrderHeading)
                     ResultActions(
-                        copyText: text,
-                        shareText: ResultText.share(text, appName: L10n.appName),
+                        shareText: ResultText.share(text, hashtag: L10n.shareHashtag, appStoreURL: Config.appStoreURL),
+                        // X は上限があるので、長い並びは上位から入るだけ載せて「ほか M 件」にする
+                        postText: ResultText.orderPost(
+                            labels, heading: L10n.shareOrderHeading, hashtag: L10n.shareHashtag,
+                            appStoreURL: Config.appStoreURL, others: L10n.shareOrderOthers
+                        ),
                         shareImage: shareImage,
-                        copyIdentifier: "order.result.copy"
+                        shareIdentifier: "order.result.share"
                     )
-                    .id(model.resultId)
+                        .id(model.resultId)
                 }
             }
-            // コピーボタンの有無で上のボタンが動かないよう高さを固定する。大きい文字では最小高さだけ残す
-            .frame(minHeight: 32, maxHeight: TypeLayout.growsFixedAreas(for: typeSize) ? nil : 32)
+            // 共有ボタンの有無で上のボタンが動かないよう高さを固定する。大きい文字では最小高さだけ残す
+            .frame(
+                minHeight: Theme.Layout.resultActionsHeight,
+                maxHeight: TypeLayout.growsFixedAreas(for: typeSize) ? nil : Theme.Layout.resultActionsHeight
+            )
         }
         .frame(maxWidth: .infinity)
     }

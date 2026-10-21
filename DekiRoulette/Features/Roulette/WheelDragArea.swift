@@ -9,6 +9,9 @@ import SwiftUI
 /// 追従で針がスライスの境目を越えたら、その時刻（秒）を `onBoundaryCross` に伝える（親が回転音と触覚を鳴らす）。
 /// 結果が出たあと（`highlightedIndex` が nil でない）に指で動かしたら `displacedByDrag` を立てる（盤面は強調を解く）。
 /// 新しい結果（または結果なし）になったら戻す。角速度は画面平面上の指の動きで出す（盤面が傾いていても同じ式）。
+/// `tracksMotion` のときは、指が動くたびに位置と追従で回した角度を `WheelDragMotion` に記録して `content` に渡す
+/// （速さに連動する演出が指で動かしている間の角速度を引く）。時刻は `now`（演出の時計）にそろえる。指を離したあとも
+/// 次のドラッグまで最後の記録を渡す（離した動きの残りの演出が消え切るまで）。
 struct WheelDragArea<Content: View>: View {
     let count: Int
     let rotation: Double
@@ -17,7 +20,11 @@ struct WheelDragArea<Content: View>: View {
     let onBoundaryCross: ((_ time: TimeInterval) -> Void)?
     let onGrab: (() -> Double?)?
     let onRelease: ((_ angularVelocity: Double?, _ dragRotation: Double) -> Void)?
-    @ViewBuilder let content: (_ dragRotation: Double, _ displacedByDrag: Bool) -> Content
+    /// 指で動かしている動きを記録するか（2D の盤面で速さに連動する演出を出すとき）。
+    var tracksMotion = false
+    /// 演出の時計（`RouletteModel.now` = `systemUptime` の秒）。記録の時刻をこれにそろえる。
+    var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    @ViewBuilder let content: (_ dragRotation: Double, _ displacedByDrag: Bool, _ dragMotion: WheelDragMotion?) -> Content
 
     @State private var flickSamples = FlickSampleBuffer()
     /// 追従で回した角度。指を離すと親に渡して 0 に戻す。親の `rotation` と違ってスピンの曲線で補間しない
@@ -25,10 +32,12 @@ struct WheelDragArea<Content: View>: View {
     /// 結果が出たあとに盤面を指で動かした。止まったスライスが針の下から外れるので強調を解く
     @State private var displacedByDrag = false
     @State private var dragSession = WheelDragSession()
+    /// 指で動かしている動きの記録（`tracksMotion` のときだけ）。次のドラッグを始めるまで残す
+    @State private var dragMotion: WheelDragMotion?
     @GestureState private var dragging = false
 
     var body: some View {
-        content(dragRotation, displacedByDrag)
+        content(dragRotation, displacedByDrag, dragMotion)
             .overlay {
                 // ドラッグ中は盤面を指に追従させ、指を離したらその角度からスピンを始める（結果は開始時に決まり、そこから止める）
                 GeometryReader { proxy in
@@ -59,6 +68,10 @@ struct WheelDragArea<Content: View>: View {
                     dragSession.ignored = !interactive
                     // 惰性の途中なら親がその場で止める。止めた角度は描き直すまで `rotation` に届かないので、最初の追従の基準にする
                     if !dragSession.ignored { dragSession.grabbedRotation = onGrab?() ?? nil }
+                    // 指の時刻（`Date` の秒）と演出の時計（`systemUptime` の秒）のずれ。ドラッグの間はこれで直す
+                    dragSession.clockOffset = WheelDragMotion.clockOffset(
+                        effectNow: now(), gestureNow: Date().timeIntervalSinceReferenceDate
+                    )
                 }
                 guard !dragSession.ignored else { return }
                 follow(
@@ -66,6 +79,7 @@ struct WheelDragArea<Content: View>: View {
                     time: value.time.timeIntervalSinceReferenceDate
                 )
                 flickSamples.append(FlickSpin.Sample(time: value.time.timeIntervalSinceReferenceDate, location: value.location))
+                record(value.location, at: value.time.timeIntervalSinceReferenceDate, center: center)
             }
             .onEnded { value in
                 guard dragSession.started, !dragSession.ignored else {
@@ -77,6 +91,7 @@ struct WheelDragArea<Content: View>: View {
                     time: value.time.timeIntervalSinceReferenceDate
                 )
                 flickSamples.append(FlickSpin.Sample(time: value.time.timeIntervalSinceReferenceDate, location: value.location))
+                record(value.location, at: value.time.timeIntervalSinceReferenceDate, center: center)
                 release(angularVelocity: FlickSpin.angularVelocity(samples: flickSamples.samples, center: center))
             }
     }
@@ -94,6 +109,19 @@ struct WheelDragArea<Content: View>: View {
         if highlightedIndex != nil { displacedByDrag = true }
         if WheelDrag.boundaryCrossings(from: before, to: base + dragRotation, count: count) > 0 {
             onBoundaryCross?(time)
+        }
+    }
+
+    /// 指で動かしている動きに、今の指の位置と追従で回した角度を記録する（`follow` のあと）。ドラッグの最初の点で記録を作り直す。
+    /// 時刻は指の時刻（`Date` の秒）に、ドラッグを始めたときのずれを足して演出の時計にする。
+    private func record(_ location: CGPoint, at gestureTime: TimeInterval, center: CGPoint) {
+        guard tracksMotion else { return }
+        let time = gestureTime + dragSession.clockOffset
+        if dragSession.recording, dragMotion != nil {
+            dragMotion?.append(time: time, location: location, angle: dragRotation)
+        } else {
+            dragSession.recording = true
+            dragMotion = WheelDragMotion(center: center, time: time, location: location, angle: dragRotation)
         }
     }
 
@@ -121,11 +149,17 @@ final class WheelDragSession {
     var lastLocation: CGPoint?
     /// 惰性を止めた角度。止めた直後の追従で、まだ描き直されていない `rotation` の代わりに境目の判定の基準にする。
     var grabbedRotation: Double?
+    /// 演出の時計 − 指の時計（秒）。ドラッグを始めたときに求める。
+    var clockOffset: TimeInterval = 0
+    /// このドラッグの動きを記録し始めた。
+    var recording = false
 
     func reset() {
         started = false
         ignored = false
         lastLocation = nil
         grabbedRotation = nil
+        clockOffset = 0
+        recording = false
     }
 }

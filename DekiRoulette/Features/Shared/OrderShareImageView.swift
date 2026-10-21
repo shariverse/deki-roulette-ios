@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 共有シートに渡す順番決めの結果画像。一辺 `side` の正方形に、順位の行（カード）を上から並べ、アプリ名（`L10n.appName` の文字だけ）を下に置く。
 /// 寸法は `ShareImageLayout.order(side:)`、地と文字はルーレットの画像（`RouletteShareImageView`）と同じ固定色（`Theme.shareBackground` / `shareInk`）。
-/// 行は `ResultText.order` と同じ「1. ラベル」の並びで、1 位は画面（`OrderResultView`）と同じ `gold`、他は `muted` 系。
+/// 行は `ResultText.numbered` と同じ「1. ラベル」の並びで、1 位は画面（`OrderResultView`）と同じ `gold`、他は `muted` 系。
 /// 行の色のトークンは外観で変わるが、`ShareImageRenderer` がダークに固定して焼くので画像は端末の外観に依らない。
 /// 行数が上限を超えるときは上限より 1 つ少ない件数を並べ、最後の行を「ほか M 件」にする（`Order.rows(count:)`）。長いラベルは `labelLimit` で省略する。
 ///
@@ -39,7 +39,7 @@ struct OrderShareImageView: View {
             }
 
             Text(L10n.appName)
-                .font(.system(size: ShareImageLayout.brandFontSize(side: side), weight: .bold))
+                .font(Theme.Typography.fixed(size: ShareImageLayout.brandFontSize(side: side), weight: .bold))
                 .foregroundStyle(Theme.shareInk)
                 .lineLimit(1)
                 .position(x: side / 2, y: ShareImageLayout.brandCenterY(side: side))
@@ -57,11 +57,11 @@ struct OrderShareImageView: View {
         let radius = layout.rowHeight * Self.cornerRatio
         return HStack(spacing: layout.rankGap) {
             Text(rank.map { "\($0)." } ?? "")
-                .font(.system(size: layout.fontSize, weight: .black).monospacedDigit())
+                .font(Theme.Typography.fixed(size: layout.fontSize, weight: .black).monospacedDigit())
                 .foregroundStyle(top ? Theme.gold : Theme.muted)
                 .frame(width: layout.rankWidth, alignment: .trailing)
             Text(text)
-                .font(.system(size: layout.fontSize, weight: .bold))
+                .font(Theme.Typography.fixed(size: layout.fontSize, weight: .bold))
                 .foregroundStyle(top ? Theme.gold : rank == nil ? Theme.muted : Theme.ivory)
                 .lineLimit(1)
             Spacer(minLength: 0)

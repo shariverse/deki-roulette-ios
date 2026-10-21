@@ -7,7 +7,8 @@ struct WheelLabelTests {
     @Test func 基準の直径では仕様の表どおりになる() {
         for count in 2...5 {
             #expect(WheelLabel.limit(count: count, diameter: reference) == 10)
-            #expect(WheelLabel.fontSize(count: count, diameter: reference) == 13)
+            // 表の 13 から、同梱の書体の字幅に合わせて 11.5 にしている（`WheelLabel.baseFontSize`）
+            #expect(WheelLabel.fontSize(count: count, diameter: reference) == 11.5)
         }
         for count in 6...8 {
             #expect(WheelLabel.limit(count: count, diameter: reference) == 7)
@@ -28,7 +29,7 @@ struct WheelLabelTests {
         let diameter = reference * 0.875
         #expect(WheelLabel.limit(count: 4, diameter: diameter) == 10)
         #expect(WheelLabel.limit(count: 12, diameter: diameter) == 5)
-        #expect(WheelLabel.fontSize(count: 4, diameter: diameter) == 13 * 0.875)
+        #expect(WheelLabel.fontSize(count: 4, diameter: diameter) == 11.5 * 0.875)
         #expect(WheelLabel.fontSize(count: 12, diameter: diameter) == 9 * 0.875)
     }
 
@@ -38,7 +39,7 @@ struct WheelLabelTests {
         #expect(WheelLabel.limit(count: 4, diameter: diameter) == 12)
         #expect(WheelLabel.limit(count: 7, diameter: diameter) == 8)
         #expect(WheelLabel.limit(count: 12, diameter: diameter) == 6)
-        #expect(abs(WheelLabel.fontSize(count: 4, diameter: diameter) - 13 * 1.5.squareRoot()) < 1e-9)
+        #expect(abs(WheelLabel.fontSize(count: 4, diameter: diameter) - 11.5 * 1.5.squareRoot()) < 1e-9)
         #expect(abs(WheelLabel.fontSize(count: 12, diameter: diameter) - 9 * 1.5.squareRoot()) < 1e-9)
     }
 

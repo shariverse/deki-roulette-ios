@@ -4,7 +4,7 @@ import Foundation
 /// 端点は (0, 0) と (1, 1) に固定。`Theme.spinAnimation` の `timingCurve` と同じ形なので、
 /// `withAnimation` の補間中の角度（observable ではない）をこの曲線から逆算できる。
 /// 制御点は x, y とも 0...1 に収まり、両成分が単調増加である前提（CSS と同じ制約）。
-struct CubicBezierCurve: Equatable, Sendable {
+struct CubicBezierCurve: Hashable, Sendable {
     let x1: Double
     let y1: Double
     let x2: Double
@@ -27,8 +27,28 @@ struct CubicBezierCurve: Equatable, Sendable {
         x(at: solve(target: clamp(progress), y(at:)))
     }
 
+    /// 時刻の割合 `time`（0...1）における曲線の傾き（進み具合 ÷ 時刻の割合、dy/dx）。
+    /// 回転の角速度は、これに平均の速さ（回る角度 ÷ 長さ）を掛けたものになる。
+    /// パラメータ s での接線の比 (dy/ds) ÷ (dx/ds) で求める。dx/ds が 0 になる端（`x1 == 0` の始点、`x2 == 1` の終点）は
+    /// 傾きが発散するので、端からわずかに内側のパラメータで測る（演出に使う値を有限に保つ）。
+    func slope(atTime time: Double) -> Double {
+        var s = solve(target: clamp(time), x(at:))
+        if dx(at: s) < 1e-12 {
+            s = min(max(s, 1e-6), 1 - 1e-6)
+        }
+        return dy(at: s) / dx(at: s)
+    }
+
     private func x(at s: Double) -> Double { component(s, x1, x2) }
     private func y(at s: Double) -> Double { component(s, y1, y2) }
+    private func dx(at s: Double) -> Double { derivative(s, x1, x2) }
+    private func dy(at s: Double) -> Double { derivative(s, y1, y2) }
+
+    /// `component` をパラメータ s で微分した値。
+    private func derivative(_ s: Double, _ p1: Double, _ p2: Double) -> Double {
+        let u = 1 - s
+        return 3 * u * u * p1 + 6 * u * s * (p2 - p1) + 3 * s * s * (1 - p2)
+    }
 
     /// 端点 0 と 1 を持つ 3 次ベジェの 1 成分をパラメータ s で評価する。
     private func component(_ s: Double, _ p1: Double, _ p2: Double) -> Double {

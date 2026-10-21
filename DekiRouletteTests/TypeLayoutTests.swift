@@ -22,4 +22,9 @@ struct TypeLayoutTests {
         #expect(TypeLayout.growsFixedAreas(for: .accessibility1))
         #expect(TypeLayout.growsFixedAreas(for: .accessibility5))
     }
+
+    @Test func 結果の下の行はタップ領域44pt以上() {
+        // 「結果を共有」の高さ。開始ボタンより低くしても、押せる大きさの下限は割らない
+        #expect(Theme.Layout.resultActionsHeight >= 44)
+    }
 }
