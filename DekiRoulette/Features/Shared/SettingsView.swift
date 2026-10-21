@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// ヘッダ右上のアイコンから開く設定。触覚フィードバックと効果音の切替、ルーレットの詳細設定（光彩の色・3D 表示）、
-/// アプリアイコンの選択、項目の初期化、著作権の項目を置く。
+/// 外観（自動・ライト・ダーク。visionOS には出さない）とアプリアイコンの選択、項目の初期化、著作権・ライセンスの項目を置く。
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Config.hapticsEnabledKey) private var hapticsEnabled = true
@@ -40,6 +40,12 @@ struct SettingsView: View {
                     SettingsLinkRow(title: L10n.rouletteAdvancedTitle) {
                         RouletteAdvancedSettingsView()
                     }
+                    // visionOS では外観を当てずにシステムに従うので、項目ごと出さない
+                    #if !os(visionOS)
+                    SettingsLinkRow(title: L10n.appearanceTitle) {
+                        AppearanceSettingsView()
+                    }
+                    #endif
                     // 代替アイコンに切り替えられない端末では項目ごと出さない
                     if appIcons.isSupported {
                         SettingsLinkRow(title: L10n.appIconTitle) {
@@ -195,6 +201,33 @@ private struct RouletteAdvancedSettingsView: View {
         }
         .background(Theme.ink900.ignoresSafeArea())
         .appNavigationTitle(L10n.rouletteAdvancedTitle)
+        .toolbarBackground(Theme.ink800, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
+/// 設定から進む「外観」。自動（端末の外観に従う）・ライト・ダークから選び、押したらその場で `Config.appearanceModeKey` に書く。
+/// アプリの根（`DekiRouletteApp`）が同じキーを読んで当てるので、開いているこのシートとその下の画面もその場で切り替わる。
+private struct AppearanceSettingsView: View {
+    @AppStorage(Config.appearanceModeKey) private var appearanceMode = AppearanceMode.default
+
+    var body: some View {
+        ScrollView {
+            SettingsCard {
+                ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                    SettingsChoiceRow(title: L10n.appearanceModeName(mode), selected: appearanceMode == mode) {
+                        appearanceMode = mode
+                    }
+                }
+                Text(L10n.appearanceNote)
+                    .font(Theme.Typography.font(.caption))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
+        }
+        .background(Theme.ink900.ignoresSafeArea())
+        .appNavigationTitle(L10n.appearanceTitle)
         .toolbarBackground(Theme.ink800, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
     }
