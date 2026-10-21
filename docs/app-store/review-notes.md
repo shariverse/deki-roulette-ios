@@ -7,13 +7,14 @@ App Store Connect の「App Review に関する情報」→「メモ」に貼る
 
 ・アカウントの登録・ログインはありません（デモ用アカウントは不要です）。
 ・インターネットを通じた通信は行いません。入力した項目はすべて端末の中だけに保存します。
-・課金・広告・通知はありません。クリップボードへは「結果をコピー」を押したときだけ書き込み、読み取ることはありません。
+・課金・広告・通知はありません。クリップボードの読み取り・書き込みはしません（共有シートで「コピー」を選んだときは、システムが書き込みます）。
+・写真への追加の許可は、共有シートで「画像を保存」を選んだときだけ求めます（写真の読み取りの許可は求めません）。
 
 【確認の手順】
-1. 起動すると「ルーレット」画面が出ます。「ラーメン」「カレー」「寿司」「焼肉」などの初期項目があり、「スピン」を押すと盤面が回って結果が出ます。盤面のフリックでも回せます。結果の下の「結果をコピー」「共有」が使えます（共有シートには結果の画像が付きます）。
+1. 起動すると「ルーレット」画面が出ます。「ラーメン」「カレー」「寿司」「焼肉」などの初期項目があり、「スピン」を押すと盤面が回って結果が出ます。盤面のフリックでも回せます。結果の下の「結果を共有」と X・LINE のボタンが使えます。共有シートには結果の画像が付きます。X・LINE のボタンは、結果の文面を入れた投稿画面（各アプリ、または Web）を開きます（アプリから投稿・通信はせず、URL を開くだけです）。
 2. 画面の「順番決め」タブで「並べ替え」を押すと、1 位から 1 件ずつ順番が表示されます。
 3. 項目は入力欄から追加・編集・削除できます（2〜24 個）。項目ごとに色や絵文字を付けられます。よく使うリストは名前を付けて保存できます。
-4. ヘッダ右上の歯車から設定（効果音・触覚フィードバック・ルーレットの詳細設定・アプリアイコン・項目の初期化・著作権）を開けます。
+4. ヘッダ右上の歯車から設定（効果音・触覚フィードバック・ルーレットの詳細設定・アプリアイコン・項目の初期化・著作権・ライセンス）を開けます。
 5. 画面キャプチャの確認: 画面収録やミラーリングでキャプチャしている間の表示は通常と同じです（後述の印だけが出なくなります）。
 
 【補足】
@@ -31,13 +32,14 @@ DekiRoulette has two screens: a roulette that picks one item out of several, and
 
 - There is no account registration or sign-in (no demo account is needed).
 - The app does not communicate over the internet. All items you enter are stored only on the device.
-- There are no in-app purchases, ads or notifications. The app writes to the clipboard only when you press "Copy result", and never reads it.
+- There are no in-app purchases, ads or notifications. The app does not read or write the clipboard (if you choose Copy in the share sheet, the system writes to it).
+- The app asks for permission to add photos only when you choose Save Image in the share sheet. It never asks to read your photos.
 
 [How to review]
-1. On launch, the roulette screen appears with default items such as Ramen, Curry, Sushi and Yakiniku. Press "Spin" and the wheel turns and lands on a result. You can also flick the wheel to spin it. "Copy result" and "Share" appear below the result (the share sheet includes an image of the result).
+1. On launch, the roulette screen appears with default items such as Ramen, Curry, Sushi and Yakiniku. Press "Spin" and the wheel turns and lands on a result. You can also flick the wheel to spin it. "Share result" and the X and LINE buttons appear below the result. The share sheet includes an image of the result. The X and LINE buttons open a post with the result text filled in, in the app or on the web (the app itself does not post or communicate; it only opens the URL).
 2. On the "Random order" tab, press "Shuffle" and the order appears one place at a time.
 3. Add, edit and delete items (2 to 24). Each item can have a color or an emoji, and you can save lists with a name.
-4. Open Settings from the gear button at the top right (sound, haptics, roulette details, app icon, reset items, copyright).
+4. Open Settings from the gear button at the top right (sound, haptics, roulette details, app icon, reset items, copyright, licenses).
 5. Screen capture check: while the screen is being recorded or mirrored, everything looks the same except that the marks described below are hidden.
 
 [Note]
@@ -50,5 +52,6 @@ The app supports iPhone, iPad and Apple Vision Pro.
 
 - **ユーザーが作る内容**: 項目は端末の中だけで、ほかの利用者に見せる機能は無い（共有は本人が押したときだけ。通報・ブロックの仕組みは不要）
 - **ギャンブル**: 実際のお金を賭ける機能は無い（賭け事・賞金には使えない）
-- **商標・人物**: アプリの中に実在のアーティスト名や画像は入れていない。初期項目（ラーメン・カレーなど）も一般的な語だけ
-- **クリップボード**: 書き込みは「結果をコピー」を押したときだけ。読み取りはしない
+- **商標・人物**: アプリの中に実在のアーティスト名や画像は入れていない。初期項目（ラーメン・カレーなど）も一般的な語だけ。X・LINE のロゴは各社の配布素材を比率・色を変えずに縮めて使い、設定の「著作権」に商標の注記を置いている
+- **クリップボード**: アプリからは読み書きしない（共有シートの「コピー」はシステムが書き込む）
+- **写真**: 共有シートの「画像を保存」のときだけ追加の許可を求める（`NSPhotoLibraryAddUsageDescription`）。読み取りの許可は求めない

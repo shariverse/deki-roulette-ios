@@ -50,14 +50,14 @@ Picking who organizes the party, choosing where to have lunch, setting the runni
 ◆ Make the items yours
 Give each item a color or an emoji. Save the lists you use often with a name and load them whenever you need them.
 
-◆ Copy and share the result
-"Copy result" puts the result and the items on the clipboard as text. "Share" also sends an image of the result. Paste it into a group chat and everyone sees the same result.
+◆ Share the result
+"Share result" sends an image of the result together with the text. The X and LINE buttons open a post with the result already filled in. Send it to a group chat and everyone sees the same result.
 
 ◆ Sound and feel
 Spin sound, haptics, how the stopped slice glows, and a 3D wheel. Fine-tune it all in Settings.
 
 ◆ App icons to choose from
-Pick from Neon, Pastel, Spinner, and Target (iPhone and iPad).
+Pick from Neon, Pastel, Spinner, and Rings (iPhone and iPad).
 
 ◆ For iPhone, iPad and Apple Vision Pro
 It follows Dark Mode and larger text settings, too.
