@@ -18,10 +18,10 @@ import XCTest
 /// - visionOS は XCTest の手動スクリーンショットが使えない（`Manual screenshots are not supported.` で 1×1 の絵になる）ため、
 ///   スクリプト（ホスト）に合図のファイルを書いて、`xcrun simctl io ... screenshot` で撮ってもらう
 final class AppStoreScreenshotTests: XCTestCase {
-    /// 結果が出ている間だけ出る「結果をコピー」ボタン。スピンや並べ替えが終わったこと（＝結果が出たこと）を待つのに使う。
+    /// 結果が出ている間だけ出る「結果を共有」ボタン。スピンや並べ替えが終わったこと（＝結果が出たこと）を待つのに使う。
     private enum ResultSignal {
-        static let roulette = "roulette.result.copy"
-        static let order = "order.result.copy"
+        static let roulette = "roulette.result.share"
+        static let order = "order.result.share"
     }
 
     override func setUpWithError() throws {
@@ -42,7 +42,7 @@ final class AppStoreScreenshotTests: XCTestCase {
         XCTAssertTrue(spin.waitForExistence(timeout: 30), "スピンのボタンが見つからない")
         capture("01-ルーレット")
 
-        // 2. 回した結果。スピン中は出ない「結果をコピー」が出るまで待つ（内側の状態を見なくて済む）
+        // 2. 回した結果。スピン中は出ない「結果を共有」が出るまで待つ（内側の状態を見なくて済む）
         spin.tap()
         if !app.buttons[ResultSignal.roulette].waitForExistence(timeout: 20) {
             // 1 回目のタップが届かなかったときの保険（スピン中に押しても無効なので、二度押しは無害）
@@ -62,7 +62,7 @@ final class AppStoreScreenshotTests: XCTestCase {
         XCTAssertTrue(shuffle.waitForExistence(timeout: 30), "並べ替えのボタンが見つからない")
         capture("03-順番決め")
 
-        // 4. 並べ替えた結果。演出中は出ない「結果をコピー」が出るまで待つ
+        // 4. 並べ替えた結果。演出中は出ない「結果を共有」が出るまで待つ
         shuffle.tap()
         if !app.buttons[ResultSignal.order].waitForExistence(timeout: 20) {
             shuffle.tap()
