@@ -127,6 +127,83 @@ enum Theme {
     /// 結果が現れる演出。両画面で使い回す。
     static let revealAnimation = Animation.timingCurve(0.2, 0.9, 0.3, 1, duration: Config.revealAnimationDuration)
 
+    // MARK: 書体
+
+    /// 同梱の書体（`AppFont`）のトークン。文字の `.font` はここから引く（SF Symbols の `Image(systemName:)` の `.font` は記号の大きさ・太さなのでシステムのまま）。
+    /// 太さはフェイスで出すので、返した `Font` に `.weight(_:)` / `.bold()` を掛けない。
+    enum Typography {
+        /// テキストスタイルの文字。Dynamic Type でスタイルと同じ割合で拡大する。`weight` を省くとスタイルの既定の太さ（`AppFont.defaultWeight(for:)`）。
+        static func font(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> Font {
+            let face = AppFont.face(for: weight ?? AppFont.defaultWeight(for: style))
+            return .custom(face.postScriptName, size: defaultSize(for: style), relativeTo: style)
+        }
+
+        /// 固定の大きさの文字（盤面・結果の帯・共有画像）。Dynamic Type で大きくしない。
+        static func fixed(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+            .custom(AppFont.face(for: weight).postScriptName, fixedSize: size)
+        }
+
+        /// UIKit で描く文字（3D のラベル画像など）。読めなかったら丸ゴシックのシステムの書体に戻す。
+        static func uiFont(size: CGFloat, weight: Font.Weight = .regular) -> UIFont {
+            let face = AppFont.face(for: weight)
+            if let font = UIFont(name: face.postScriptName, size: size) { return font }
+            let system = UIFont.systemFont(ofSize: size, weight: systemWeight(of: face))
+            guard let descriptor = system.fontDescriptor.withDesign(.rounded) else { return system }
+            return UIFont(descriptor: descriptor, size: size)
+        }
+
+        /// シートのツールバーの文字のボタン（「閉じる」「編集」）。システムの既定と同じ semibold の太さ（Bold のフェイス）にする。
+        /// iOS 26 のツールバーのボタンは環境の書体で描かれるので、付けないとアプリの既定（本文の Regular）になる。
+        static var barButton: Font { font(.body, weight: .semibold) }
+
+        /// `List` のセクションの見出し。アプリの根の本文の書体を引き継がないよう、システムの見出しと同じ大きさ・太さを明示する
+        /// （iOS 26 は本文の semibold、iOS 17・18 は footnote。`UIListContentConfiguration.groupedHeader()` の値）。
+        static var listSectionHeader: Font {
+            if #available(iOS 26, *) {
+                font(.body, weight: .semibold)
+            } else {
+                font(.footnote)
+            }
+        }
+
+        /// `List` のセクションの注記（システムと同じ footnote）。
+        static var listSectionFooter: Font { font(.footnote) }
+
+        /// スタイルの既定の大きさ（Dynamic Type が標準の `.large` のとき）。iOS と visionOS で違うので、数字を書き写さずシステムから引く。
+        static func defaultSize(for style: Font.TextStyle) -> CGFloat {
+            let traits = UITraitCollection(preferredContentSizeCategory: .large)
+            return UIFont.preferredFont(forTextStyle: uiTextStyle(style), compatibleWith: traits).pointSize
+        }
+
+        static func uiTextStyle(_ style: Font.TextStyle) -> UIFont.TextStyle {
+            switch style {
+            case .largeTitle: .largeTitle
+            case .title: .title1
+            case .title2: .title2
+            case .title3: .title3
+            case .headline: .headline
+            case .subheadline: .subheadline
+            case .callout: .callout
+            case .footnote: .footnote
+            case .caption: .caption1
+            case .caption2: .caption2
+            #if os(visionOS)
+            case .extraLargeTitle: .extraLargeTitle
+            case .extraLargeTitle2: .extraLargeTitle2
+            #endif
+            default: .body
+            }
+        }
+
+        private static func systemWeight(of face: AppFont.Face) -> UIFont.Weight {
+            switch face {
+            case .regular: .regular
+            case .bold: .bold
+            case .black: .black
+            }
+        }
+    }
+
     // MARK: レイアウト
 
     /// 画面の寸法。Web 版では Tailwind のユーティリティ（`max-w-3xl` / `w-[min(320px,78vw)]`）だったもの。
@@ -493,6 +570,29 @@ struct RevealOnAppear: ViewModifier {
 }
 
 extension View {
+    /// アプリの既定の書体。`.font` を持たない文字（`Toggle` / `Button` / `TextField` のラベルなど）も同梱の書体の本文にする。
+    /// シートは環境を引き継ぐので、アプリの根に 1 回掛ければよい。
+    /// `.fontDesign(.rounded)` は掛けない（環境に置くと `Font.custom` の文字までシステムの丸ゴシックに置き換わり、同梱の書体が出ない）。
+    func appTypography() -> some View {
+        font(Theme.Typography.font(.body))
+    }
+
+    /// シートの画面の題名（ナビゲーションバーの中央・インライン）。`navigationTitle` の文字は UIKit の外観の API でも同梱の書体にならないので、
+    /// 同じ題名を `.principal` の `Text` で同梱の書体で出す（`navigationTitle` も残し、戻るボタンと読み上げの画面名に使わせる）。
+    func appNavigationTitle(_ title: String) -> some View {
+        navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .font(Theme.Typography.font(.headline))
+                        .foregroundStyle(Theme.ivory)
+                        .lineLimit(1)
+                        .accessibilityAddTraits(.isHeader)
+                }
+            }
+    }
+
     func revealOnAppear(delay: TimeInterval = 0, reducedMotion: Bool) -> some View {
         modifier(RevealOnAppear(delay: delay, reducedMotion: reducedMotion))
     }

@@ -247,7 +247,7 @@ struct WheelFaceView: View {
                     .animation(animated ? Theme.stopDimAnimation : nil, value: highlighted)
                     .frame(width: radius * 2, height: radius * 2)
                 Text(WheelLabel.display(items[0].label, appearance: items[0].appearance, limit: maxLabelLength))
-                    .font(.system(size: fontSize, weight: .bold))
+                    .font(Theme.Typography.fixed(size: fontSize, weight: .bold))
                     .foregroundStyle(Self.ink)
             } else {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -267,7 +267,7 @@ struct WheelFaceView: View {
                             )
 
                         Text(WheelLabel.display(item.label, appearance: item.appearance, limit: maxLabelLength))
-                            .font(.system(size: fontSize, weight: .bold))
+                            .font(Theme.Typography.fixed(size: fontSize, weight: .bold))
                             .foregroundStyle(Self.ink)
                             .fixedSize()
                             // 左半分はそのまま回すと文字が上下逆さまになるため 180 度返す

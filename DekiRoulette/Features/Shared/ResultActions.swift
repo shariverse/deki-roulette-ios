@@ -121,7 +121,7 @@ private struct ResultActionLabel: View {
                 // 名前は文字から読ませる（「結果を共有」）
                 .accessibilityHidden(true)
             Text(title)
-                .font(.subheadline.weight(.bold))
+                .font(Theme.Typography.font(.subheadline, weight: .bold))
                 // アクセシビリティサイズでは省略せず 2 行まで折り返す（行の高さも `TypeLayout.growsFixedAreas` で伸びる）
                 .lineLimit(TypeLayout.labelLineLimit(for: typeSize))
                 .multilineTextAlignment(.center)

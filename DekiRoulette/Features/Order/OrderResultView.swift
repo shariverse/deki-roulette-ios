@@ -29,7 +29,7 @@ struct OrderResultView: View {
                 .accessibilityLabel(L10n.orderResultTitle)
             } else {
                 Text(revealing ? L10n.orderShuffling : L10n.orderResultPlaceholder)
-                    .font(.caption)
+                    .font(Theme.Typography.font(.caption))
                     .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
@@ -48,18 +48,18 @@ struct OrderResultView: View {
         let top = rank == 1
         return HStack(spacing: 12) {
             Text("\(rank)")
-                .font(.subheadline.weight(.black).monospacedDigit())
+                .font(Theme.Typography.font(.subheadline, weight: .black).monospacedDigit())
                 .foregroundStyle(top ? Theme.gold : Theme.muted)
                 .frame(width: rankWidth, alignment: .trailing)
                 .accessibilityLabel(L10n.orderRankAccessibilityLabel(rank))
             // 絵文字の項目はラベルの前に絵文字を置く（項目リストの行と同じ。読み上げはラベルだけ）
             if case .emoji(let emoji) = item.appearance {
                 Text(String(emoji))
-                    .font(.subheadline)
+                    .font(Theme.Typography.font(.subheadline))
                     .accessibilityHidden(true)
             }
             Text(item.label)
-                .font(.subheadline.weight(.bold))
+                .font(Theme.Typography.font(.subheadline, weight: .bold))
                 .foregroundStyle(top ? Theme.gold : Theme.ivory)
                 .lineLimit(TypeLayout.labelLineLimit(for: typeSize))
             Spacer(minLength: 0)

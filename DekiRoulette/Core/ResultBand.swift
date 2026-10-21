@@ -17,7 +17,8 @@ enum ResultBand {
     static let baseHorizontalPadding: Double = 14
     static let baseVerticalPadding: Double = 5
     /// 1 行の高さの見積もり（文字サイズに対する割合）。ハブ・円との重なりの確認に使う。
-    static let lineHeightRatio: Double = 1.2
+    /// 同梱の書体（Zen Maru Gothic）の 1 行の高さは文字サイズの約 1.448 倍（SF Rounded は約 1.19 倍）で、それを下回らない値にする（`FixedTextFitTests`）。
+    static let lineHeightRatio: Double = 1.45
     /// 中心のハブの直径（基準の直径での pt）。`RouletteWheelView` のハブと同じ。
     static let baseHubDiameter: Double = 38
     /// 盤面の外枠からスライスの円までの距離（基準の直径での pt）。`RouletteWheelView` と同じ（`WheelGeometry.sliceInset`）。
