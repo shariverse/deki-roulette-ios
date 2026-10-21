@@ -36,7 +36,11 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 - ロジックは `Core/` の純粋関数に寄せ、乱数は `RandomNumberGenerator` を注入できるようにしてテストする（テストは Swift Testing）。
 - 文言は `Localizable.xcstrings` にだけ置き、`L10n` 経由で読む。表示言語は OS 設定に従い、アプリ内切替は持たない。
 - 配色・アニメーションは `Theme` に集約。`gold` は順番決めの 1 位とフォーカスリング専用（ルーレットの結果表示は止まったスライスと同じ色）、`flare` は開始ボタン専用。印に専用色は使わない。
-- 色は端末の外観設定に従う。トークンは `Color(light:dark:)` で 2 値を持ち、アプリ内に切替は置かない。
+- 色はトークンの `Color(light:dark:)` の 2 値で、外観のモード（`AppearanceMode`。`Core/`。自動 `system` / ライト / ダーク、既定は自動）で決める。
+  保存は `@AppStorage(Config.appearanceModeKey)`（未設定・読めない値は自動 = 端末の外観設定に従う）で、アプリの根（`DekiRouletteApp` の `RootView`）に
+  `appAppearance(_:)`（`preferredColorScheme`。自動は nil）を 1 回掛ける。シート・タブバー・ナビゲーションバー・アラート・3D の盤面（`@Environment(\.colorScheme)`）も
+  ウィンドウの外観に従うので、個別に当てない。visionOS では保存値に依らず当てない（システムの外観に従う）。
+  起動画面（`LaunchBackground`）は OS の外観のまま、共有画像はダーク固定のまま（`ShareImageRenderer`）で、外観のモードは効かない。
   盤面と開始ボタンの塗りは外観に依らず固定（`onSlice` / `wheel*` / `onFlare`）で、スライス色を文字や
   色見本に使うところは `sliceColor` ではなく `sliceAccent` を使う。追加した配色は
   `ThemeContrastTests` でコントラスト比を検証する。
