@@ -142,6 +142,7 @@ struct RouletteScreen: View {
                 enabled: model.canSpin,
                 action: spin
             )
+            .accessibilityIdentifier("roulette.spin")
 
             ZStack {
                 // 結果が出ている間だけ出す。順番決めと同じ位置・同じ見た目
@@ -149,7 +150,8 @@ struct RouletteScreen: View {
                     let text = ResultText.roulette(label: outcome.label, template: L10n.shareRouletteResult)
                     ResultActions(
                         shareText: ResultText.share(text, hashtag: L10n.shareHashtag, appStoreURL: Config.appStoreURL),
-                        shareImage: shareImage
+                        shareImage: shareImage,
+                        shareIdentifier: "roulette.result.share"
                     )
                         .id(outcome.label + "\(model.spinCount)")
                 }

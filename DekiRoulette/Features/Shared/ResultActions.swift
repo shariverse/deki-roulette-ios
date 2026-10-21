@@ -15,6 +15,9 @@ struct ResultActions: View {
     var postText: String? = nil
     /// 共有シートに本文と一緒に渡す結果の画像。nil なら本文だけを共有する。
     var shareImage: UIImage? = nil
+    /// 「結果を共有」ボタンのアクセシビリティ ID。App Store 用スクリーンショットの UI テストが、
+    /// 結果が出た（＝このボタンが出た）のを待つのに使う。
+    var shareIdentifier: String
 
     @Environment(\.openURL) private var openURL
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -70,11 +73,13 @@ struct ResultActions: View {
                 ResultActionLabel(title: L10n.shareResult)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(shareIdentifier)
         } else {
             ShareLink(item: shareText) {
                 ResultActionLabel(title: L10n.shareResult)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(shareIdentifier)
         }
     }
 
@@ -156,7 +161,7 @@ private struct ShareLogoLabel: View {
 }
 
 #Preview {
-    ResultActions(shareText: "ルーレットで「ラーメン」に決まりました！\n\n#デキレーレット")
+    ResultActions(shareText: "ルーレットで「ラーメン」に決まりました！\n\n#デキレーレット", shareIdentifier: "result.share")
         .padding()
         .background(Theme.ink900)
 }

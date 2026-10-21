@@ -76,6 +76,22 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.basekeita.roulette.tests
         GENERATE_INFOPLIST_FILE: YES
 
+  # App Store 用のスクリーンショットを撮る UI テスト（scripts/app-store-screenshots.sh）。
+  # ふだんのテストには流さないので、スキーム DekiRoulette（Build ワークフロー）には入れず、
+  # 撮影用のスキーム DekiRouletteScreenshots だけで使う
+  DekiRouletteUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [iOS, visionOS]
+    sources:
+      - path: DekiRouletteUITests
+    dependencies:
+      - target: DekiRoulette
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.basekeita.roulette.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: DekiRoulette
+
 schemes:
   DekiRoulette:
     build:
@@ -88,3 +104,14 @@ schemes:
       config: Debug
       targets:
         - DekiRouletteTests
+  DekiRouletteScreenshots:
+    build:
+      targets:
+        DekiRoulette: all
+        DekiRouletteUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - DekiRouletteUITests

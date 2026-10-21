@@ -88,6 +88,7 @@ struct OrderScreen: View {
                 enabled: model.canShuffle,
                 action: { model.shuffleItems(reducedMotion: reduceMotion) }
             )
+            .accessibilityIdentifier("order.shuffle")
 
             ZStack {
                 // 演出が終わって結果が出ている間だけ出す。結果が変わると作り直す
@@ -101,7 +102,8 @@ struct OrderScreen: View {
                             labels, heading: L10n.shareOrderHeading, hashtag: L10n.shareHashtag,
                             appStoreURL: Config.appStoreURL, others: L10n.shareOrderOthers
                         ),
-                        shareImage: shareImage
+                        shareImage: shareImage,
+                        shareIdentifier: "order.result.share"
                     )
                         .id(model.resultId)
                 }
