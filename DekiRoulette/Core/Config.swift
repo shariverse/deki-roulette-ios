@@ -230,6 +230,11 @@ enum Config {
     /// スピン中に境目を越える触覚を鳴らす最短間隔。序盤は境目を越える間隔がこれより短いので間引く。
     static let hapticMinInterval: TimeInterval = 0.06
 
+    // MARK: 外観
+
+    /// アプリの外観（`AppearanceMode.rawValue`）を保存する `UserDefaults` のキー。未設定・読めない値なら `AppearanceMode.default`（端末の外観に従う）。
+    static let appearanceModeKey = "appearanceMode"
+
     // MARK: 停止の強調
 
     /// 止まったスライスの光彩の色（`GlowStyle.rawValue`）を保存する `UserDefaults` のキー。未設定なら `GlowStyle.default`。

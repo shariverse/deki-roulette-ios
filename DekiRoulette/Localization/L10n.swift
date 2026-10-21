@@ -77,6 +77,15 @@ enum L10n {
         }
     }
     static var appIconTitle: String { tr("appIconTitle") }
+    static var appearanceTitle: String { tr("appearanceTitle") }
+    static func appearanceModeName(_ mode: AppearanceMode) -> String {
+        switch mode {
+        case .system: tr("appearanceModeSystem")
+        case .light: tr("appearanceModeLight")
+        case .dark: tr("appearanceModeDark")
+        }
+    }
+    static var appearanceNote: String { tr("appearanceNote") }
     static func appIconName(_ choice: AppIconChoice) -> String {
         switch choice {
         case .standard: tr("appIconStandard")
