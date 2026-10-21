@@ -517,7 +517,7 @@ extension Color {
         )
     }
 
-    /// 端末の外観設定に追従する色。
+    /// 外観（ライト・ダーク）に追従する色。外観は外観のモード（`AppearanceMode`）がウィンドウに当てたもので、自動なら端末の外観設定。
     init(light: UInt32, dark: UInt32, lightAlpha: Double = 1, darkAlpha: Double = 1) {
         self.init(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
@@ -575,6 +575,16 @@ extension View {
     /// `.fontDesign(.rounded)` は掛けない（環境に置くと `Font.custom` の文字までシステムの丸ゴシックに置き換わり、同梱の書体が出ない）。
     func appTypography() -> some View {
         font(Theme.Typography.font(.body))
+    }
+
+    /// 設定の「外観」で選んだ外観をアプリ全体（シート・タブバー・ナビゲーションバー・アラートを含む）に当てる。アプリの根に 1 回掛ける。
+    /// visionOS では保存値に依らず当てない（ガラスの地の上ではシステムの外観に従う）。
+    func appAppearance(_ mode: AppearanceMode) -> some View {
+        #if os(visionOS)
+        self
+        #else
+        preferredColorScheme(mode.colorScheme)
+        #endif
     }
 
     /// シートの画面の題名（ナビゲーションバーの中央・インライン）。`navigationTitle` の文字は UIKit の外観の API でも同梱の書体にならないので、
