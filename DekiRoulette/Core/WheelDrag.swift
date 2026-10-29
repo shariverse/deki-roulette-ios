@@ -12,6 +12,19 @@ enum WheelDrag {
         return normalized(angle(of: to, around: center) - angle(of: from, around: center))
     }
 
+    /// 一辺 `side`（pt）の盤面で、ドラッグとフリックを受ける円の半径（pt）。スライスの円（`WheelGeometry.sliceRadius`）と同じで、
+    /// 外周の縁・針の先・縁の外の余白は含めない。2D と 3D（傾けても判定は傾けない円）で同じ値を使う。
+    static func hitRadius(side: Double) -> Double {
+        WheelGeometry.sliceRadius(diameter: side)
+    }
+
+    /// 一辺 `side` の盤面の中心 `center` に対して、触れ始めた点 `point` がドラッグとフリックを受ける円の内側（円周を含む）か。
+    /// 判定は触れ始めの位置だけで行い、円の内側で始めたドラッグは指が外へ出ても続く（`WheelDragArea` の `contentShape`）。
+    static func contains(_ point: CGPoint, center: CGPoint, side: Double) -> Bool {
+        let radius = hitRadius(side: side)
+        return radius > 0 && distance(from: center, to: point) <= radius
+    }
+
     /// 盤面の累積角が `from` から `to` へ動いたときに、針がスライスの境目を越えた数（向きに依らず 0 以上）。
     /// 境目は累積角が `360 / count` の倍数に達するところ（`SpinTicks` と同じ）。1 件以下の盤面には境目が無いので 0。
     static func boundaryCrossings(from: Double, to: Double, count: Int) -> Int {
