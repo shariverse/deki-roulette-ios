@@ -193,9 +193,11 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 
 抽選したスピンの間（`model.spinning`。`reducedMotion` のスピンも含む）は、盤面だけを明るく残してページ全体を暗い幕（`Theme.spinScrim`。外観に依らない 1 値）で覆う（SPEC §5.2）。
 幕は領域ごとに重ねず、ページ全体に 1 枚だけ重ねて盤面の位置だけを円く抜く（領域ごとだと、ライトで領域の間の余白が明るく残るか、地と二重に暗くなって四角が浮く）。
-`RouletteScreen` が盤面（2D・3D の `wheel`）に `spinSpotlightTarget()`（`anchorPreference(.bounds)`。`SpinSpotlightAnchorKey`）を付け、`PageFrame` の `spotlight`（既定は false。順番決め画面は使わない）に `model.spinning` を渡す。
-`PageFrame` は `ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で `SpinScrim` を重ねる（中身と同じ座標なので、スクロールしても穴が盤面に付いていく）。盤面を伝えていなければ幕は出さない。
-幕は中身より四方へ `Config.spinScrimBleed`（2000pt）広く塗り（`SpinSpotlight.scrimRect`）、見える範囲は `ScrollView` が切り抜く。穴（`SpinSpotlight.hole(in:)`）は枠の中央を中心に
+`RouletteScreen` が盤面（2D・3D の `wheel`）に `spinSpotlightTarget()`（`onGeometryChange` の `.global` の枠を environment の `SpinSpotlightTracker` に書く。`Features/Shared/SpinScrim.swift`）を付け、
+`PageFrame` の `spotlight`（既定は false。順番決め画面は使わない）に `model.spinning` を渡す。`PageFrame` は `SpinSpotlightTracker` を `@State` で 1 つ持って中身に流し、
+`NavigationStack` の外に `overlay` で `SpinScrimLayer`（`ignoresSafeArea`）を 1 枚だけ重ねる。ナビゲーションバー（題名・タグライン・Liquid Glass の設定ボタン）と上の安全領域も同じ 1 枚で覆い、
+`TabView` のタブバーはその上に描かれるので暗くならない。盤面を伝えていなければ幕は出さない。枠を読むのは幕だけなので、スクロールで枠が変わっても描き直すのは幕だけ。
+穴は `SpinSpotlight.hole(inGlobal:layerOrigin:)`（画面の座標の枠から幕の原点を引く。スクロールしても盤面に付いていく）→ `hole(in:)` で、枠の中央を中心に
 `min(幅, 高さ)` を直径とする内接円（`WheelFaceView`・`WheelDragArea` と同じ取り方）で、外へ `Config.spinSpotlightFeatherRatio` × 直径だけぼかす（幕の塗りは下の段落。
 オフスクリーンの合成を作らないよう `mask` / `compositingGroup` は使わない）。3D の傾いた盤が枠の外へはみ出す分（`overscan`）は穴に含めない。
 不透明度は `SpinSpotlight.opacity(spinning:)` で、`.animation(Theme.spinDimAnimation, value: spotlight)` を幕にだけ掛ける（`reduceMotion` では nil）。`withAnimation` で `spinning` を包まない
