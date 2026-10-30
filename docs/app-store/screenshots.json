@@ -1,0 +1,42 @@
+{
+  "_comment": [
+    "App Store 用スクリーンショットを撮る表示サイズ。scripts/app-store-screenshots.sh と App Store Metadata のワークフローが読む。",
+    "キーは App Store Connect の screenshotDisplayType。devices は上から順に、ランナーにある機種を使う。",
+    "sizes は書き出した画像に期待する寸法（縦向き）。登録するスクリプトも、画像の寸法からこの表で表示サイズを決める。",
+    "platform は Simulator と App Store Connect のバージョンのプラットフォーム（iOS / visionOS。省略すると iOS）。",
+    "Apple Vision Pro は 3840x2160 を撮るため、4K の「Apple Vision Pro」を使う（「Apple Vision Pro (at 2732x2048)」だと寸法が足りない）。landscape の寸法。",
+    "iOS は 6.9 / 6.5 インチの iPhone と 13 インチの iPad。撮る画面は DekiRouletteUITests/AppStoreScreenshotTests の 4 枚（App Store Connect の上限は 1 言語・1 表示サイズにつき 10 枚）。"
+  ],
+  "screenshotCount": 4,
+  "displayTypes": {
+    "APP_IPHONE_67": {
+      "label": "iPhone 6.9 inch",
+      "devices": ["iPhone 17 Pro Max", "iPhone 16 Pro Max"],
+      "sizes": ["1320x2868", "1290x2796"],
+      "runsOn": "macos-latest",
+      "xcodeVersion": "26.6"
+    },
+    "APP_IPHONE_65": {
+      "label": "iPhone 6.5 inch",
+      "devices": ["iPhone 14 Plus"],
+      "sizes": ["1284x2778", "1242x2688"],
+      "runsOn": "macos-latest",
+      "xcodeVersion": "26.6"
+    },
+    "APP_IPAD_PRO_3GEN_129": {
+      "label": "iPad 13 inch",
+      "devices": ["iPad Pro 13-inch (M5)", "iPad Pro 13-inch (M4)"],
+      "sizes": ["2064x2752", "2048x2732"],
+      "runsOn": "macos-latest",
+      "xcodeVersion": "26.6"
+    },
+    "APP_APPLE_VISION_PRO": {
+      "label": "Apple Vision Pro",
+      "platform": "visionOS",
+      "devices": ["Apple Vision Pro"],
+      "sizes": ["3840x2160"],
+      "runsOn": "macos-latest",
+      "xcodeVersion": "26.6"
+    }
+  }
+}
