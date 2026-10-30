@@ -8,7 +8,7 @@ struct PageFrame<Content: View, Help: View>: View {
     /// 演出中。開いたままの説明を畳む。
     let busy: Bool
     let useCases: String
-    /// スピン中の暗転。真の間、中身が `spinSpotlightTarget()` で伝えた盤面だけを残してページを暗い幕で覆う。
+    /// スピン中の暗転。真の間、中身が `spinSpotlightTarget()` で伝えた盤面だけを残して、ナビゲーションバーを含むページ全体を暗い幕で覆う。
     /// 既定は無効（順番決め画面は使わない）。
     var spotlight = false
     /// 真の間、バーの設定ボタンとフッターの折りたたみを無効にする（ルーレットのスピン中。暗い所は触れない）。
@@ -21,7 +21,8 @@ struct PageFrame<Content: View, Help: View>: View {
     @State private var settingsOpen = false
     @State private var useCasesOpen = false
     @State private var noticeOpen = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// スピン中の幕で明るく残す盤面の枠。中身の `spinSpotlightTarget()` が書き、幕だけが読む。
+    @State private var spotlightTracker = SpinSpotlightTracker()
 
     var body: some View {
         // 大きいタイトルが縮むのはスタックの根の `ScrollView` のスクロールに連動するため、`ScrollView` を根に置く
@@ -41,16 +42,6 @@ struct PageFrame<Content: View, Help: View>: View {
                 .padding(.bottom, 24)
                 .frame(maxWidth: Theme.Layout.pageMaxWidth)
                 .frame(maxWidth: .infinity)
-                // 幕は中身と同じ座標に 1 枚だけ重ねるので、スクロールしても穴が盤面に付いていく
-                .overlayPreferenceValue(SpinSpotlightAnchorKey.self) { anchor in
-                    if let anchor {
-                        GeometryReader { proxy in
-                            SpinScrim(contentSize: proxy.size, hole: SpinSpotlight.hole(in: proxy[anchor]))
-                                .opacity(SpinSpotlight.opacity(spinning: spotlight))
-                                .animation(reduceMotion ? nil : Theme.spinDimAnimation, value: spotlight)
-                        }
-                    }
-                }
             }
             // visionOS にはソフトウェアキーボードが無いので付けない
             #if !os(visionOS)
@@ -66,6 +57,10 @@ struct PageFrame<Content: View, Help: View>: View {
                 }
             }
         }
+        .environment(\.spinSpotlightTracker, spotlightTracker)
+        // 幕はナビゲーションバー（題名・タグライン・設定ボタン）も覆うよう、`NavigationStack` の外に 1 枚だけ重ねる。
+        // 盤面の枠は画面の座標で伝わるので、スクロールしても穴が盤面に付いていく。タブバーは `TabView` が上に描くので暗くならない
+        .overlay { SpinScrimLayer(tracker: spotlightTracker, spotlight: spotlight) }
         .sheet(isPresented: $settingsOpen) { SettingsView() }
         // 開始した瞬間に畳む。人前で回すときに開きっぱなしを踏まないための保険
         .onChange(of: busy) { _, isBusy in

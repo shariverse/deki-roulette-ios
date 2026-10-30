@@ -33,11 +33,11 @@ enum SpinSpotlight {
         )
     }
 
-    /// 大きさ `size` のページの中身に重ねる幕の範囲。中身より四方へ `Config.spinScrimBleed` だけ広げ、
-    /// 中身が画面より短いときの下の余白・上の安全領域・引っ張りすぎたときの余白まで覆う（見える範囲は `ScrollView` が切り抜く）。
-    static func scrimRect(contentSize size: CGSize) -> CGRect {
-        let bleed = Config.spinScrimBleed
-        return CGRect(x: -bleed, y: -bleed, width: size.width + bleed * 2, height: size.height + bleed * 2)
+    /// 画面の座標（`.global`）で伝えた盤面の枠 `frame` に抜く穴を、原点が `layerOrigin`（画面の座標）の幕の座標で返す。
+    /// 幕はナビゲーションバー・安全領域まで覆うよう `NavigationStack` の外に重ね、盤面はその中のスクロールする本文にあるので、
+    /// 同じ画面の座標で測って幕の原点を引く（スクロールしても穴が盤面に付いていく）。
+    static func hole(inGlobal frame: CGRect, layerOrigin: CGPoint) -> Hole? {
+        hole(in: frame.offsetBy(dx: -layerOrigin.x, dy: -layerOrigin.y))
     }
 
     /// 幕の範囲 `rect` に対する穴の中心の位置（左上 0・右下 1 の割合。`UnitPoint` に使う）。
