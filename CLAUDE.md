@@ -128,7 +128,10 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 
 盤面は 12 時を 0 度、時計回り。`SliceShape` は `clockwise: false` で画面上は時計回りになる（y 軸が下向きのため）。
 
-盤面のフリックでも始められる。ドラッグ中は盤面を指に追従させる。`WheelDragArea`（2D の `RouletteWheelView` と 3D の `Wheel3DView` で共有）が `WheelDrag.rotationDelta` で
+盤面のフリックでも始められる。ドラッグとフリックを受けるのは、`WheelDragArea` の `contentShape`（`WheelHitShape`。枠の中央を中心に、半径 `WheelDrag.hitRadius(side:)` = スライスの円 `WheelGeometry.sliceRadius`）の内側で触れ始めたときだけで、
+外周の縁・針の先・四隅のタッチは後ろの `PageFrame` の `ScrollView` に渡る（四隅でジェスチャを吸い込む層は置かない）。判定は触れ始めの位置だけで、円の内側で始めたドラッグは指が外へ出ても続ける（`onChanged` で距離を見ない）。
+3D も傾き・揺れを渡さず同じ傾けない円で判定し、結果表示中の `stopHoldScale` の拡大にも合わせない。内外の判定は `WheelDrag.contains(_:center:side:)`（`WheelDragHitTests`）。
+ドラッグ中は盤面を指に追従させる。`WheelDragArea`（2D の `RouletteWheelView` と 3D の `Wheel3DView` で共有）が `WheelDrag.rotationDelta` で
 指が中心のまわりを回った角度を `@State dragRotation` に足して盤面に渡し、2D は `rotationEffect(rotation + dragRotation)` で、
 3D は `Wheel3DSurface` に `rotation + dragRotation` を渡して盤のノードを回す（どちらもドラッグ中は
 `rotation` が変わらないのでスピンの曲線の `.animation` は掛からない）。指を離すと `dragRotation` を 0 に戻し、
