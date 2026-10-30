@@ -27,6 +27,32 @@ struct RootView: View {
         }
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+        Self.applyNavigationTitleAppearance()
+    }
+
+    /// iOS 17〜18 の両画面の題名（ナビゲーションバー）を同梱の書体に寄せる。地はシステムの既定のまま
+    /// （先頭の大きいタイトルの間は透明、スクロールしたらぼかしの地）で、`PageFrame` は塗らない。
+    /// iOS 26 以上の SwiftUI の題名にはこの属性が効かないので当てず（`PageFrame` が toolbar の置き場所に `Text` を置く）、
+    /// visionOS はシステムの書体のまま。シートは `toolbarBackground` の地と `.principal` の題名で上書きしているので変わらない。
+    private static func applyNavigationTitleAppearance() {
+        #if !os(visionOS)
+        guard #unavailable(iOS 26) else { return }
+        func appearance(transparent: Bool) -> UINavigationBarAppearance {
+            let appearance = UINavigationBarAppearance()
+            if transparent {
+                appearance.configureWithTransparentBackground()
+            } else {
+                appearance.configureWithDefaultBackground()
+            }
+            appearance.largeTitleTextAttributes = Theme.Typography.navigationLargeTitleAttributes()
+            appearance.titleTextAttributes = Theme.Typography.navigationInlineTitleAttributes()
+            return appearance
+        }
+        let bar = UINavigationBar.appearance()
+        bar.standardAppearance = appearance(transparent: false)
+        bar.compactAppearance = appearance(transparent: false)
+        bar.scrollEdgeAppearance = appearance(transparent: true)
+        #endif
     }
 
     var body: some View {
