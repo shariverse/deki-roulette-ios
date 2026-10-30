@@ -189,7 +189,7 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 
 ## スピン中の暗転（ページの幕）
 
-- ページの一部だけを明るく残す幕は、領域ごとに `overlay` せず、`ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で 1 枚だけ重ね、残す View の枠を `anchorPreference(.bounds)` で伝えて抜く。
+- （ナビゲーションバーが無い画面の方式。このリポジトリは今は次の項目の `NavigationStack` の外に重ねる方式）ページの一部だけを明るく残す幕は、領域ごとに `overlay` せず、`ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で 1 枚だけ重ね、残す View の枠を `anchorPreference(.bounds)` で伝えて抜く。
   中身と同じ座標なのでスクロールしても穴が付いていき、中身より四方へ大きく塗れば `ScrollView` の切り抜きで上の安全領域・中身の下の余白まで覆える（overlay はレイアウトに響かない）。
   抜くのは四角 1 枚を穴の中心からの `RadialGradient`（中心は幕の範囲に対する割合の `UnitPoint`）で塗るだけにし、巨大な幕に `mask` / `compositingGroup` を掛けない（オフスクリーンの合成が幕の大きさになるおそれ）。
   even-odd の `Path`（外）とグラデーションの円（縁）の 2 枚に分けると、同じ半径で両方の端がアンチエイリアスされて継ぎ目に細い明るい輪が出るおそれがある（グラデーションは最後の色が外へ延びるので 1 枚で済む）（2026-10-31）
