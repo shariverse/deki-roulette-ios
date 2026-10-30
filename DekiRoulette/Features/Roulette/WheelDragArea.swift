@@ -1,6 +1,9 @@
 import SwiftUI
 
 /// 盤面のドラッグ追従とフリック。2D の `RouletteWheelView` と 3D の `Wheel3DView` が同じ手触りになるよう共有する。
+/// 受けるのは盤面のスライスの円（`WheelHitShape`）の内側で触れ始めたドラッグだけで、四隅（縁・針の先・余白）のタッチは
+/// 後ろのページのスクロールに渡す。判定は触れ始めの位置だけで、内側で始めたドラッグは指が円の外へ出ても続ける。
+/// 3D で盤が傾いていても、判定は傾けない同じ円にする。
 /// ドラッグ中は追従で回した角度（`dragRotation`）を `content` に渡して盤面を指に追従させ、指を離したら、追従で回した角度と、
 /// 離す直前の動きから出した角速度（度/秒、時計回りが正）を `onRelease` に伝える。指を離さずにジェスチャが取り消されたときは
 /// 角速度を nil で伝える。追従した角度は親が `rotation` に取り込むまでこのビューが持つ。
@@ -41,8 +44,10 @@ struct WheelDragArea<Content: View>: View {
             .overlay {
                 // ドラッグ中は盤面を指に追従させ、指を離したらその角度からスピンを始める（結果は開始時に決まり、そこから止める）
                 GeometryReader { proxy in
+                    // 受けるのはスライスの円の内側だけ。四隅（縁・針の先・余白）のタッチは後ろのページのスクロールに渡る。
+                    // 判定は触れ始めの位置だけなので、円の内側で始めたドラッグは指が外へ出ても追従もフリックも続く
                     Color.clear
-                        .contentShape(Rectangle())
+                        .contentShape(WheelHitShape())
                         .highPriorityGesture(flickGesture(center: CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)))
                 }
             }
@@ -135,6 +140,16 @@ struct WheelDragArea<Content: View>: View {
         let rotated = dragRotation
         dragRotation = 0
         onRelease?(angularVelocity, rotated)
+    }
+}
+
+/// ドラッグとフリックを受ける形。枠の中央を中心に、一辺 `min(width, height)` の盤面のスライスの円（`WheelDrag.hitRadius`）を描く。
+/// 盤面の描画（2D の `WheelFaceView`・3D の盤）と同じ中心・大きさの取り方にそろえる。
+struct WheelHitShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let radius = CGFloat(WheelDrag.hitRadius(side: Double(min(rect.width, rect.height))))
+        guard radius > 0 else { return Path() }
+        return Path(ellipseIn: CGRect(x: rect.midX - radius, y: rect.midY - radius, width: radius * 2, height: radius * 2))
     }
 }
 
