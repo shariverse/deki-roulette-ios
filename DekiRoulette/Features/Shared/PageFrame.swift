@@ -215,7 +215,6 @@ private struct PageTitleBar: ViewModifier {
                             .font(Theme.Typography.pageInlineTitle)
                             .foregroundStyle(Theme.ivory)
                             .lineLimit(1)
-                            .accessibilityAddTraits(.isHeader)
                             .inlineTitleVisibility(inlineShown)
                     }
                     ToolbarItem(placement: .largeSubtitle) {
