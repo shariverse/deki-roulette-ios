@@ -321,8 +321,4 @@ enum Config {
     /// スピン中にページを覆う幕（`SpinSpotlight`）の穴の縁をぼかす幅（盤面の直径に対する割合）。
     /// 穴は盤面の枠の内接円で、その外へこの幅だけかけて幕の濃さに戻す（基準直径 320pt で約 13pt）。
     static let spinSpotlightFeatherRatio: CGFloat = 0.04
-
-    /// 幕をページの中身より四方へ広げる量（pt）。いちばん高い iPad（13 インチの縦向きで約 1376pt）の画面の高さより大きくし、
-    /// 中身が画面より短いときの余白・上の安全領域・引っ張りすぎたときの余白まで覆う。
-    static let spinScrimBleed: CGFloat = 2000
 }
