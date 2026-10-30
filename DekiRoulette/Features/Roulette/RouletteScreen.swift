@@ -25,7 +25,11 @@ struct RouletteScreen: View {
             title: L10n.title,
             tagline: L10n.tagline,
             busy: model.spinning,
-            useCases: L10n.useCases
+            useCases: L10n.useCases,
+            // スピン中は盤面だけを残してページを暗くする。止まった瞬間（`finishSpin`）に戻す。指定の有無では変えない
+            spotlight: model.spinning,
+            // 暗くした設定ボタンとフッターの折りたたみも、スピン中は押せなくする（順番決めは渡さない）
+            locksControls: model.spinning
         ) {
             Text(L10n.helpBasic)
             HelpHeading(text: L10n.helpAimTitle)
@@ -129,6 +133,8 @@ struct RouletteScreen: View {
     private var wheelSection: some View {
         VStack(spacing: 24) {
             wheel
+            // スピン中の幕で明るく残す範囲。3D でも傾いた盤がはみ出す分（overscan）は含めず、2D と同じ枠を伝える
+            .spinSpotlightTarget()
             // 帯は回転しない層に置く（盤面の `rotationEffect` の外側）。盤面のフリックを妨げないよう触れられなくする。
             // 3D 表示では帯を盤と同じ面に乗せるので、3D の盤面が自分で描く
             .overlay {

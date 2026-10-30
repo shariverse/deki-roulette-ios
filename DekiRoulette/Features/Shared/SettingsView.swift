@@ -57,8 +57,9 @@ struct SettingsView: View {
                             .font(Theme.Typography.font(.caption))
                             .foregroundStyle(Theme.muted)
                             .lineSpacing(3)
-                        resetButton(L10n.resetItemsRoulette, target: .roulette)
-                        resetButton(L10n.resetItemsOrder, target: .order)
+                        // ルーレットのスピン中は押せなくする（順番決めのタブから開いたときに、回っている盤面の項目を戻さない）
+                        resetButton(L10n.resetItemsRoulette, target: .roulette, disabled: rouletteModel.spinning)
+                        resetButton(L10n.resetItemsOrder, target: .order, disabled: false)
                     }
                     SettingsSection(title: L10n.copyrightTitle) {
                         Text(L10n.copyrightOwner)
@@ -108,7 +109,7 @@ struct SettingsView: View {
         }
     }
 
-    private func resetButton(_ title: String, target: ResetTarget) -> some View {
+    private func resetButton(_ title: String, target: ResetTarget, disabled: Bool) -> some View {
         Button {
             resetTarget = target
         } label: {
@@ -127,6 +128,9 @@ struct SettingsView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
+        // 文字と記号の色は固定なので、無効のときは薄くして押せないことを見せる
+        .opacity(disabled ? 0.45 : 1)
     }
 
     private func screenName(_ target: ResetTarget?) -> String {

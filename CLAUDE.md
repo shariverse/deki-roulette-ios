@@ -182,6 +182,22 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 惰性で回る間もスピンと同じ方式で回転音と触覚を鳴らす（下記「触覚の仕組み」「回転音の仕組み」）。速さに連動する演出（電飾の流れ・光の尾と残像・火花）も、
 惰性は `currentMotion` から、指で動かしている間は `WheelDragMotion` からスピンと同じ関数で引いて出る（下記「スピンの演出の仕組み」。惰性は強さ約 0.33 未満なので、光の尾・残像は閾値に届かず描かれない）。
 
+### スピン中の暗転
+
+抽選したスピンの間（`model.spinning`。`reducedMotion` のスピンも含む）は、盤面だけを明るく残してページ全体を暗い幕（`Theme.spinScrim`。外観に依らない 1 値）で覆う（SPEC §5.2）。
+幕は領域ごとに重ねず、ページ全体に 1 枚だけ重ねて盤面の位置だけを円く抜く（領域ごとだと、ライトで領域の間の余白が明るく残るか、地と二重に暗くなって四角が浮く）。
+`RouletteScreen` が盤面（2D・3D の `wheel`）に `spinSpotlightTarget()`（`anchorPreference(.bounds)`。`SpinSpotlightAnchorKey`）を付け、`PageFrame` の `spotlight`（既定は false。順番決め画面は使わない）に `model.spinning` を渡す。
+`PageFrame` は `ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で `SpinScrim` を重ねる（中身と同じ座標なので、スクロールしても穴が盤面に付いていく）。盤面を伝えていなければ幕は出さない。
+幕は中身より四方へ `Config.spinScrimBleed`（2000pt）広く塗り（`SpinSpotlight.scrimRect`）、見える範囲は `ScrollView` が切り抜く。穴（`SpinSpotlight.hole(in:)`）は枠の中央を中心に
+`min(幅, 高さ)` を直径とする内接円（`WheelFaceView`・`WheelDragArea` と同じ取り方）で、外へ `Config.spinSpotlightFeatherRatio` × 直径だけぼかす（幕の塗りは下の段落。
+オフスクリーンの合成を作らないよう `mask` / `compositingGroup` は使わない）。3D の傾いた盤が枠の外へはみ出す分（`overscan`）は穴に含めない。
+不透明度は `SpinSpotlight.opacity(spinning:)` で、`.animation(Theme.spinDimAnimation, value: spotlight)` を幕にだけ掛ける（`reduceMotion` では nil）。`withAnimation` で `spinning` を包まない
+（スピン開始の更新に別のトランザクションを重ねると、回転の補間・回転音・触覚の時刻に響くおそれがある）。幕は `allowsHitTesting(false)`・`accessibilityHidden(true)` で、
+スクロール・タブの切り替え・盤面の当たり判定は変えない。タブバーは暗くしない。幕の View と `SpinSpotlight` は指定・印を受け取らない。
+幕は四角 1 枚を穴の中心からの放射状のグラデーション（`SpinSpotlight.unitCenter(of:in:)` で中心を割合にする）で塗り、外は最後の色が延びる（塗りを 2 枚に分けると継ぎ目に細い輪が出る）。
+同じ間（`model.spinning`）は `PageFrame` の `locksControls` でヘッダの設定ボタンと 3 つの `FooterDisclosure` を `.disabled` にする（`busy` は順番決めでも立つので流用しない。順番決めは渡さない）。
+`RouletteModel.resetItems` はスピン中は何もせず、設定シートのルーレットの「戻す」ボタンもスピン中は無効（`opacity` で薄く）にする（スピン中にタブを切り替え、順番決め画面の設定シートから戻せる経路のため）。
+
 ### 触覚の仕組み
 
 `sensoryFeedback(_:trigger:)` でモデルの値の変化に反応させる（`spinning` / `outcome` / `revealing` と、

@@ -487,6 +487,18 @@ enum Theme {
     /// 削除を元に戻すトーストの出入り。
     static let undoToastAnimation = Animation.easeOut(duration: 0.2)
 
+    // MARK: スピン中の暗転
+
+    // スピン中に盤面以外のページを覆う幕（`SpinSpotlight`。ページ全体に 1 枚で、盤面の位置だけ円く抜く）。
+    // ライトでも「暗転」に見えるよう外観に依らず同じ暗色の半透明にし、透明度を下げる方式（ライトで白飛びする）は使わない。
+    // 文字や面の色ではなく上に重ねるだけなので、`ThemeContrastTests` の対象にはしない（幕の下はスピン中に読ませる対象ではなく、
+    // 項目リスト・設定ボタン・フッターの折りたたみはスピン中は `.disabled`）。
+
+    /// スピン中にページを覆う幕。ダークの `ink900` より暗い色を半分強の濃さで重ねる。
+    static let spinScrim = Color(hex: 0x07050B).opacity(0.62)
+    /// 幕の出入り。不透明度にだけ掛ける（盤面の回転の補間・回転音・触覚の時刻を変えないよう `withAnimation` では包まない）。
+    static let spinDimAnimation = Animation.easeInOut(duration: 0.25)
+
     // MARK: 共有画像
 
     // 共有シートに渡す結果の画像（`RouletteShareImageView`。寸法は `ShareImageLayout`）。アプリの外で見られるので外観に依らず固定し、
