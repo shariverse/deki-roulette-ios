@@ -32,10 +32,10 @@ private struct SpinSpotlightTarget: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // 画面を離れても枠は捨てない（タブを往復しても位置が変わらなければ書き直されないため）。幕はスピン中しか見えないので、古い枠が残っても害は無い
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
                 if tracker?.frame != frame { tracker?.frame = frame }
             }
-            .onDisappear { tracker?.frame = nil }
     }
 }
 
