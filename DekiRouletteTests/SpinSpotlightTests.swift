@@ -51,4 +51,17 @@ struct SpinSpotlightTests {
         #expect(bleed > 1376)
         #expect(rect.contains(CGRect(origin: .zero, size: size)))
     }
+
+    @Test func グラデーションの中心は幕の範囲に対する穴の中心の割合() throws {
+        let size = CGSize(width: 400, height: 1000)
+        let rect = SpinSpotlight.scrimRect(contentSize: size)
+        let hole = try #require(SpinSpotlight.hole(in: CGRect(x: 40, y: 150, width: 320, height: 320)))
+        let unit = SpinSpotlight.unitCenter(of: hole, in: rect)
+        // 割合を幕の範囲に戻すと穴の中心になる
+        #expect(abs(rect.minX + unit.x * rect.width - hole.center.x) < 1e-9)
+        #expect(abs(rect.minY + unit.y * rect.height - hole.center.y) < 1e-9)
+        #expect(unit.x > 0 && unit.x < 1 && unit.y > 0 && unit.y < 1)
+        // 大きさの無い範囲では中央
+        #expect(SpinSpotlight.unitCenter(of: hole, in: .zero) == CGPoint(x: 0.5, y: 0.5))
+    }
 }

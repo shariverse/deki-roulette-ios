@@ -39,4 +39,11 @@ enum SpinSpotlight {
         let bleed = Config.spinScrimBleed
         return CGRect(x: -bleed, y: -bleed, width: size.width + bleed * 2, height: size.height + bleed * 2)
     }
+
+    /// 幕の範囲 `rect` に対する穴の中心の位置（左上 0・右下 1 の割合。`UnitPoint` に使う）。
+    /// 幕は放射状のグラデーション 1 枚で塗るので、グラデーションの中心を穴の中心に合わせる。範囲の大きさが無ければ中央。
+    static func unitCenter(of hole: Hole, in rect: CGRect) -> CGPoint {
+        guard rect.width > 0, rect.height > 0 else { return CGPoint(x: 0.5, y: 0.5) }
+        return CGPoint(x: (hole.center.x - rect.minX) / rect.width, y: (hole.center.y - rect.minY) / rect.height)
+    }
 }

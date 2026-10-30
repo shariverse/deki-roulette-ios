@@ -152,8 +152,9 @@ final class RouletteModel {
     }
 
     /// 項目を初期状態に戻す。保存データも消すので、以降は言語設定に応じた初期項目に追従する。
+    /// スピン中は戻さない（別のタブの設定シートから呼ばれても、回っている盤面の項目と結果を変えない）。
     func resetItems() {
-        guard let store else { return }
+        guard !spinning, let store else { return }
         replaceItems(store.defaultItems)
         store.clear()
     }
