@@ -27,7 +27,9 @@ struct RouletteScreen: View {
             busy: model.spinning,
             useCases: L10n.useCases,
             // スピン中は盤面だけを残してページを暗くする。止まった瞬間（`finishSpin`）に戻す。指定の有無では変えない
-            spotlight: model.spinning
+            spotlight: model.spinning,
+            // 暗くした設定ボタンとフッターの折りたたみも、スピン中は押せなくする（順番決めは渡さない）
+            locksControls: model.spinning
         ) {
             Text(L10n.helpBasic)
             HelpHeading(text: L10n.helpAimTitle)

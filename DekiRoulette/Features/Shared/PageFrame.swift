@@ -10,6 +10,9 @@ struct PageFrame<Content: View, Help: View>: View {
     /// スピン中の暗転。真の間、中身が `spinSpotlightTarget()` で伝えた盤面だけを残してページを暗い幕で覆う。
     /// 既定は無効（順番決め画面は使わない）。
     var spotlight = false
+    /// 真の間、ヘッダの設定ボタンとフッターの折りたたみを無効にする（ルーレットのスピン中。暗い所は触れない）。
+    /// `busy` は順番決めの並べ替え中にも立つので流用せず、既定は無効（順番決め画面は今のまま押せる）。
+    var locksControls = false
     @ViewBuilder let help: () -> Help
     @ViewBuilder let content: () -> Content
 
@@ -88,6 +91,7 @@ struct PageFrame<Content: View, Help: View>: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .disabled(locksControls)
         .accessibilityLabel(L10n.settingsTitle)
     }
 
@@ -95,15 +99,19 @@ struct PageFrame<Content: View, Help: View>: View {
         VStack(alignment: .leading, spacing: 20) {
             Divider().overlay(Theme.ink700)
 
+            // 開いている折りたたみはそのまま出し、開け閉めだけを止める
             FooterDisclosure(title: L10n.helpTitle, isExpanded: $helpOpen) {
                 help()
             }
+            .disabled(locksControls)
             FooterDisclosure(title: L10n.useCasesTitle, isExpanded: $useCasesOpen) {
                 Text(useCases)
             }
+            .disabled(locksControls)
             FooterDisclosure(title: L10n.noticeTitle, isExpanded: $noticeOpen) {
                 Text(L10n.notice)
             }
+            .disabled(locksControls)
         }
         .font(Theme.Typography.font(.subheadline))
         .foregroundStyle(Theme.muted)
