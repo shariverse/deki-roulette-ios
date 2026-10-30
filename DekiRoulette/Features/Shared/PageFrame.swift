@@ -98,6 +98,10 @@ struct PageFrame<Content: View, Help: View>: View {
         }
         .disabled(locksControls)
         .accessibilityLabel(L10n.settingsTitle)
+        // visionOS のツールバーのボタンは tint で地を塗るので、アプリの根の `ivory` の tint を外してシステムのガラスのボタンにする
+        #if os(visionOS)
+        .tint(nil)
+        #endif
     }
 
     private var footer: some View {
