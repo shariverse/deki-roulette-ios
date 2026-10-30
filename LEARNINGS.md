@@ -165,3 +165,25 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   一方、ツールバーの文字のボタン（`Button("閉じる")` / `EditButton`）は環境の `.font` で描かれるので、アプリの根に本文の書体を掛けると Regular になる（ボタンに太さを明示する）。タブの項目は `UITabBarAppearance` の `titleTextAttributes` が効く（2026-10-21）
 - Zen Maru Gothic には `tnum`（等幅の数字）が無く、`.monospacedDigit()` を掛けても数字の字幅は変わる。行の高さはヒラギノより大きく、同じ文字サイズでも行が少し高くなる（2026-10-21）
 - フォントのファイルが同じものかは、`git hash-object <ファイル>` の値を GitHub の contents API（`gh api repos/<owner>/<repo>/contents/<パス>`）の `sha` と比べると確かめられる（2026-10-21）
+
+## 盤面の当たり判定・UI テスト
+
+- 盤面の上の `Color.clear` に付けた `contentShape` を円（`WheelHitShape`）にすると、円の外のタッチは `highPriorityGesture` の `DragGesture` に届かず、
+  後ろの `PageFrame` の `ScrollView` がそのまま受けてスクロールする（2D の盤面・3D の `SCNView`（`isUserInteractionEnabled = false`）・`allowsHitTesting(false)` の演出の層は
+  タッチを取らないので、四隅に別の層は要らない）。判定は触れ始めの位置だけで、円の内側で始めたドラッグは指が外へ出ても続く（2026-10-30）
+- このリポジトリには UI テストのターゲットが無い。画面で確かめるときは `project.yml` に `type: bundle.ui-testing`・`platform: iOS`・`TEST_TARGET_NAME: DekiRoulette` の
+  ターゲットを足し、スキームの `test.targets` にも足して `xcodegen generate` し、`-only-testing:<ターゲット>` で流す（`project.yml` とテストのファイルはコミットしない）。
+  盤面は `accessibilityHidden` なので、座標は「スピン」ボタンの frame から求める（盤面の下端はボタンの 24pt 上、compact では一辺 320pt）。
+  フリックは `press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` で、スピンが始まったかはボタンの文言（「スピン中…」）で見る。
+  3D は launch の引数 `-wheel3DEnabled YES` で入る（2026-10-30）
+- 一時的な UI テストのスクリーンショットは `XCTAttachment(screenshot:)` を `lifetime = .keepAlways` で残し、`-resultBundlePath` の `.xcresult` から
+  `xcrun xcresulttool export attachments --path <xcresult> --output-path <dir>` で取り出すと確実（ファイル名は UUID なので、`manifest.json` の `suggestedHumanReadableName` で名前を付け直す）。
+  スピン中は「スピン」を押して約 1.2 秒後に撮ると回っている途中が写る（2026-10-31）
+
+## スピン中の暗転（ページの幕）
+
+- ページの一部だけを明るく残す幕は、領域ごとに `overlay` せず、`ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で 1 枚だけ重ね、残す View の枠を `anchorPreference(.bounds)` で伝えて抜く。
+  中身と同じ座標なのでスクロールしても穴が付いていき、中身より四方へ大きく塗れば `ScrollView` の切り抜きで上の安全領域・中身の下の余白まで覆える（overlay はレイアウトに響かない）。
+  抜くのは四角 1 枚を穴の中心からの `RadialGradient`（中心は幕の範囲に対する割合の `UnitPoint`）で塗るだけにし、巨大な幕に `mask` / `compositingGroup` を掛けない（オフスクリーンの合成が幕の大きさになるおそれ）。
+  even-odd の `Path`（外）とグラデーションの円（縁）の 2 枚に分けると、同じ半径で両方の端がアンチエイリアスされて継ぎ目に細い明るい輪が出るおそれがある（グラデーションは最後の色が外へ延びるので 1 枚で済む）（2026-10-31）
+- iOS 26 のタブバー（浮いたガラス）は `ScrollView` の上に描かれるので、中身の幕はタブバーを暗くしない（`TabView` に手を入れずに Q6 の「タブバーは暗くしない」が満たせる）（2026-10-31）

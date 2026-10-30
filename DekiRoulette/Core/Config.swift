@@ -230,6 +230,11 @@ enum Config {
     /// スピン中に境目を越える触覚を鳴らす最短間隔。序盤は境目を越える間隔がこれより短いので間引く。
     static let hapticMinInterval: TimeInterval = 0.06
 
+    // MARK: 外観
+
+    /// アプリの外観（`AppearanceMode.rawValue`）を保存する `UserDefaults` のキー。未設定・読めない値なら `AppearanceMode.default`（端末の外観に従う）。
+    static let appearanceModeKey = "appearanceMode"
+
     // MARK: 停止の強調
 
     /// 止まったスライスの光彩の色（`GlowStyle.rawValue`）を保存する `UserDefaults` のキー。未設定なら `GlowStyle.default`。
@@ -310,4 +315,14 @@ enum Config {
 
     /// 3D の盤を傾けるために端末の姿勢を読む間隔（秒）。
     static let motionUpdateInterval: TimeInterval = 1.0 / 60
+
+    // MARK: スピン中の暗転
+
+    /// スピン中にページを覆う幕（`SpinSpotlight`）の穴の縁をぼかす幅（盤面の直径に対する割合）。
+    /// 穴は盤面の枠の内接円で、その外へこの幅だけかけて幕の濃さに戻す（基準直径 320pt で約 13pt）。
+    static let spinSpotlightFeatherRatio: CGFloat = 0.04
+
+    /// 幕をページの中身より四方へ広げる量（pt）。いちばん高い iPad（13 インチの縦向きで約 1376pt）の画面の高さより大きくし、
+    /// 中身が画面より短いときの余白・上の安全領域・引っ張りすぎたときの余白まで覆う。
+    static let spinScrimBleed: CGFloat = 2000
 }

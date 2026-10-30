@@ -3,7 +3,7 @@ import UIKit
 
 /// 配色・書体・アニメーション。Web 版 `tailwind.config.ts` の `theme.extend` に対応する。
 ///
-/// 色は端末の外観設定に従う。トークン名は Web 版のまま据え置き、ライトでは役割ごとに値を反転させる
+/// 色は外観のモード（`AppearanceMode`。設定の「外観」で選ぶ。既定の自動は端末の外観設定）に従う。トークン名は Web 版のまま据え置き、ライトでは役割ごとに値を反転させる
 /// （`ink` 系は「地の側」、`ivory` と `muted` は「文字の側」として読む）。
 /// 盤面だけは外観に依らず同じ見た目にする（`MARK: 盤面` を参照）。
 enum Theme {
@@ -487,6 +487,18 @@ enum Theme {
     /// 削除を元に戻すトーストの出入り。
     static let undoToastAnimation = Animation.easeOut(duration: 0.2)
 
+    // MARK: スピン中の暗転
+
+    // スピン中に盤面以外のページを覆う幕（`SpinSpotlight`。ページ全体に 1 枚で、盤面の位置だけ円く抜く）。
+    // ライトでも「暗転」に見えるよう外観に依らず同じ暗色の半透明にし、透明度を下げる方式（ライトで白飛びする）は使わない。
+    // 文字や面の色ではなく上に重ねるだけなので、`ThemeContrastTests` の対象にはしない（幕の下はスピン中に読ませる対象ではなく、
+    // 項目リスト・設定ボタン・フッターの折りたたみはスピン中は `.disabled`）。
+
+    /// スピン中にページを覆う幕。ダークの `ink900` より暗い色を半分強の濃さで重ねる。
+    static let spinScrim = Color(hex: 0x07050B).opacity(0.62)
+    /// 幕の出入り。不透明度にだけ掛ける（盤面の回転の補間・回転音・触覚の時刻を変えないよう `withAnimation` では包まない）。
+    static let spinDimAnimation = Animation.easeInOut(duration: 0.25)
+
     // MARK: 共有画像
 
     // 共有シートに渡す結果の画像（`RouletteShareImageView`。寸法は `ShareImageLayout`）。アプリの外で見られるので外観に依らず固定し、
@@ -517,7 +529,7 @@ extension Color {
         )
     }
 
-    /// 端末の外観設定に追従する色。
+    /// 外観（ライト・ダーク）に追従する色。外観は外観のモード（`AppearanceMode`）がウィンドウに当てたもので、自動なら端末の外観設定。
     init(light: UInt32, dark: UInt32, lightAlpha: Double = 1, darkAlpha: Double = 1) {
         self.init(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
@@ -575,6 +587,16 @@ extension View {
     /// `.fontDesign(.rounded)` は掛けない（環境に置くと `Font.custom` の文字までシステムの丸ゴシックに置き換わり、同梱の書体が出ない）。
     func appTypography() -> some View {
         font(Theme.Typography.font(.body))
+    }
+
+    /// 設定の「外観」で選んだ外観をアプリ全体（シート・タブバー・ナビゲーションバー・アラートを含む）に当てる。アプリの根に 1 回掛ける。
+    /// visionOS では保存値に依らず当てない（ガラスの地の上ではシステムの外観に従う）。
+    func appAppearance(_ mode: AppearanceMode) -> some View {
+        #if os(visionOS)
+        self
+        #else
+        preferredColorScheme(mode.colorScheme)
+        #endif
     }
 
     /// シートの画面の題名（ナビゲーションバーの中央・インライン）。`navigationTitle` の文字は UIKit の外観の API でも同梱の書体にならないので、

@@ -36,7 +36,11 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
 - ロジックは `Core/` の純粋関数に寄せ、乱数は `RandomNumberGenerator` を注入できるようにしてテストする（テストは Swift Testing）。
 - 文言は `Localizable.xcstrings` にだけ置き、`L10n` 経由で読む。表示言語は OS 設定に従い、アプリ内切替は持たない。
 - 配色・アニメーションは `Theme` に集約。`gold` は順番決めの 1 位とフォーカスリング専用（ルーレットの結果表示は止まったスライスと同じ色）、`flare` は開始ボタン専用。印に専用色は使わない。
-- 色は端末の外観設定に従う。トークンは `Color(light:dark:)` で 2 値を持ち、アプリ内に切替は置かない。
+- 色はトークンの `Color(light:dark:)` の 2 値で、外観のモード（`AppearanceMode`。`Core/`。自動 `system` / ライト / ダーク、既定は自動）で決める。
+  保存は `@AppStorage(Config.appearanceModeKey)`（未設定・読めない値は自動 = 端末の外観設定に従う）で、アプリの根（`DekiRouletteApp` の `RootView`）に
+  `appAppearance(_:)`（`preferredColorScheme`。自動は nil）を 1 回掛ける。選ぶのは設定シートの「外観」（`SettingsView` の `AppearanceSettingsView`。「ルーレットの詳細設定」の下・「アプリアイコン」の上、visionOS には出さない）。シート・タブバー・ナビゲーションバー・アラート・3D の盤面（`@Environment(\.colorScheme)`）も
+  ウィンドウの外観に従うので、個別に当てない。visionOS では保存値に依らず当てない（システムの外観に従う）。
+  起動画面（`LaunchBackground`）は OS の外観のまま、共有画像はダーク固定のまま（`ShareImageRenderer`）で、外観のモードは効かない。
   盤面と開始ボタンの塗りは外観に依らず固定（`onSlice` / `wheel*` / `onFlare`）で、スライス色を文字や
   色見本に使うところは `sliceColor` ではなく `sliceAccent` を使う。追加した配色は
   `ThemeContrastTests` でコントラスト比を検証する。
@@ -124,7 +128,10 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 
 盤面は 12 時を 0 度、時計回り。`SliceShape` は `clockwise: false` で画面上は時計回りになる（y 軸が下向きのため）。
 
-盤面のフリックでも始められる。ドラッグ中は盤面を指に追従させる。`WheelDragArea`（2D の `RouletteWheelView` と 3D の `Wheel3DView` で共有）が `WheelDrag.rotationDelta` で
+盤面のフリックでも始められる。ドラッグとフリックを受けるのは、`WheelDragArea` の `contentShape`（`WheelHitShape`。枠の中央を中心に、半径 `WheelDrag.hitRadius(side:)` = スライスの円 `WheelGeometry.sliceRadius`）の内側で触れ始めたときだけで、
+外周の縁・針の先・四隅のタッチは後ろの `PageFrame` の `ScrollView` に渡る（四隅でジェスチャを吸い込む層は置かない）。判定は触れ始めの位置だけで、円の内側で始めたドラッグは指が外へ出ても続ける（`onChanged` で距離を見ない）。
+3D も傾き・揺れを渡さず同じ傾けない円で判定し、結果表示中の `stopHoldScale` の拡大にも合わせない。内外の判定は `WheelDrag.contains(_:center:side:)`（`WheelDragHitTests`）。
+ドラッグ中は盤面を指に追従させる。`WheelDragArea`（2D の `RouletteWheelView` と 3D の `Wheel3DView` で共有）が `WheelDrag.rotationDelta` で
 指が中心のまわりを回った角度を `@State dragRotation` に足して盤面に渡し、2D は `rotationEffect(rotation + dragRotation)` で、
 3D は `Wheel3DSurface` に `rotation + dragRotation` を渡して盤のノードを回す（どちらもドラッグ中は
 `rotation` が変わらないのでスピンの曲線の `.animation` は掛からない）。指を離すと `dragRotation` を 0 に戻し、
@@ -174,6 +181,22 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 惰性の途中で `beginSpin` を呼ぶと惰性を打ち切り（止まる位置は行き先の `rotation` から）、`rotationPath` をスピンのものに差し替える。`reducedMotion` では付けない。
 惰性で回る間もスピンと同じ方式で回転音と触覚を鳴らす（下記「触覚の仕組み」「回転音の仕組み」）。速さに連動する演出（電飾の流れ・光の尾と残像・火花）も、
 惰性は `currentMotion` から、指で動かしている間は `WheelDragMotion` からスピンと同じ関数で引いて出る（下記「スピンの演出の仕組み」。惰性は強さ約 0.33 未満なので、光の尾・残像は閾値に届かず描かれない）。
+
+### スピン中の暗転
+
+抽選したスピンの間（`model.spinning`。`reducedMotion` のスピンも含む）は、盤面だけを明るく残してページ全体を暗い幕（`Theme.spinScrim`。外観に依らない 1 値）で覆う（SPEC §5.2）。
+幕は領域ごとに重ねず、ページ全体に 1 枚だけ重ねて盤面の位置だけを円く抜く（領域ごとだと、ライトで領域の間の余白が明るく残るか、地と二重に暗くなって四角が浮く）。
+`RouletteScreen` が盤面（2D・3D の `wheel`）に `spinSpotlightTarget()`（`anchorPreference(.bounds)`。`SpinSpotlightAnchorKey`）を付け、`PageFrame` の `spotlight`（既定は false。順番決め画面は使わない）に `model.spinning` を渡す。
+`PageFrame` は `ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で `SpinScrim` を重ねる（中身と同じ座標なので、スクロールしても穴が盤面に付いていく）。盤面を伝えていなければ幕は出さない。
+幕は中身より四方へ `Config.spinScrimBleed`（2000pt）広く塗り（`SpinSpotlight.scrimRect`）、見える範囲は `ScrollView` が切り抜く。穴（`SpinSpotlight.hole(in:)`）は枠の中央を中心に
+`min(幅, 高さ)` を直径とする内接円（`WheelFaceView`・`WheelDragArea` と同じ取り方）で、外へ `Config.spinSpotlightFeatherRatio` × 直径だけぼかす（幕の塗りは下の段落。
+オフスクリーンの合成を作らないよう `mask` / `compositingGroup` は使わない）。3D の傾いた盤が枠の外へはみ出す分（`overscan`）は穴に含めない。
+不透明度は `SpinSpotlight.opacity(spinning:)` で、`.animation(Theme.spinDimAnimation, value: spotlight)` を幕にだけ掛ける（`reduceMotion` では nil）。`withAnimation` で `spinning` を包まない
+（スピン開始の更新に別のトランザクションを重ねると、回転の補間・回転音・触覚の時刻に響くおそれがある）。幕は `allowsHitTesting(false)`・`accessibilityHidden(true)` で、
+スクロール・タブの切り替え・盤面の当たり判定は変えない。タブバーは暗くしない。幕の View と `SpinSpotlight` は指定・印を受け取らない。
+幕は四角 1 枚を穴の中心からの放射状のグラデーション（`SpinSpotlight.unitCenter(of:in:)` で中心を割合にする）で塗り、外は最後の色が延びる（塗りを 2 枚に分けると継ぎ目に細い輪が出る）。
+同じ間（`model.spinning`）は `PageFrame` の `locksControls` でヘッダの設定ボタンと 3 つの `FooterDisclosure` を `.disabled` にする（`busy` は順番決めでも立つので流用しない。順番決めは渡さない）。
+`RouletteModel.resetItems` はスピン中は何もせず、設定シートのルーレットの「戻す」ボタンもスピン中は無効（`opacity` で薄く）にする（スピン中にタブを切り替え、順番決め画面の設定シートから戻せる経路のため）。
 
 ### 触覚の仕組み
 

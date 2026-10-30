@@ -769,6 +769,29 @@ struct RouletteModelTests {
         #expect(store.loadSaved() == nil)
     }
 
+    @Test func スピン中は初期状態に戻さず止まったあとは戻せる() throws {
+        let storage = InMemoryStorage()
+        let store = makeStore(storage)
+        let model = RouletteModel(store: store)
+        model.addItem("E")
+        let saved = store.loadSaved()
+        let rotation = try #require(model.beginSpin(reducedMotion: false))
+        #expect(model.spinning)
+
+        model.resetItems()
+        // 回っている盤面の項目・保存データ・これから出る結果は変えない
+        #expect(model.items.map(\.label) == ["A", "B", "C", "D", "E"])
+        #expect(store.loadSaved() == saved)
+        model.rotation = rotation
+        model.finishSpin()
+        #expect(model.result != nil)
+
+        model.resetItems()
+        #expect(model.items.map(\.label) == ["A", "B", "C", "D"])
+        #expect(model.result == nil)
+        #expect(store.loadSaved() == nil)
+    }
+
     @Test func 保存先が無いときは初期状態に戻しても何もしない() {
         let model = makeModel(["A", "B"])
         model.resetItems()
