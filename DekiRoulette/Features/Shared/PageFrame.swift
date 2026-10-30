@@ -7,6 +7,9 @@ struct PageFrame<Content: View, Help: View>: View {
     /// 演出中。開いたままの説明を畳む。
     let busy: Bool
     let useCases: String
+    /// スピン中の暗転。真の間、中身が `spinSpotlightTarget()` で伝えた盤面だけを残してページを暗い幕で覆う。
+    /// 既定は無効（順番決め画面は使わない）。
+    var spotlight = false
     @ViewBuilder let help: () -> Help
     @ViewBuilder let content: () -> Content
 
@@ -14,6 +17,7 @@ struct PageFrame<Content: View, Help: View>: View {
     @State private var settingsOpen = false
     @State private var useCasesOpen = false
     @State private var noticeOpen = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 設定ボタンの円。中のアイコンが `.body` で伸縮するので、円も同じ比率で伸ばす。
     @ScaledMetric(relativeTo: .body) private var settingsButtonSize: CGFloat = 40
 
@@ -30,6 +34,16 @@ struct PageFrame<Content: View, Help: View>: View {
             .padding(.vertical, 24)
             .frame(maxWidth: Theme.Layout.pageMaxWidth)
             .frame(maxWidth: .infinity)
+            // 幕は中身と同じ座標に 1 枚だけ重ねるので、スクロールしても穴が盤面に付いていく
+            .overlayPreferenceValue(SpinSpotlightAnchorKey.self) { anchor in
+                if let anchor {
+                    GeometryReader { proxy in
+                        SpinScrim(contentSize: proxy.size, hole: SpinSpotlight.hole(in: proxy[anchor]))
+                            .opacity(SpinSpotlight.opacity(spinning: spotlight))
+                            .animation(reduceMotion ? nil : Theme.spinDimAnimation, value: spotlight)
+                    }
+                }
+            }
         }
         // visionOS にはソフトウェアキーボードが無いので付けない
         #if !os(visionOS)
