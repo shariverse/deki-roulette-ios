@@ -17,7 +17,7 @@ extension View {
 }
 
 /// ページの中身に重ねる幕。中身より四方へ広く塗り（`SpinSpotlight.scrimRect`）、盤面の位置だけ円く抜いて縁をぼかす。
-/// タッチと読み上げは取らない（スクロール・タブ切り替えはスピン中も受け、暗くした所は今の `.disabled` のまま読み上げる）。
+/// タッチと読み上げは取らない（スクロール・タブ切り替えはスピン中も受け、暗くした所の読み上げは今のまま）。
 struct SpinScrim: View {
     /// ページの中身の大きさ（幕と同じ座標の原点が中身の左上）。
     let contentSize: CGSize
@@ -25,40 +25,31 @@ struct SpinScrim: View {
     let hole: SpinSpotlight.Hole?
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            // 穴の外側（ぼかしの外端より外）を 1 回の塗りで覆う
-            Path { path in
-                path.addRect(SpinSpotlight.scrimRect(contentSize: contentSize))
-                if let hole {
-                    path.addEllipse(in: circleRect(center: hole.center, radius: hole.outerRadius))
-                }
-            }
-            .fill(Theme.spinScrim, style: FillStyle(eoFill: true))
-
-            // 穴の縁のぼかし。半径 `radius` で透明、ぼかしの外端で幕と同じ濃さになり、外の塗りと継ぎ目なくつながる
-            if let hole, hole.outerRadius > 0 {
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            stops: [
-                                .init(color: Theme.spinScrim.opacity(0), location: hole.radius / hole.outerRadius),
-                                .init(color: Theme.spinScrim, location: 1),
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: hole.outerRadius
-                        )
-                    )
-                    .frame(width: hole.outerRadius * 2, height: hole.outerRadius * 2)
-                    .position(hole.center)
-            }
-        }
-        .frame(width: contentSize.width, height: contentSize.height, alignment: .topLeading)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        let rect = SpinSpotlight.scrimRect(contentSize: contentSize)
+        // 四角 1 枚を、穴の中心からの放射状のグラデーションで塗る。半径 `radius` まで透明、ぼかしの外端で幕の濃さになり、
+        // その外は最後の色が延びるので、塗りを 2 枚に分けたときのような継ぎ目（端のアンチエイリアスが重なる細い輪）が出ない
+        Rectangle()
+            .fill(fill(in: rect))
+            .frame(width: rect.width, height: rect.height)
+            .position(x: rect.midX, y: rect.midY)
+            .frame(width: contentSize.width, height: contentSize.height, alignment: .topLeading)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
-    private func circleRect(center: CGPoint, radius: CGFloat) -> CGRect {
-        CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+    private func fill(in rect: CGRect) -> AnyShapeStyle {
+        guard let hole, hole.outerRadius > 0 else { return AnyShapeStyle(Theme.spinScrim) }
+        let center = SpinSpotlight.unitCenter(of: hole, in: rect)
+        return AnyShapeStyle(
+            RadialGradient(
+                stops: [
+                    .init(color: Theme.spinScrim.opacity(0), location: hole.radius / hole.outerRadius),
+                    .init(color: Theme.spinScrim, location: 1),
+                ],
+                center: UnitPoint(x: center.x, y: center.y),
+                startRadius: 0,
+                endRadius: hole.outerRadius
+            )
+        )
     }
 }
