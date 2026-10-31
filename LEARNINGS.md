@@ -163,6 +163,11 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - 環境に `.fontDesign(.rounded)` を置いたままだと、その下の `Font.custom(...)` の文字もシステムの丸ゴシック（日本語はヒラギノ角ゴ）で描かれ、同梱の書体が出ない（エラーも出ない）。同梱の書体を当てる View の上に `fontDesign` を置かない（2026-10-21）
 - iOS 26 の SwiftUI の `navigationTitle` の文字は、`UINavigationBar.appearance()` の `titleTextAttributes` や `UINavigationBarAppearance` を設定しても変わらない。題名を同梱の書体にするには `.principal` の `ToolbarItem` に `Text` を置く。
   一方、ツールバーの文字のボタン（`Button("閉じる")` / `EditButton`）は環境の `.font` で描かれるので、アプリの根に本文の書体を掛けると Regular になる（ボタンに太さを明示する）。タブの項目は `UITabBarAppearance` の `titleTextAttributes` が効く（2026-10-21）
+- iOS 26 の大きいタイトルを同梱の書体にするには、toolbar の `ToolbarItem(placement: .largeTitle)` / `.largeSubtitle` に `Text` を置く（中央寄せになるので `.frame(maxWidth: .infinity, alignment: .leading)`）。
+  ただし `.toolbarBackground(_:for: .navigationBar)` と `.visible` を付けると大きいタイトルの置き場所が出なくなり、色だけ付けてもスクロールの途中の位置でバー全体が白く覆われる。地は塗らず、`.scrollEdgeEffectStyle(.hard, for: .top)` で読みやすくする。
+  `.title` / `.subtitle` の置き場所の `Text` は大きいタイトルが出ている間も常に出る（置かないと縮んだ題名はシステムの書体）ので、`onScrollGeometryChange` で縮み切ったときだけ見せる。
+  大きいタイトルが縮む間は `contentInsets.top`（バーの下端）がスクロールした分だけ減り（iPhone 17 Pro で 187 → 116）、その間 `contentOffset.y + contentInsets.top` は 0 のまま。途中で離すと展開か縮み切りに戻る。
+  置き場所の `Text` の `accessibilityHidden` は Simulator の読み上げの木では効かない（2026-10-31）
 - Zen Maru Gothic には `tnum`（等幅の数字）が無く、`.monospacedDigit()` を掛けても数字の字幅は変わる。行の高さはヒラギノより大きく、同じ文字サイズでも行が少し高くなる（2026-10-21）
 - フォントのファイルが同じものかは、`git hash-object <ファイル>` の値を GitHub の contents API（`gh api repos/<owner>/<repo>/contents/<パス>`）の `sha` と比べると確かめられる（2026-10-21）
 
@@ -176,14 +181,20 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   盤面は `accessibilityHidden` なので、座標は「スピン」ボタンの frame から求める（盤面の下端はボタンの 24pt 上、compact では一辺 320pt）。
   フリックは `press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` で、スピンが始まったかはボタンの文言（「スピン中…」）で見る。
   3D は launch の引数 `-wheel3DEnabled YES` で入る（2026-10-30）
+- 一時的な UI テストのソースはスロットの外（`ralph-dd` の下の接頭辞付きのディレクトリ）に置き、`project.yml` の `sources` に絶対パスで渡すと、スロットには `project.yml` の変更しか残らない。
+  大きいタイトルを途中まで縮めるドラッグは `press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` で指を止めてから離す（止めないと慣性で流れる）。`sips --cropOffset` は効かず中央を切り抜く（2026-10-31）
 - 一時的な UI テストのスクリーンショットは `XCTAttachment(screenshot:)` を `lifetime = .keepAlways` で残し、`-resultBundlePath` の `.xcresult` から
   `xcrun xcresulttool export attachments --path <xcresult> --output-path <dir>` で取り出すと確実（ファイル名は UUID なので、`manifest.json` の `suggestedHumanReadableName` で名前を付け直す）。
   スピン中は「スピン」を押して約 1.2 秒後に撮ると回っている途中が写る（2026-10-31）
 
 ## スピン中の暗転（ページの幕）
 
-- ページの一部だけを明るく残す幕は、領域ごとに `overlay` せず、`ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で 1 枚だけ重ね、残す View の枠を `anchorPreference(.bounds)` で伝えて抜く。
+- （ナビゲーションバーが無い画面の方式。このリポジトリは今は次の項目の `NavigationStack` の外に重ねる方式）ページの一部だけを明るく残す幕は、領域ごとに `overlay` せず、`ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で 1 枚だけ重ね、残す View の枠を `anchorPreference(.bounds)` で伝えて抜く。
   中身と同じ座標なのでスクロールしても穴が付いていき、中身より四方へ大きく塗れば `ScrollView` の切り抜きで上の安全領域・中身の下の余白まで覆える（overlay はレイアウトに響かない）。
   抜くのは四角 1 枚を穴の中心からの `RadialGradient`（中心は幕の範囲に対する割合の `UnitPoint`）で塗るだけにし、巨大な幕に `mask` / `compositingGroup` を掛けない（オフスクリーンの合成が幕の大きさになるおそれ）。
   even-odd の `Path`（外）とグラデーションの円（縁）の 2 枚に分けると、同じ半径で両方の端がアンチエイリアスされて継ぎ目に細い明るい輪が出るおそれがある（グラデーションは最後の色が外へ延びるので 1 枚で済む）（2026-10-31）
+- ナビゲーションバーに題名・設定ボタンを載せた後は、`ScrollView` の中身に重ねた幕はバーに掛からない（iOS 26 はバーの下の本文は暗くなるが、題名と Liquid Glass のボタンは明るく残る）。
+  幕を `NavigationStack` の外に `overlay`（`ignoresSafeArea`）で 1 枚だけ重ね、盤面の枠は `onGeometryChange` の `.global` で測って幕の原点を引けば、スクロールしても穴が付いていき、
+  タブバー（`TabView` が上に描く）は暗くならない。
+  枠は幕だけが読む `@Observable` に書くと、スクロールのたびに描き直すのは幕だけで済む（2026-10-31）
 - iOS 26 のタブバー（浮いたガラス）は `ScrollView` の上に描かれるので、中身の幕はタブバーを暗くしない（`TabView` に手を入れずに Q6 の「タブバーは暗くしない」が満たせる）（2026-10-31）

@@ -42,19 +42,33 @@ struct SpinSpotlightTests {
         #expect(SpinSpotlight.hole(in: frame) == nil)
     }
 
-    @Test func 幕は中身より四方へ広く覆う() {
-        let size = CGSize(width: 393, height: 1400)
-        let rect = SpinSpotlight.scrimRect(contentSize: size)
-        let bleed = Config.spinScrimBleed
-        #expect(rect == CGRect(x: -bleed, y: -bleed, width: 393 + bleed * 2, height: 1400 + bleed * 2))
-        // いちばん高い iPad の画面（約 1376pt）より広くはみ出し、中身が短くても見える範囲を覆う
-        #expect(bleed > 1376)
-        #expect(rect.contains(CGRect(origin: .zero, size: size)))
+    @Test func 画面の座標の枠は幕の原点を引いて穴にする() throws {
+        // 幕は NavigationStack の外（安全領域を含む）に重ねるので、原点は画面の左上に近い。盤面はスクロールした本文の中
+        let frame = CGRect(x: 41, y: 250, width: 320, height: 320)
+        let hole = try #require(SpinSpotlight.hole(inGlobal: frame, layerOrigin: CGPoint(x: 0, y: 0)))
+        #expect(hole == SpinSpotlight.hole(in: frame))
+        // 幕の原点がずれていれば（iPad の分割表示などで窓が画面の左上に無い）その分を引く
+        let shifted = try #require(SpinSpotlight.hole(inGlobal: frame, layerOrigin: CGPoint(x: 20, y: -30)))
+        #expect(shifted.center == CGPoint(x: 181, y: 440))
+        #expect(shifted.radius == 160)
+    }
+
+    @Test func スクロールした分だけ穴が盤面に付いていく() throws {
+        let origin = CGPoint.zero
+        let top = try #require(SpinSpotlight.hole(inGlobal: CGRect(x: 41, y: 250, width: 320, height: 320), layerOrigin: origin))
+        // 本文を 200pt 上へスクロールした。盤面の上半分がナビゲーションバーの下に潜っても穴は盤面の中心に残る
+        let scrolled = try #require(SpinSpotlight.hole(inGlobal: CGRect(x: 41, y: 50, width: 320, height: 320), layerOrigin: origin))
+        #expect(scrolled.center.y == top.center.y - 200)
+        #expect(scrolled.center.x == top.center.x)
+    }
+
+    @Test func 画面の座標でも大きさの無い枠には穴を抜かない() {
+        #expect(SpinSpotlight.hole(inGlobal: CGRect(x: 10, y: 10, width: 0, height: 320), layerOrigin: .zero) == nil)
     }
 
     @Test func グラデーションの中心は幕の範囲に対する穴の中心の割合() throws {
-        let size = CGSize(width: 400, height: 1000)
-        let rect = SpinSpotlight.scrimRect(contentSize: size)
+        // 幕は原点が左上の画面の大きさ
+        let rect = CGRect(x: 0, y: 0, width: 402, height: 874)
         let hole = try #require(SpinSpotlight.hole(in: CGRect(x: 40, y: 150, width: 320, height: 320)))
         let unit = SpinSpotlight.unitCenter(of: hole, in: rect)
         // 割合を幕の範囲に戻すと穴の中心になる

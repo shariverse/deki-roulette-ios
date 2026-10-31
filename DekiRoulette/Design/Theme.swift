@@ -156,6 +156,49 @@ enum Theme {
         /// iOS 26 のツールバーのボタンは環境の書体で描かれるので、付けないとアプリの既定（本文の Regular）になる。
         static var barButton: Font { font(.body, weight: .semibold) }
 
+        /// 両画面（`PageFrame`）の大きいタイトル。ヘッダにあった題名と同じ largeTitle の Black で、字間を `pageTitleTracking` だけ詰める。
+        static var pageLargeTitle: Font { font(.largeTitle, weight: .black) }
+        /// 両画面の大きいタイトルの字間。
+        static let pageTitleTracking: CGFloat = -1
+        /// 両画面の縮んだあとの題名。シートの題名（`appNavigationTitle(_:)`）と同じ headline の既定の太さ。
+        static var pageInlineTitle: Font { font(.headline) }
+        /// 両画面のタグライン（大きいタイトルの下・本文の先頭）。
+        static var pageTagline: Font { font(.subheadline) }
+        /// 縮んだあとのバーのタグライン（iOS 26 以上の `.subtitle`）。システムのサブタイトルと同じ大きさにする。
+        static var pageInlineTagline: Font { font(.caption) }
+
+        /// iOS 17〜18 のナビゲーションバー（`UINavigationBarAppearance`）の大きいタイトルの文字の属性。
+        /// iOS 26 の SwiftUI の題名には効かないので、iOS 26 以上は `PageFrame` が toolbar の置き場所に同梱の書体の `Text` を置く。
+        static func navigationLargeTitleAttributes(
+            compatibleWith traits: UITraitCollection? = nil
+        ) -> [NSAttributedString.Key: Any] {
+            [
+                .font: scaledUIFont(.largeTitle, weight: .black, compatibleWith: traits),
+                .kern: pageTitleTracking,
+                .foregroundColor: UIColor(Theme.ivory),
+            ]
+        }
+
+        /// iOS 17〜18 のナビゲーションバーの縮んだあとの題名の文字の属性（headline の既定の太さ）。
+        static func navigationInlineTitleAttributes(
+            compatibleWith traits: UITraitCollection? = nil
+        ) -> [NSAttributedString.Key: Any] {
+            [
+                .font: scaledUIFont(.headline, weight: AppFont.defaultWeight(for: .headline), compatibleWith: traits),
+                .foregroundColor: UIColor(Theme.ivory),
+            ]
+        }
+
+        /// UIKit で描くテキストスタイルの文字。既定の大きさから Dynamic Type の割合で拡大する（`traits` を省くと今の設定）。
+        static func scaledUIFont(
+            _ style: Font.TextStyle,
+            weight: Font.Weight,
+            compatibleWith traits: UITraitCollection? = nil
+        ) -> UIFont {
+            UIFontMetrics(forTextStyle: uiTextStyle(style))
+                .scaledFont(for: uiFont(size: defaultSize(for: style), weight: weight), compatibleWith: traits)
+        }
+
         /// `List` のセクションの見出し。アプリの根の本文の書体を引き継がないよう、システムの見出しと同じ大きさ・太さを明示する
         /// （iOS 26 は本文の semibold、iOS 17・18 は footnote。`UIListContentConfiguration.groupedHeader()` の値）。
         static var listSectionHeader: Font {

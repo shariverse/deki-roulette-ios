@@ -64,8 +64,15 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
   2〜5 件の盤面のラベルは 11.5pt（§5.1 の表の 13 から下げた。`WheelLabel.baseFontSize`）。いちばん広い文字で上限の文字数のラベル（絵文字付き・左右どちらの向きも）がハブと縁の外周の間・帯・共有画像の欄に収まることは
   `FixedTextFitTests` が実際の字幅で確かめる。
   シートの題名は `appNavigationTitle(_:)`（`navigationTitle` と、同じ題名を `.principal` の `Text` で出す。`UINavigationBar` の外観の API は SwiftUI の題名に効かない）、
+  両画面の題名（`PageFrame`）はナビゲーションバーの大きいタイトルで、iOS 26 以上は toolbar の `.largeTitle`（`Theme.Typography.pageLargeTitle`・字間 `pageTitleTracking`）・`.title`（`pageInlineTitle`）・
+  `.largeSubtitle` / `.subtitle`（タグライン）の置き場所に `Text` を置く。`.title` / `.subtitle` の `Text` は大きいタイトルが出ている間も消えないので、
+  縮み切ったときだけ見せる（`LargeTitleCollapse`。`Core/`。スクロールの幾何だけで決める）。iOS 17〜18 は置き場所が無いので `RootView.init` の `UINavigationBarAppearance` に
+  `navigationLargeTitleAttributes()` / `navigationInlineTitleAttributes()` を当てる（iOS 26 以上では当てない）。visionOS はシステムの `navigationTitle` のまま。
   ツールバーの文字のボタンは `.font(Theme.Typography.barButton)`（付けないと環境の本文の Regular で描かれる）、タブの項目は `RootView.init` の `UITabBarAppearance` の文字の属性で当てる。
   Zen Maru Gothic には `tnum` が無いので `.monospacedDigit()` は効かない。
+- 両画面の枠（`PageFrame`。`Features/Shared/`）は `NavigationStack` の根に `ScrollView`（本文 → フッター）を置き、題名・タグライン・設定ボタン（`.topBarTrailing` の標準のツールバーのボタン）をバーに載せて、スクロールしても上部に残す。
+  タグラインは iOS 26 以上はバーのサブタイトル、iOS 17〜18 と visionOS は本文の先頭（出し分けは `PageFrame.taglineInBar`）。バーの地は塗らず
+  （`toolbarBackground` を付けると iOS 26 で大きいタイトルの置き場所が消える）、iOS 26 はスクロールの縁の効果を `.hard` にする。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
   絵文字の項目は `WheelLabel.display` が絵文字ぶん 1 文字短く省略して前に絵文字を付け、結果の帯（2D・3D・共有画像）は `WheelLabel.decorated` の全文を出す（読み上げと共有の本文はラベルのまま）。
@@ -186,16 +193,18 @@ ON なら止まり際の焦らし（下記）を足した区間の列になる�
 
 抽選したスピンの間（`model.spinning`。`reducedMotion` のスピンも含む）は、盤面だけを明るく残してページ全体を暗い幕（`Theme.spinScrim`。外観に依らない 1 値）で覆う（SPEC §5.2）。
 幕は領域ごとに重ねず、ページ全体に 1 枚だけ重ねて盤面の位置だけを円く抜く（領域ごとだと、ライトで領域の間の余白が明るく残るか、地と二重に暗くなって四角が浮く）。
-`RouletteScreen` が盤面（2D・3D の `wheel`）に `spinSpotlightTarget()`（`anchorPreference(.bounds)`。`SpinSpotlightAnchorKey`）を付け、`PageFrame` の `spotlight`（既定は false。順番決め画面は使わない）に `model.spinning` を渡す。
-`PageFrame` は `ScrollView` の中身（`VStack`）に `overlayPreferenceValue` で `SpinScrim` を重ねる（中身と同じ座標なので、スクロールしても穴が盤面に付いていく）。盤面を伝えていなければ幕は出さない。
-幕は中身より四方へ `Config.spinScrimBleed`（2000pt）広く塗り（`SpinSpotlight.scrimRect`）、見える範囲は `ScrollView` が切り抜く。穴（`SpinSpotlight.hole(in:)`）は枠の中央を中心に
+`RouletteScreen` が盤面（2D・3D の `wheel`）に `spinSpotlightTarget()`（`onGeometryChange` の `.global` の枠を environment の `SpinSpotlightTracker` に書く。`Features/Shared/SpinScrim.swift`）を付け、
+`PageFrame` の `spotlight`（既定は false。順番決め画面は使わない）に `model.spinning` を渡す。`PageFrame` は `SpinSpotlightTracker` を `@State` で 1 つ持って中身に流し、
+`NavigationStack` の外に `overlay` で `SpinScrimLayer`（`ignoresSafeArea`）を 1 枚だけ重ねる。ナビゲーションバー（題名・タグライン・Liquid Glass の設定ボタン）と上の安全領域も同じ 1 枚で覆い、
+`TabView` のタブバーはその上に描かれるので暗くならない。盤面を伝えていなければ幕は出さない。枠を読むのは幕だけなので、スクロールで枠が変わっても描き直すのは幕だけ。
+穴は `SpinSpotlight.hole(inGlobal:layerOrigin:)`（画面の座標の枠から幕の原点を引く。スクロールしても盤面に付いていく）→ `hole(in:)` で、枠の中央を中心に
 `min(幅, 高さ)` を直径とする内接円（`WheelFaceView`・`WheelDragArea` と同じ取り方）で、外へ `Config.spinSpotlightFeatherRatio` × 直径だけぼかす（幕の塗りは下の段落。
 オフスクリーンの合成を作らないよう `mask` / `compositingGroup` は使わない）。3D の傾いた盤が枠の外へはみ出す分（`overscan`）は穴に含めない。
 不透明度は `SpinSpotlight.opacity(spinning:)` で、`.animation(Theme.spinDimAnimation, value: spotlight)` を幕にだけ掛ける（`reduceMotion` では nil）。`withAnimation` で `spinning` を包まない
 （スピン開始の更新に別のトランザクションを重ねると、回転の補間・回転音・触覚の時刻に響くおそれがある）。幕は `allowsHitTesting(false)`・`accessibilityHidden(true)` で、
 スクロール・タブの切り替え・盤面の当たり判定は変えない。タブバーは暗くしない。幕の View と `SpinSpotlight` は指定・印を受け取らない。
 幕は四角 1 枚を穴の中心からの放射状のグラデーション（`SpinSpotlight.unitCenter(of:in:)` で中心を割合にする）で塗り、外は最後の色が延びる（塗りを 2 枚に分けると継ぎ目に細い輪が出る）。
-同じ間（`model.spinning`）は `PageFrame` の `locksControls` でヘッダの設定ボタンと 3 つの `FooterDisclosure` を `.disabled` にする（`busy` は順番決めでも立つので流用しない。順番決めは渡さない）。
+同じ間（`model.spinning`）は `PageFrame` の `locksControls` でバーの設定ボタンと 3 つの `FooterDisclosure` を `.disabled` にする（`busy` は順番決めでも立つので流用しない。順番決めは渡さない）。
 `RouletteModel.resetItems` はスピン中は何もせず、設定シートのルーレットの「戻す」ボタンもスピン中は無効（`opacity` で薄く）にする（スピン中にタブを切り替え、順番決め画面の設定シートから戻せる経路のため）。
 
 ### 触覚の仕組み
