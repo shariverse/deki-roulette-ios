@@ -72,7 +72,7 @@ visionOS 向けの分岐は `#if os(visionOS)` で書く。前提は 4 つ: `UIS
   Zen Maru Gothic には `tnum` が無いので `.monospacedDigit()` は効かない。
 - 両画面の枠（`PageFrame`。`Features/Shared/`）は `NavigationStack` の根に `ScrollView`（本文 → フッター）を置き、題名・タグライン・設定ボタン（`.topBarTrailing` の標準のツールバーのボタン）をバーに載せて、スクロールしても上部に残す。
   タグラインは iOS 26 以上はバーのサブタイトル、iOS 17〜18 と visionOS は本文の先頭（出し分けは `PageFrame.taglineInBar`）。バーの地は塗らず
-  （`toolbarBackground` を付けると iOS 26 で大きいタイトルの置き場所が消える）、iOS 26 はスクロールの縁の効果を `.hard` にする。
+  （`toolbarBackground` を付けると iOS 26 で大きいタイトルの置き場所が消える）、iOS 26 はスクロールの縁の効果を `.hard` にし、大きいタイトルが出ている間（先頭・縮む途中）は `scrollEdgeEffectHidden` で隠して、縮み切ったら（`LargeTitleCollapse` が小さい題名を見せたら）出す（先頭でバーの帯と境目の線を見せない）。
 - レイアウトの寸法（盤面の上限、横並びの列幅、ページ幅）は `Theme.Layout` に置く。`horizontalSizeClass == .regular`
   で横並びになり、盤面は 480pt まで広がる。盤面ラベルの省略と文字サイズは `WheelLabel`（`Core/`）が直径から決める。
   絵文字の項目は `WheelLabel.display` が絵文字ぶん 1 文字短く省略して前に絵文字を付け、結果の帯（2D・3D・共有画像）は `WheelLabel.decorated` の全文を出す（読み上げと共有の本文はラベルのまま）。
