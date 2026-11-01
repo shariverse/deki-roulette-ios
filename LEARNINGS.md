@@ -165,6 +165,8 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
   一方、ツールバーの文字のボタン（`Button("閉じる")` / `EditButton`）は環境の `.font` で描かれるので、アプリの根に本文の書体を掛けると Regular になる（ボタンに太さを明示する）。タブの項目は `UITabBarAppearance` の `titleTextAttributes` が効く（2026-10-21）
 - iOS 26 の大きいタイトルを同梱の書体にするには、toolbar の `ToolbarItem(placement: .largeTitle)` / `.largeSubtitle` に `Text` を置く（中央寄せになるので `.frame(maxWidth: .infinity, alignment: .leading)`）。
   ただし `.toolbarBackground(_:for: .navigationBar)` と `.visible` を付けると大きいタイトルの置き場所が出なくなり、色だけ付けてもスクロールの途中の位置でバー全体が白く覆われる。地は塗らず、`.scrollEdgeEffectStyle(.hard, for: .top)` で読みやすくする。
+  ただし `.hard` の縁の効果は先頭の位置（スクロールしていない）でも出て、ステータスバーから歯車の行までが一段明るい帯になり、その下端の境目の線に大きいタイトルの上端が接して見える（iOS 26.5・27.0 の Simulator で再現）。
+  大きいタイトルが出ている間は `.scrollEdgeEffectHidden(true, for: .top)` で隠し、縮み切ったときだけ出す（`withAnimation` で書く状態に結べば、小さい題名と同じ時刻に出入りする）
   `.title` / `.subtitle` の置き場所の `Text` は大きいタイトルが出ている間も常に出る（置かないと縮んだ題名はシステムの書体）ので、`onScrollGeometryChange` で縮み切ったときだけ見せる。
   大きいタイトルが縮む間は `contentInsets.top`（バーの下端）がスクロールした分だけ減り（iPhone 17 Pro で 187 → 116）、その間 `contentOffset.y + contentInsets.top` は 0 のまま。途中で離すと展開か縮み切りに戻る。
   置き場所の `Text` の `accessibilityHidden` は Simulator の読み上げの木では効かない（2026-10-31）
@@ -186,6 +188,9 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - 一時的な UI テストのスクリーンショットは `XCTAttachment(screenshot:)` を `lifetime = .keepAlways` で残し、`-resultBundlePath` の `.xcresult` から
   `xcrun xcresulttool export attachments --path <xcresult> --output-path <dir>` で取り出すと確実（ファイル名は UUID なので、`manifest.json` の `suggestedHumanReadableName` で名前を付け直す）。
   スピン中は「スピン」を押して約 1.2 秒後に撮ると回っている途中が写る（2026-10-31）
+- 指を止めている間の画面（大きいタイトルが縮む途中など）は、XCTest の添付では撮れない（`press(forDuration:thenDragTo:withVelocity:thenHoldForDuration:)` は離すまで返らず、離すと展開か縮み切りに戻る）。
+  テストが hold の直前にホストの絶対パスへ合図のファイルを書き（Simulator のテストのプロセスからホストのファイルに書ける）、ホストのシェルが合図を見て数秒待ってから
+  `xcrun simctl io <SIM> screenshot` で撮る。iOS 26.5・27.0 とも、指を止めている間は大きいタイトルが縮まずに本文ごとバーの下へ潜り、`LargeTitleCollapse` は小さい題名を見せる側に倒れる（2026-11-02）
 
 ## スピン中の暗転（ページの幕）
 
