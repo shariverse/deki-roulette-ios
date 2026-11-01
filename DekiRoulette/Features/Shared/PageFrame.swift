@@ -179,6 +179,7 @@ struct HelpHeading: View {
 /// iOS 26 の SwiftUI の `navigationTitle` の文字は UIKit の外観の API でも同梱の書体にならないので、同じ題名を toolbar の置き場所の `Text` で出す。
 /// `navigationTitle` は読み上げの画面名と、置き場所の無い iOS 17〜18（`RootView.init` の外観で寄せる）・visionOS（システムの書体）に使う。
 /// 縮んだ題名（`.title` / `.subtitle`）の置き場所は大きいタイトルが出ている間も消えないので、縮み切ったときだけ見せる（`LargeTitleCollapse`）。
+/// スクロールの縁の効果（バーの帯と境目の線）も同じ判定で、縮み切ったときだけ出す。
 private struct PageTitleBar: ViewModifier {
     let title: String
     let tagline: String
@@ -245,6 +246,10 @@ private struct PageTitleBar: ViewModifier {
                 // バーの地は塗らず（`toolbarBackground` を付けると大きいタイトルの置き場所が消える・途中の位置でバーが白く覆われる）、
                 // 縁の効果をはっきりした方にして、縮んだ題名の下を流れる本文と文字を分ける
                 .scrollEdgeEffectStyle(.hard, for: .top)
+                // 大きいタイトルが出ている間（先頭・縮む途中）は縁の効果を出さない。出すと先頭でもバーの帯と境目の線が見え、
+                // 大きいタイトルの上端が線に接して見える（Discussion #421）。縮み切って小さい題名を出したらバーとして見せる。
+                // 切り替えは `inlineShown` を書く `withAnimation` に乗るので、小さい題名と同じ時刻に出入りする
+                .scrollEdgeEffectHidden(!inlineShown, for: .top)
                 // 文字の大きさが変わると展開時のバーの高さが変わるので測り直す
                 .onChange(of: typeSize) { collapse.reset() }
         } else {
