@@ -440,11 +440,13 @@ OFF・閾値未満では `.none` を渡し、ノードは作らない（初め�
 `Theme` のトークンにしたり塗り替えたりしない。素材は X のブランドツールキット（`x-logo.zip` の `logo-black.png` / `logo-white.png`）と LINE の LINE APP ICON GUIDELINE（`LINE_Brand_icon.zip` の
 `LINE_Brand_icon.png`）から取得し、比率・色を変えずに @2x・@3x の大きさに縮めただけ。大きさは `Theme.Layout.shareLogoXSize` / `shareLogoLINESize`。
 ロゴの画像は読み上げから外し、ボタンの名前は `L10n.shareToX`（「X でポスト」）・`shareToLINE`（「LINE で送る」）。1 語だけの名前は使わない（`ShareLogoButtonTests`）。
-`shareImage` があれば `ShareLink(item: ShareImageFile, message: 本文, preview:)` で
-結果の画像（PNG）を本体にし本文（`ResultText.share`）を添えて共有シートに渡す。無ければ今までどおり本文だけ。
+`shareImage` があれば `ShareLink(items:preview:)` で結果の画像（PNG。`ShareImageFile`）と本文（`ResultText.share`）を別々の項目（`ShareItem`、`Core/`。
+`ShareItem.items(image:text:)` が画像・本文の順に並べ、`ResultActions.swift` の `Transferable` の適合で画像は PNG・本文はプレーンテキストだけを書き出す）として共有シートに渡す。
+本文は `message` にしない（添えるだけだと「メモ」など添えた本文を読まない共有先に画像しか届かず、両方に渡すとメッセージなどで本文が二重になる）。App Store の URL も本文の中だけで、別の項目にしない。
+X・LINE・メモ・メッセージには画像と本文、Instagram のフィード・「画像を保存」には画像だけが届く（届かない本文は補わない）。無ければ今までどおり本文だけ。
 本文は結果の文（ルーレットは `ResultText.roulette(label:template:)` に `L10n.shareRouletteResult`、順番決めは `ResultText.order(_:heading:)`）・空行・ハッシュタグ（`L10n.shareHashtag`。アプリ名の行の代わり）で、
 ハッシュタグの次の行に `Config.appStoreURL`（App Store の製品ページ。国を含まない `https://apps.apple.com/app/id6814132611` で、利用者の国の Store が開く。App ID は人間が示した値で、推測した URL は入れない）を付ける。本文に絵文字は入れない。
-プレビューの題名は `L10n.appName`、画像は結果画像そのもの。「結果をコピー」のボタンは持たない（本文は共有シートの「コピー」で写せる）。Instagram の専用ボタンは置かない。
+プレビューの題名は `L10n.appName`、画像は結果画像そのもの。「結果をコピー」のボタンは持たない（共有シートの「コピー」で写す）。Instagram の専用ボタンは置かない。
 X・LINE のボタンは、確認を挟まずに本文だけを投稿画面の URL（`ShareIntent`、`Core/`。非予約文字以外を自前で UTF-8 の百分率符号化する）で
 `@Environment(\.openURL)` に渡して開くだけ（API による投稿はしない。画像は付かない）。X は `ShareIntent.xPostCandidates` の順に、X アプリの投稿画面
 （`xAppPost` = `twitter://post?message=`。X が文書化した仕組みではない）→ Web の投稿画面（`xPost` = `x.com/intent/post`）を開き、
