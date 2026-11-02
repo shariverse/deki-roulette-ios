@@ -3,8 +3,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// 結果の下に置く幅広の「結果を共有」と、その右の X・LINE のロゴのボタン。両画面で同じ見た目・同じ高さ（`Theme.Layout.resultActionsHeight`）にする。
-/// 「結果を共有」は押すと直接共有シートを開く。`shareImage` があれば本文と一緒に結果の画像（`ShareImageFile`）を渡し、無ければ本文だけを渡す。
-/// 本文だけを写したいときは共有シートの「コピー」を使う（専用のコピーボタンは置かない）。
+/// 「結果を共有」は押すと直接共有シートを開く。`shareImage` があれば結果の画像（`ShareImageFile`）と本文を別々の項目（`ShareItem`）として渡し、
+/// 無ければ本文だけを渡す。本文を画像に添える（`message`）だけだと「メモ」など添えた本文を読まない共有先に画像しか届かないため。
+/// 受け取れる共有先（X・LINE・メモ・メッセージなど）には画像と本文、本文を受け取らない共有先（Instagram のフィード・「画像を保存」）には画像だけが届く。
+/// 専用のコピーボタンは置かない（本文は共有シートの「コピー」で写す。画像があるときに「コピー」で何が写るかは実機で確かめる）。
 /// X は本文だけを X アプリの投稿画面（URL スキーム）で開き、開けなければ Web の投稿画面で開く（`ShareIntent.xPostCandidates`）。
 /// LINE は本文だけを Web の URL（`ShareIntent.lineShare`）で開く。どちらも画像は付かず、確認は挟まない。投稿は利用者が各アプリで確定する。
 /// X・LINE は各社の公式のロゴを元の色のまま枠の中に置く（「X」1 文字の文字のボタンは閉じるボタンと間違えて押されたため）。
@@ -13,7 +15,7 @@ struct ResultActions: View {
     let shareText: String
     /// X に渡す本文。X の上限に収めたもの（順番決めは `ResultText.orderPost`）。nil なら `shareText` を渡す。
     var postText: String? = nil
-    /// 共有シートに本文と一緒に渡す結果の画像。nil なら本文だけを共有する。
+    /// 共有シートに本文とは別の項目として渡す結果の画像。nil なら本文だけを共有する。
     var shareImage: UIImage? = nil
     /// 「結果を共有」ボタンのアクセシビリティ ID。App Store 用スクリーンショットの UI テストが、
     /// 結果が出た（＝このボタンが出た）のを待つのに使う。
@@ -64,11 +66,11 @@ struct ResultActions: View {
     @ViewBuilder
     private var shareButton: some View {
         if let shareImage {
-            // 画像を本体（X・Instagram・LINE は画像として受け取る）、本文は添える。プレビューの題名はアプリ名
+            // 画像と本文を別々の項目にする（本文は `message` にしない。両方に渡すとメッセージなどで本文が二重になる）。
+            // プレビューの題名はアプリ名、画像は結果の画像
             ShareLink(
-                item: ShareImageFile(image: shareImage),
-                message: Text(shareText),
-                preview: SharePreview(L10n.appName, image: Image(uiImage: shareImage))
+                items: ShareItem.items(image: ShareImageFile(image: shareImage), text: shareText),
+                preview: { _ in SharePreview(L10n.appName, image: Image(uiImage: shareImage)) }
             ) {
                 ResultActionLabel(title: L10n.shareResult)
             }
@@ -103,6 +105,28 @@ struct ShareImageFile: Transferable, Sendable {
         DataRepresentation(exportedContentType: .png) { file in
             guard let data = file.image.pngData() else { throw ShareImageError.encodingFailed }
             return data
+        }
+    }
+}
+
+/// 共有シートに渡す項目（画像か本文）。画像は `ShareImageFile` と同じ PNG、本文は文字列（プレーンテキスト）として書き出す。
+/// 項目ごとに書き出す形を 1 つだけにする（画像の項目から本文を、本文の項目から画像を出さない）。
+extension ShareItem: Transferable where Image == ShareImageFile {
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .png) { item in
+            guard case .image(let file) = item, let data = file.image.pngData() else {
+                throw ShareImageError.encodingFailed
+            }
+            return data
+        }
+        .exportingCondition { item in
+            if case .image = item { true } else { false }
+        }
+        ProxyRepresentation { item in
+            if case .text(let text) = item { text } else { "" }
+        }
+        .exportingCondition { item in
+            if case .text = item { true } else { false }
         }
     }
 }
