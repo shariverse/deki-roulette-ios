@@ -147,6 +147,8 @@ PC 固有の値（ローカルパス・Simulator の UDID・ユーザー名）�
 - `.github/workflows/build.yml` の PR 側のジョブは、同じリポジトリのブランチでは `if` で常にスキップされ、push 側だけで走る。push 側は `paths-ignore` で
   `**/*.md` と `docs/**` だけの変更では走らないので、最後のコミットがドキュメントだけだと `gh pr checks` にはスキップしか出ない。
   その前のコードのコミットの push の Build の結果を見る（2026-10-18）
+- 上の `paths-ignore` は外した。Build のチェックの名前は `build / build`（再利用ワークフロー `_build.yml`）で、同じリポジトリの PR の回は `if` で飛ばした `build`（skipped）として別の名前で出る。
+  ジョブの `if` で飛ばしたジョブは `name:` の式が評価されず、式の文字列（`github.ref_name` など）がそのままチェックの名前になる（2026-11-10）
 
 ## 文言・設定画面
 

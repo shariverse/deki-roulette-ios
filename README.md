@@ -25,7 +25,7 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 | Upload | `develop` と `release/**` への push、手動実行 | Archive に加えて iOS と visionOS を TestFlight へアップロードし、IPA を Artifacts に残す |
 | App Store Metadata | 手動実行 | 掲載文（`docs/app-store/`）とスクリーンショットを App Store Connect のバージョンに登録（iOS と visionOS） |
 
-ドキュメントだけの変更（`**/*.md`、`docs/**`）では Build を実行しない（Upload / Archive は実行する）。
+Build はドキュメントだけの変更でも実行する。チェックの名前は `build / build`（手順は再利用ワークフロー `_build.yml`）で、ブランチの保護（ルールセット `askhub-protect`）で必須にしている。
 
 作業ブランチで走るのは Build だけ。TestFlight へのアップロードには App Store Connect 側の 24 時間あたりの
 上限（`Upload limit reached (90382)`）があり、作業ブランチまで上げていると枠を使い切るため。

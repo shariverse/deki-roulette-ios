@@ -1,0 +1,49 @@
+name: Build (reusable)
+
+# Build から呼ぶビルドとテストの手順。呼ぶ側のジョブ（build）とこのジョブ（build）で、チェックの名前は build / build になる
+on:
+  workflow_call:
+
+jobs:
+  build:
+    name: build
+    runs-on: macos-latest
+
+    steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.6'
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # .xcodeproj はコミットしていないので project.yml から生成する
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build and test (iOS)
+        run: |
+          # 最新の iOS ランタイムに存在する iPhone シミュレータを UDID で選ぶ
+          # （名前だけの指定は OS:latest を暗黙に要求し、古いランタイムにしかないデバイスだと解決できない）
+          device=$(xcrun simctl list devices available -j | jq -r '.devices | to_entries | map(select(.key | contains("SimRuntime.iOS"))) | sort_by(.key | capture("iOS-(?<maj>[0-9]+)-(?<min>[0-9]+)") | [(.maj|tonumber),(.min|tonumber)]) | reverse | map(.value[] | select(.name | startswith("iPhone"))) | .[0].udid')
+          echo "Using simulator: $device"
+          xcodebuild test \
+            -project DekiRoulette.xcodeproj \
+            -scheme DekiRoulette \
+            -destination "platform=iOS Simulator,id=$device" \
+            CODE_SIGNING_ALLOWED=NO
+
+      # 同じテストを visionOS でも回す（Supported Destinations が iOS / visionOS のマルチプラットフォームターゲット）
+      - name: Build and test (visionOS)
+        run: |
+          # 最新の visionOS ランタイムに存在する Apple Vision Pro シミュレータを UDID で選ぶ（iOS と同じ理由）
+          device=$(xcrun simctl list devices available -j | jq -r '.devices | to_entries | map(select(.key | contains("SimRuntime.xrOS"))) | sort_by(.key | capture("xrOS-(?<maj>[0-9]+)-(?<min>[0-9]+)") | [(.maj|tonumber),(.min|tonumber)]) | reverse | map(.value[] | select(.name | startswith("Apple Vision Pro"))) | .[0].udid')
+          echo "Using simulator: $device"
+          xcodebuild test \
+            -project DekiRoulette.xcodeproj \
+            -scheme DekiRoulette \
+            -destination "platform=visionOS Simulator,id=$device" \
+            CODE_SIGNING_ALLOWED=NO
