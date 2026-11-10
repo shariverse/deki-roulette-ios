@@ -106,6 +106,12 @@ enum L10n {
     static var trademarkNotice: String { tr("trademarkNotice") }
     static var licensesTitle: String { tr("licensesTitle") }
     static var licensesDescription: String { tr("licensesDescription") }
+    /// 設定シートの末尾のバージョンの行（「1.1.0 (24)」）。`%1$@` にバージョン、`%2$@` にビルドが入る（`AppVersion.display(template:)`）。
+    static var appVersionFormat: String { tr("appVersionFormat") }
+    /// バージョンの行の読み上げ（「バージョン 1.1.0、ビルド 24」）。片方しか無いときは `appVersionOnly…` / `appBuildOnly…` を使う。
+    static var appVersionAccessibilityFormat: String { tr("appVersionAccessibilityFormat") }
+    static var appVersionOnlyAccessibilityFormat: String { tr("appVersionOnlyAccessibilityFormat") }
+    static var appBuildOnlyAccessibilityFormat: String { tr("appBuildOnlyAccessibilityFormat") }
     static func addItemsButton(_ count: Int) -> String { plural("addItemsButton", count) }
     static var duplicateAddTitle: String { tr("duplicateAddTitle") }
     static var duplicateAddMessage: String { tr("duplicateAddMessage") }

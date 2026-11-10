@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// ヘッダ右上のアイコンから開く設定。触覚フィードバックと効果音の切替、ルーレットの詳細設定（光彩の色・3D 表示）、
-/// 外観（自動・ライト・ダーク。visionOS には出さない）とアプリアイコンの選択、項目の初期化、著作権・ライセンスの項目を置く。
+/// 外観（自動・ライト・ダーク。visionOS には出さない）とアプリアイコンの選択、項目の初期化、著作権・ライセンスの項目と、
+/// 末尾にバージョンとビルド番号の行を置く。
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Config.hapticsEnabledKey) private var hapticsEnabled = true
@@ -20,6 +21,9 @@ struct SettingsView: View {
     }
 
     @State private var resetTarget: ResetTarget?
+
+    /// 末尾の行に出すバージョンとビルド番号。Info.plist の値をそのまま読む（どちらも無ければ行を出さない）。
+    private let appVersion = AppVersion(infoDictionary: Bundle.main.infoDictionary)
 
     var body: some View {
         NavigationStack {
@@ -76,6 +80,17 @@ struct SettingsView: View {
                     }
                     SettingsLinkRow(title: L10n.licensesTitle) {
                         LicensesView()
+                    }
+                    // 見出しを付けずに 1 行だけ添える。表示だけで、操作は付けない
+                    if let appVersion {
+                        Text(appVersion.display(template: L10n.appVersionFormat))
+                            .font(Theme.Typography.font(.caption))
+                            .foregroundStyle(Theme.muted)
+                            .accessibilityLabel(appVersion.accessibilityLabel(
+                                both: L10n.appVersionAccessibilityFormat,
+                                versionOnly: L10n.appVersionOnlyAccessibilityFormat,
+                                buildOnly: L10n.appBuildOnlyAccessibilityFormat
+                            ))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
