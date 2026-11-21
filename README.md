@@ -9,10 +9,10 @@ Web 版のコードは b7b3936 以前の履歴にある。
 
 ## Status
 
-| branch \ workflow | Build | Archive | Upload |
-|---|---|---|---|
-| main | [![Build](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml?query=branch%3Amain) | [![Archive](https://github.com/shariverse/deki-roulette-ios/actions/workflows/archive.yml/badge.svg?branch=main)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/archive.yml?query=branch%3Amain) | — |
-| develop | [![Build](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml/badge.svg?branch=develop)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml?query=branch%3Adevelop) | — | [![Upload](https://github.com/shariverse/deki-roulette-ios/actions/workflows/upload.yml/badge.svg?branch=develop)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/upload.yml?query=branch%3Adevelop) |
+| branch \ workflow | Build | Upload |
+|---|---|---|
+| main | [![Build](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml?query=branch%3Amain) | — |
+| develop | [![Build](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml/badge.svg?branch=develop)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/build.yml?query=branch%3Adevelop) | [![Upload](https://github.com/shariverse/deki-roulette-ios/actions/workflows/upload.yml/badge.svg?branch=develop)](https://github.com/shariverse/deki-roulette-ios/actions/workflows/upload.yml?query=branch%3Adevelop) |
 
 ## CI
 
@@ -21,7 +21,7 @@ GitHub Actions（`.github/workflows/`）。どのワークフローも最初に 
 | ワークフロー | トリガー | 内容 |
 |---|---|---|
 | Build | 全ブランチへの push と Fork からの PR | iOS と visionOS のシミュレータでビルドしてユニットテストを実行 |
-| Archive | `main` への push、手動実行 | iOS と visionOS を Release 構成でアーカイブし、App Store Connect API キーで署名して IPA を書き出す |
+| Archive | 手動実行のみ（`main` への push では動かさない） | iOS と visionOS を Release 構成でアーカイブし、App Store Connect API キーで署名して IPA を書き出す |
 | Upload | `develop` と `release/**` への push、手動実行 | Archive に加えて iOS と visionOS を TestFlight へアップロードし、IPA を Artifacts に残す |
 | App Store Metadata | 手動実行 | 掲載文（`docs/app-store/`）とスクリーンショットを App Store Connect のバージョンに登録（iOS と visionOS） |
 
