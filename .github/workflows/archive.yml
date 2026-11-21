@@ -1,11 +1,8 @@
 name: Archive
 
-# main は TestFlight へ上げないので、署名と IPA の書き出しが通ることだけをここで確かめる（iOS と visionOS の両方）。
-# それ以外のブランチは Build（ビルド + テスト）と、develop / release なら Upload が受け持つ。
+# 手動実行（workflow_dispatch）だけで動く。TestFlight へ上げずに、署名と IPA の書き出しが通ることだけを確かめる（iOS と visionOS の両方）。
+# main への push では動かさない（Build だけが動く）。develop / release なら Upload が Archive を含む。
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
